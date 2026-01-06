@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { getBaseUrl } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -15,14 +16,14 @@ export const metadata: Metadata = {
   authors: [{ name: "IBEX Arena" }],
   creator: "IBEX Arena",
   publisher: "IBEX Arena",
-  metadataBase: new URL(process.env.APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'),
+  metadataBase: new URL(getBaseUrl()),
   openGraph: {
     title: "IBEX Arena - Premium Sports Court Booking",
     description: "Book premium sports courts at IBEX Arena. Experience world-class facilities with dynamic pricing.",
     type: "website",
     locale: "en_US",
     siteName: "IBEX Arena",
-    url: process.env.APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000',
+    url: getBaseUrl(),
   },
   twitter: {
     card: "summary_large_image",
@@ -41,7 +42,7 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: process.env.APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000',
+    canonical: getBaseUrl(),
   },
 };
 
