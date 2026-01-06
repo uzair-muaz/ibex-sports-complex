@@ -1,65 +1,80 @@
-import Image from "next/image";
+import { Metadata } from 'next';
+import { Navbar } from '@/components/Navbar';
+import { Footer } from '@/components/Footer';
+import { HeroSection } from '@/components/sections/HeroSection';
+import { MarqueeSection } from '@/components/sections/MarqueeSection';
+import { FacilitiesSection } from '@/components/sections/FacilitiesSection';
+import { AmenitiesSection } from '@/components/sections/AmenitiesSection';
+import { GetInTouchSection } from '@/components/sections/GetInTouchSection';
+import { InfiniteGallery } from '@/components/ui/InfiniteScroll';
+import { ParallaxSection } from '@/components/ui/ParallaxSection';
+import { TextReveal } from '@/components/ui/TextReveal';
+import { GALLERY_IMAGES } from '@/types';
+import { getCourts } from './actions/courts';
 
-export default function Home() {
+export const metadata: Metadata = {
+  title: 'IBEX Arena - Premium Sports Court Booking',
+  description: 'Book premium Padel, Cricket, and Pickleball courts at IBEX Arena. Experience world-class facilities with professional-grade courts. Dynamic pricing available.',
+  keywords: ['sports arena', 'padel tennis', 'cricket', 'pickleball', 'court booking', 'IBEX Arena', 'sports facility', 'premium courts'],
+  openGraph: {
+    title: 'IBEX Arena - Premium Sports Court Booking',
+    description: 'Book premium sports courts at IBEX Arena. Experience world-class facilities with dynamic pricing.',
+    type: 'website',
+    locale: 'en_US',
+    siteName: 'IBEX Arena',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'IBEX Arena - Premium Sports Court Booking',
+    description: 'Book premium sports courts at IBEX Arena',
+  },
+};
+
+// ISR (Incremental Static Regeneration) - Revalidate every 15 minutes
+// This enables hybrid rendering: static HTML for SEO + dynamic data updates
+export const revalidate = 900; // 15 minutes = 900 seconds
+
+export default async function Home() {
+  // Server-side: Fetch only prices from DB
+  const result = await getCourts();
+  const courts = result.success ? result.courts : [];
+  
+  const padelCourts = courts.filter((c: any) => c.type === 'PADEL');
+  const cricketCourts = courts.filter((c: any) => c.type === 'CRICKET');
+  const pickleballCourts = courts.filter((c: any) => c.type === 'PICKLEBALL');
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white overflow-hidden transition-colors duration-200">
+      <Navbar />
+      
+      <HeroSection />
+
+      <div className="relative z-30">
+        <MarqueeSection text="PADEL • CRICKET • PICKLEBALL • ELITE" />
+      </div>
+
+      <FacilitiesSection 
+        padelCourts={padelCourts}
+        cricketCourts={cricketCourts}
+        pickleballCourts={pickleballCourts}
+      />
+
+      <ParallaxSection speed={0.1}>
+        <section className="py-24 bg-white dark:bg-black overflow-hidden transition-colors duration-200">
+          <div className="px-6 mb-12 max-w-7xl mx-auto">
+            <TextReveal className="text-5xl md:text-6xl font-bold tracking-tighter gradient-text">
+              LIFESTYLE
+            </TextReveal>
+          </div>
+          <InfiniteGallery images={GALLERY_IMAGES} />
+        </section>
+      </ParallaxSection>
+
+      <AmenitiesSection />
+
+      <GetInTouchSection />
+
+      <Footer />
     </div>
   );
 }
