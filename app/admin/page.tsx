@@ -55,6 +55,7 @@ import {
   cancelBooking,
   updateBooking,
   deleteBooking,
+  createBooking,
 } from "../actions/bookings";
 import {
   getAllCourts,
@@ -128,6 +129,7 @@ export default function AdminPage() {
     userEmail: "",
     userPhone: "",
     status: "confirmed" as "confirmed" | "cancelled" | "completed",
+    courtType: "PADEL" as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
   });
 
   useEffect(() => {
@@ -208,6 +210,7 @@ export default function AdminPage() {
 
   const handleEditBooking = (booking: Booking) => {
     setEditingBooking(booking);
+    const court = courts.find((c) => c._id === booking.courtId);
     setBookingForm({
       date: booking.date,
       startTime: booking.startTime,
@@ -216,26 +219,69 @@ export default function AdminPage() {
       userEmail: booking.userEmail,
       userPhone: booking.userPhone || "",
       status: booking.status,
+      courtType: court?.type || "PADEL",
     });
+    setShowBookingModal(true);
+  };
+
+  const handleCreateBooking = () => {
+    setEditingBooking(null);
+    resetBookingForm();
     setShowBookingModal(true);
   };
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingBooking) return;
 
-    const result = await updateBooking({
-      bookingId: editingBooking._id,
-      ...bookingForm,
-    });
+    if (editingBooking) {
+      // Update existing booking
+      const result = await updateBooking({
+        bookingId: editingBooking._id,
+        ...bookingForm,
+      });
 
-    if (result.success) {
-      setShowBookingModal(false);
-      setEditingBooking(null);
-      loadData();
+      if (result.success) {
+        setShowBookingModal(false);
+        setEditingBooking(null);
+        resetBookingForm();
+        loadData();
+      } else {
+        alert(result.error || "Failed to update booking");
+      }
     } else {
-      alert(result.error || "Failed to update booking");
+      // Create new booking
+      const result = await createBooking({
+        courtType: bookingForm.courtType,
+        date: bookingForm.date,
+        startTime: bookingForm.startTime,
+        duration: bookingForm.duration,
+        userName: bookingForm.userName,
+        userEmail: bookingForm.userEmail,
+        userPhone: bookingForm.userPhone || undefined,
+      });
+
+      if (result.success) {
+        setShowBookingModal(false);
+        resetBookingForm();
+        loadData();
+      } else {
+        alert(result.error || "Failed to create booking");
+      }
     }
+  };
+
+  const resetBookingForm = () => {
+    setBookingForm({
+      date: "",
+      startTime: 6,
+      duration: 1,
+      userName: "",
+      userEmail: "",
+      userPhone: "",
+      status: "confirmed",
+      courtType: "PADEL",
+    });
+    setEditingBooking(null);
   };
 
   const handleCourtSubmit = async (e: React.FormEvent) => {
@@ -610,28 +656,30 @@ export default function AdminPage() {
               </CardHeader>
             </Card>
 
-            <Card className="border-zinc-800 bg-zinc-950">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
-                    <DollarSign className="w-6 h-6 text-[#2DD4BF]" />
+            {isSuperAdmin && (
+              <Card className="border-zinc-800 bg-zinc-950">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
+                      <DollarSign className="w-6 h-6 text-[#2DD4BF]" />
+                    </div>
                   </div>
-                </div>
-                <CardDescription className="text-zinc-400">
-                  Total Revenue
-                </CardDescription>
-                <CardTitle className="text-3xl text-[#2DD4BF]">
-                  PKR{" "}
-                  {totalRevenue.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </CardTitle>
-                <p className="text-xs text-zinc-400 mt-2">
-                  {confirmedBookings.length} confirmed
-                </p>
-              </CardHeader>
-            </Card>
+                  <CardDescription className="text-zinc-400">
+                    Total Revenue
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-[#2DD4BF]">
+                    PKR{" "}
+                    {totalRevenue.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </CardTitle>
+                  <p className="text-xs text-zinc-400 mt-2">
+                    {confirmedBookings.length} confirmed
+                  </p>
+                </CardHeader>
+              </Card>
+            )}
 
             <Card className="border-zinc-800 bg-zinc-950">
               <CardHeader>
@@ -884,15 +932,26 @@ export default function AdminPage() {
 
             {/* Bookings Tab */}
             <TabsContent value="bookings" className="space-y-4">
-              <div className="relative mt-6">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                <Input
-                  type="text"
-                  placeholder="Search by name, email or booking ID..."
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  className="w-full pl-10"
-                />
+              <div className="flex gap-4 mt-6">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                  <Input
+                    type="text"
+                    placeholder="Search by name, email or booking ID..."
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    className="w-full pl-10"
+                  />
+                </div>
+                {(isSuperAdmin || userRole === "admin") && (
+                  <Button
+                    onClick={handleCreateBooking}
+                    className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Booking
+                  </Button>
+                )}
               </div>
 
               <Card className="border-zinc-800 bg-zinc-950">
@@ -1454,12 +1513,42 @@ export default function AdminPage() {
       <Dialog open={showBookingModal} onOpenChange={setShowBookingModal}>
         <DialogContent className="bg-zinc-950 border-zinc-800 max-w-2xl text-white">
           <DialogHeader>
-            <DialogTitle className="text-white">Edit Booking</DialogTitle>
+            <DialogTitle className="text-white">
+              {editingBooking ? "Edit Booking" : "Create Booking"}
+            </DialogTitle>
             <DialogDescription className="text-zinc-400">
-              Update booking details and status
+              {editingBooking
+                ? "Update booking details and status"
+                : "Create a new booking"}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleBookingSubmit} className="space-y-4">
+            {!editingBooking && (
+              <div className="space-y-2">
+                <Label htmlFor="booking-court-type" className="text-zinc-200">
+                  Court Type
+                </Label>
+                <Select
+                  value={bookingForm.courtType}
+                  onValueChange={(v) =>
+                    setBookingForm({
+                      ...bookingForm,
+                      courtType: v as any,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PADEL">Padel</SelectItem>
+                    <SelectItem value="CRICKET">Cricket</SelectItem>
+                    <SelectItem value="PICKLEBALL">Pickleball</SelectItem>
+                    <SelectItem value="FUTSAL">Futsal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="booking-date" className="text-zinc-200">
@@ -1475,32 +1564,34 @@ export default function AdminPage() {
                   }
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="booking-status" className="text-zinc-200">
-                  Status
-                </Label>
-                <Select
-                  value={bookingForm.status}
-                  onValueChange={(v) =>
-                    setBookingForm({ ...bookingForm, status: v as any })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="confirmed">Confirmed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {editingBooking && (
+                <div className="space-y-2">
+                  <Label htmlFor="booking-status" className="text-zinc-200">
+                    Status
+                  </Label>
+                  <Select
+                    value={bookingForm.status}
+                    onValueChange={(v) =>
+                      setBookingForm({ ...bookingForm, status: v as any })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="booking-start-time" className="text-zinc-200">
-                  Start Time
+                  Start Time (hour, e.g., 6 or 6.5 for 6:30)
                 </Label>
                 <Input
                   id="booking-start-time"
@@ -1508,24 +1599,25 @@ export default function AdminPage() {
                   required
                   min="6"
                   max="23"
+                  step="0.5"
                   value={bookingForm.startTime}
                   onChange={(e) =>
                     setBookingForm({
                       ...bookingForm,
-                      startTime: parseInt(e.target.value),
+                      startTime: parseFloat(e.target.value),
                     })
                   }
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="booking-duration" className="text-zinc-200">
-                  Duration (hours)
+                  Duration (hours, 30-min increments)
                 </Label>
                 <Input
                   id="booking-duration"
                   type="number"
                   required
-                  min="1"
+                  min="0.5"
                   step="0.5"
                   value={bookingForm.duration}
                   onChange={(e) =>
@@ -1595,7 +1687,7 @@ export default function AdminPage() {
                 variant="ghost"
                 onClick={() => {
                   setShowBookingModal(false);
-                  setEditingBooking(null);
+                  resetBookingForm();
                 }}
               >
                 Cancel
@@ -1604,7 +1696,7 @@ export default function AdminPage() {
                 type="submit"
                 className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
               >
-                Update Booking
+                {editingBooking ? "Update Booking" : "Create Booking"}
               </Button>
             </DialogFooter>
           </form>

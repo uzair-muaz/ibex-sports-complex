@@ -18,7 +18,7 @@ export default function BookingPage() {
   const [courts, setCourts] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<
-    { courtId: string; hour: number }[]
+    { courtId: string; slotTime: number }[]
   >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -67,7 +67,7 @@ export default function BookingPage() {
     }
   };
 
-  const isSlotBooked = (courtId: string, hour: number) => {
+  const isSlotBooked = (courtId: string, slotTime: number) => {
     return bookings.some((b) => {
       const bookingCourtId =
         typeof b.courtId === "object" ? b.courtId._id : b.courtId;
@@ -76,20 +76,22 @@ export default function BookingPage() {
       const bookingStart = b.startTime;
       const bookingEnd = b.startTime + b.duration;
 
-      // Check if hour falls within booking range
-      return hour >= bookingStart && hour < bookingEnd;
+      // Check if 30-minute slot falls within booking range
+      return slotTime >= bookingStart && slotTime < bookingEnd;
     });
   };
 
-  const isSlotSelected = (courtId: string, hour: number) => {
-    return selectedSlots.some((s) => s.courtId === courtId && s.hour === hour);
+  const isSlotSelected = (courtId: string, slotTime: number) => {
+    return selectedSlots.some(
+      (s) => s.courtId === courtId && s.slotTime === slotTime
+    );
   };
 
-  const toggleSlot = (courtId: string, hour: number) => {
-    if (isSlotBooked(courtId, hour)) return;
+  const toggleSlot = (courtId: string, slotTime: number) => {
+    if (isSlotBooked(courtId, slotTime)) return;
 
     const existingIndex = selectedSlots.findIndex(
-      (s) => s.courtId === courtId && s.hour === hour
+      (s) => s.courtId === courtId && s.slotTime === slotTime
     );
 
     if (existingIndex >= 0) {
@@ -97,36 +99,38 @@ export default function BookingPage() {
       newSlots.splice(existingIndex, 1);
       setSelectedSlots(newSlots);
     } else {
-      // Logic for multiple selection - must be same court and contiguous
+      // Logic for multiple selection - must be same court and consecutive (no breaks)
       if (selectedSlots.length > 0) {
         const firstCourt = selectedSlots[0].courtId;
         if (firstCourt !== courtId) {
           // Different court - replace selection
-          setSelectedSlots([{ courtId, hour }]);
+          setSelectedSlots([{ courtId, slotTime }]);
           return;
         }
 
-        // Same court - check if contiguous
-        const sortedHours = [...selectedSlots.map((s) => s.hour), hour].sort(
-          (a, b) => a - b
-        );
-        let isContiguous = true;
-        for (let i = 0; i < sortedHours.length - 1; i++) {
-          if (sortedHours[i + 1] !== sortedHours[i] + 1) {
-            isContiguous = false;
+        // Same court - check if consecutive (0.5 hour increments, no breaks)
+        const sortedTimes = [
+          ...selectedSlots.map((s) => s.slotTime),
+          slotTime,
+        ].sort((a, b) => a - b);
+        let isConsecutive = true;
+        for (let i = 0; i < sortedTimes.length - 1; i++) {
+          // Check if next slot is exactly 0.5 hours after current slot
+          if (Math.abs(sortedTimes[i + 1] - sortedTimes[i] - 0.5) > 0.01) {
+            isConsecutive = false;
             break;
           }
         }
 
-        if (!isContiguous) {
-          // Not contiguous - start new selection from this hour
-          setSelectedSlots([{ courtId, hour }]);
+        if (!isConsecutive) {
+          // Not consecutive - start new selection from this slot
+          setSelectedSlots([{ courtId, slotTime }]);
           return;
         }
       }
 
       setSelectedSlots((prev) =>
-        [...prev, { courtId, hour }].sort((a, b) => a.hour - b.hour)
+        [...prev, { courtId, slotTime }].sort((a, b) => a.slotTime - b.slotTime)
       );
     }
   };
@@ -135,22 +139,27 @@ export default function BookingPage() {
     e.preventDefault();
     if (selectedSlots.length === 0) return;
 
-    const sortedHours = selectedSlots.map((s) => s.hour).sort((a, b) => a - b);
-    let isContiguous = true;
-    for (let i = 0; i < sortedHours.length - 1; i++) {
-      if (sortedHours[i + 1] !== sortedHours[i] + 1) {
-        isContiguous = false;
+    const sortedTimes = selectedSlots
+      .map((s) => s.slotTime)
+      .sort((a, b) => a - b);
+
+    // Check if slots are consecutive (0.5 hour increments, no breaks)
+    let isConsecutive = true;
+    for (let i = 0; i < sortedTimes.length - 1; i++) {
+      if (Math.abs(sortedTimes[i + 1] - sortedTimes[i] - 0.5) > 0.01) {
+        isConsecutive = false;
         break;
       }
     }
 
-    if (!isContiguous) {
-      setErrorMessage("Please select contiguous time slots.");
+    if (!isConsecutive) {
+      setErrorMessage("Please select consecutive time slots with no breaks.");
       return;
     }
 
-    if (selectedSlots.length < 1) {
-      setErrorMessage("Minimum booking time is 1 hour.");
+    // Minimum booking is 1 hour (2 slots of 30 minutes each)
+    if (selectedSlots.length < 2) {
+      setErrorMessage("Minimum booking time is 1 hour (2 consecutive slots).");
       return;
     }
 
@@ -158,8 +167,9 @@ export default function BookingPage() {
     setErrorMessage("");
 
     try {
-      const startTime = sortedHours[0];
-      const duration = selectedSlots.length;
+      const startTime = sortedTimes[0];
+      // Duration in hours: number of slots * 0.5 hours per slot
+      const duration = selectedSlots.length * 0.5;
 
       const result = await createBooking({
         courtType: selectedCourtType,
@@ -191,12 +201,14 @@ export default function BookingPage() {
     }
   };
 
-  const hours = Array.from(
-    { length: OPERATING_HOURS.end - OPERATING_HOURS.start },
-    (_, i) => OPERATING_HOURS.start + i
-  );
+  // Generate 30-minute slots (e.g., 4.0, 4.5, 5.0, 5.5, ...)
+  const timeSlots: number[] = [];
+  for (let hour = OPERATING_HOURS.start; hour < OPERATING_HOURS.end; hour++) {
+    timeSlots.push(hour);
+    timeSlots.push(hour + 0.5);
+  }
 
-  const selectedDuration = selectedSlots.length;
+  const selectedDuration = selectedSlots.length * 0.5; // Duration in hours
   const selectedCourt = courts.find((c) => c._id === selectedSlots[0]?.courtId);
   const totalPrice = selectedCourt
     ? selectedCourt.pricePerHour * selectedDuration
@@ -288,21 +300,28 @@ export default function BookingPage() {
             </div>
           ) : (
             <div className="glass-panel rounded-3xl overflow-hidden p-1">
-              <div className="overflow-x-auto">
-                <div className="min-w-[800px] grid grid-cols-[100px_1fr]">
-                  {/* Hours Column */}
+              <div className="">
+                <div className="min-w-[800px] grid grid-cols-[130px_1fr]">
+                  {/* Time Slots Column */}
                   <div className="border-r border-white/5 bg-black/20">
                     <div className="h-24 flex items-center justify-center border-b border-white/5 text-zinc-500 text-xs font-mono uppercase tracking-widest">
                       Time
                     </div>
-                    {hours.map((hour) => (
-                      <div
-                        key={hour}
-                        className="h-14 flex items-center justify-center text-xs text-zinc-600 font-mono border-b border-dashed border-white/5"
-                      >
-                        {hour}:00
-                      </div>
-                    ))}
+                    {timeSlots.map((slotTime) => {
+                      const startHour = Math.floor(slotTime);
+                      const startMin = slotTime % 1 === 0 ? "00" : "30";
+                      const endTime = slotTime + 0.5;
+                      const endHour = Math.floor(endTime);
+                      const endMin = endTime % 1 === 0 ? "00" : "30";
+                      return (
+                        <div
+                          key={slotTime}
+                          className="h-7 flex items-center justify-center text-xs text-zinc-600 font-mono border-b border-dashed border-white/5"
+                        >
+                          {startHour}:{startMin}-{endHour}:{endMin}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Courts Columns */}
@@ -326,22 +345,27 @@ export default function BookingPage() {
                         </div>
 
                         <div className="">
-                          {hours.map((hour) => {
-                            const isBooked = isSlotBooked(court._id, hour);
-                            const isSelected = isSlotSelected(court._id, hour);
+                          {timeSlots.map((slotTime) => {
+                            const isBooked = isSlotBooked(court._id, slotTime);
+                            const isSelected = isSlotSelected(
+                              court._id,
+                              slotTime
+                            );
 
                             return (
                               <div
-                                key={hour}
-                                className="h-14 p-1 border-b border-white/5"
+                                key={slotTime}
+                                className="h-7 p-0.5 border-b border-white/5"
                               >
                                 <motion.button
                                   whileHover={!isBooked ? { scale: 0.98 } : {}}
                                   whileTap={!isBooked ? { scale: 0.95 } : {}}
-                                  onClick={() => toggleSlot(court._id, hour)}
+                                  onClick={() =>
+                                    toggleSlot(court._id, slotTime)
+                                  }
                                   disabled={isBooked}
                                   className={`
-                                    w-full h-full rounded-lg transition-all duration-300 relative overflow-hidden
+                                    w-full h-full rounded transition-all duration-300 relative overflow-hidden
                                     ${
                                       isBooked
                                         ? "bg-zinc-800/50 border border-zinc-700/60 cursor-not-allowed opacity-75"
@@ -353,10 +377,10 @@ export default function BookingPage() {
                                 >
                                   {isSelected && (
                                     <motion.div
-                                      layoutId="check"
+                                      layoutId={`check-${court._id}-${slotTime}`}
                                       className="absolute inset-0 flex items-center justify-center text-[#0F172A]"
                                     >
-                                      <CheckCircle className="w-4 h-4" />
+                                      <CheckCircle className="w-3 h-3" />
                                     </motion.div>
                                   )}
                                 </motion.button>
@@ -392,10 +416,23 @@ export default function BookingPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-white">
-                    Hours Selected
+                    {selectedDuration === 1 ? "Hour" : "Hours"} Selected
                   </h3>
                   <p className="text-zinc-400 text-sm">
                     {selectedCourt ? `${selectedCourt.name} • ` : ""}
+                    {selectedSlots.length > 0 &&
+                      (() => {
+                        const sortedTimes = selectedSlots
+                          .map((s) => s.slotTime)
+                          .sort((a, b) => a - b);
+                        const startHour = Math.floor(sortedTimes[0]);
+                        const startMin = sortedTimes[0] % 1 === 0 ? "00" : "30";
+                        const endTime =
+                          sortedTimes[sortedTimes.length - 1] + 0.5;
+                        const endHour = Math.floor(endTime);
+                        const endMin = endTime % 1 === 0 ? "00" : "30";
+                        return `${startHour}:${startMin} - ${endHour}:${endMin} • `;
+                      })()}
                     Total: PKR {totalPrice.toFixed(2)}
                   </p>
                 </div>
@@ -471,6 +508,26 @@ export default function BookingPage() {
                       })}
                     </span>
                     <span>•</span>
+                    {selectedSlots.length > 0 &&
+                      (() => {
+                        const sortedTimes = selectedSlots
+                          .map((s) => s.slotTime)
+                          .sort((a, b) => a - b);
+                        const startHour = Math.floor(sortedTimes[0]);
+                        const startMin = sortedTimes[0] % 1 === 0 ? "00" : "30";
+                        const endTime =
+                          sortedTimes[sortedTimes.length - 1] + 0.5;
+                        const endHour = Math.floor(endTime);
+                        const endMin = endTime % 1 === 0 ? "00" : "30";
+                        return (
+                          <>
+                            <span>
+                              {startHour}:{startMin} - {endHour}:{endMin}
+                            </span>
+                            <span>•</span>
+                          </>
+                        );
+                      })()}
                     <span>
                       {selectedDuration}{" "}
                       {selectedDuration === 1 ? "Hour" : "Hours"}
@@ -548,9 +605,11 @@ export default function BookingPage() {
                   <Button
                     type="submit"
                     className="flex-1 bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-                    isLoading={formStatus === "loading"}
+                    disabled={formStatus === "loading"}
                   >
-                    Confirm Booking
+                    {formStatus === "loading"
+                      ? "Processing..."
+                      : "Confirm Booking"}
                   </Button>
                 </div>
               </form>
