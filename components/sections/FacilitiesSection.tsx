@@ -104,7 +104,7 @@ export const FacilitiesSection = ({
               <TextReveal className="text-7xl md:text-8xl font-bold tracking-tighter gradient-text">
                 THE FACILITIES
               </TextReveal>
-              <div className="h-2 w-32 bg-[#ccff00] rounded-full" />
+              <div className="h-2 w-32 bg-[#2DD4BF] rounded-full" />
             </div>
             <p className="text-zinc-600 dark:text-zinc-400 max-w-sm text-xl font-light leading-relaxed">
               Immerse yourself in our world-class courts designed for optimal
@@ -133,7 +133,7 @@ export const FacilitiesSection = ({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-[#ccff00] font-mono text-sm tracking-widest uppercase font-bold">
+                    <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
                       01 — Padel
                     </span>
                     <PricingBadge
@@ -170,7 +170,7 @@ export const FacilitiesSection = ({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-[#ccff00] font-mono text-sm tracking-widest uppercase font-bold">
+                    <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
                       02 — Cricket
                     </span>
                     <PricingBadge
@@ -207,7 +207,7 @@ export const FacilitiesSection = ({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-[#ccff00] font-mono text-sm tracking-widest uppercase font-bold">
+                    <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
                       03 — Pickleball
                     </span>
                     <PricingBadge
@@ -244,7 +244,7 @@ export const FacilitiesSection = ({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-[#ccff00] font-mono text-sm tracking-widest uppercase font-bold">
+                    <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
                       04 — Futsal
                     </span>
                     <PricingBadge

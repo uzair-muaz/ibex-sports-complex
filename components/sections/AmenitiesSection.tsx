@@ -42,7 +42,7 @@ export const AmenitiesSection = () => {
                   className="object-cover transition-transform duration-700 group-hover:scale-110"
                 />
                 <div className="absolute top-6 right-6 bg-black/50 backdrop-blur-md p-4 rounded-full">
-                  <AnimatedCoffeeIcon className="w-8 h-8" color="#ccff00" />
+                  <AnimatedCoffeeIcon className="w-8 h-8" color="#2DD4BF" />
                 </div>
               </div>
               <div>
@@ -72,7 +72,7 @@ export const AmenitiesSection = () => {
                   className="object-cover transition-transform duration-700 group-hover:scale-110"
                 />
                 <div className="absolute top-6 right-6 bg-black/50 backdrop-blur-md p-4 rounded-full">
-                  <AnimatedFoodTruckIcon className="w-8 h-8" color="#ccff00" />
+                  <AnimatedFoodTruckIcon className="w-8 h-8" color="#2DD4BF" />
                 </div>
               </div>
               <div>

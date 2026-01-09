@@ -56,7 +56,7 @@ export const Navbar = () => {
             </motion.div>
             <motion.span
               className="text-xl md:text-2xl font-black tracking-tighter text-white dark:text-white"
-              whileHover={{ color: "#ccff00" }}
+              whileHover={{ color: "#2DD4BF" }}
               transition={{ duration: 0.2 }}
             >
               IBEX
@@ -82,14 +82,14 @@ export const Navbar = () => {
                         ? "text-white"
                         : "text-zinc-300 dark:text-zinc-400"
                     }`}
-                    whileHover={{ color: "#ccff00" }}
+                    whileHover={{ color: "#2DD4BF" }}
                   >
                     {link.name}
                     {/* Active indicator */}
                     {isActive && (
                       <motion.div
                         layoutId="navbarIndicator"
-                        className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#ccff00] rounded-full"
+                        className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#2DD4BF] rounded-full"
                         initial={false}
                         transition={{
                           type: "spring",
@@ -114,12 +114,12 @@ export const Navbar = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="relative px-4 py-2 rounded-lg text-zinc-300 dark:text-zinc-400 hover:text-[#ccff00] hover:bg-white/5 dark:hover:bg-white/5 transition-all duration-200 group cursor-pointer flex items-center gap-2"
+                className="relative px-4 py-2 rounded-lg text-zinc-300 dark:text-zinc-400 hover:text-[#2DD4BF] hover:bg-white/5 dark:hover:bg-white/5 transition-all duration-200 group cursor-pointer flex items-center gap-2"
               >
                 <Lock className="w-4 h-4" />
                 <span className="text-sm font-medium">Admin</span>
                 <motion.div
-                  className="absolute inset-0 bg-[#ccff00]/10 rounded-lg opacity-0 group-hover:opacity-100"
+                  className="absolute inset-0 bg-[#2DD4BF]/10 rounded-lg opacity-0 group-hover:opacity-100"
                   transition={{ duration: 0.2 }}
                 />
               </motion.button>
@@ -137,7 +137,7 @@ export const Navbar = () => {
             <Link href="/booking">
               <Button
                 size="sm"
-                className="relative overflow-hidden bg-[#ccff00] text-black font-bold px-6 py-2.5 rounded-lg border-0 shadow-lg shadow-[#ccff00]/30 hover:shadow-[#ccff00]/50 transition-all duration-200 group cursor-pointer"
+                className="relative overflow-hidden bg-[#2DD4BF] text-[#0F172A] font-bold px-6 py-2.5 rounded-lg border-0 shadow-lg shadow-[#2DD4BF]/30 hover:shadow-[#2DD4BF]/50 transition-all duration-200 group cursor-pointer"
               >
                 <span className="relative z-10 flex items-center gap-2">
                   Book Now
@@ -150,7 +150,7 @@ export const Navbar = () => {
                 </span>
                 {/* Hover gradient overlay */}
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-[#a8d600] to-[#ccff00] opacity-0 group-hover:opacity-100"
+                  className="absolute inset-0 bg-gradient-to-r from-[#14B8A6] to-[#2DD4BF] opacity-0 group-hover:opacity-100"
                   transition={{ duration: 0.2 }}
                 />
                 {/* Shine effect */}
@@ -232,14 +232,14 @@ export const Navbar = () => {
                     <Link
                       href={link.path}
                       className={`relative text-2xl font-bold transition-colors ${
-                        isActive ? "text-[#ccff00]" : "text-white"
-                      } hover:text-[#ccff00]`}
+                        isActive ? "text-[#2DD4BF]" : "text-white"
+                      } hover:text-[#2DD4BF]`}
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       {link.name}
                       {isActive && (
                         <motion.div
-                          className="absolute -left-4 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#ccff00] rounded-r-full"
+                          className="absolute -left-4 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#2DD4BF] rounded-r-full"
                           layoutId="mobileActiveIndicator"
                           initial={false}
                         />
@@ -257,7 +257,7 @@ export const Navbar = () => {
                   href="/booking"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Button className="w-full bg-[#ccff00] text-black font-bold py-6 text-lg rounded-xl hover:bg-[#a8d600] transition-all duration-200 shadow-lg shadow-[#ccff00]/30 cursor-pointer">
+                  <Button className="w-full bg-[#2DD4BF] text-[#0F172A] font-bold py-6 text-lg rounded-xl hover:bg-[#14B8A6] transition-all duration-200 shadow-lg shadow-[#2DD4BF]/30 cursor-pointer">
                     Book Now
                   </Button>
                 </Link>

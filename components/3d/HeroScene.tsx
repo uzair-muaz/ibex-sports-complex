@@ -9,13 +9,13 @@ export const HeroScene = () => {
        <div className="absolute inset-0 bg-white dark:bg-[#050505] transition-colors duration-500" />
        
        {/* Animated Gradient Orb 1 - Neon Yellow */}
-       <div className="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full bg-[#ccff00]/30 dark:bg-[#ccff00]/10 blur-[120px] animate-pulse" />
+       <div className="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full bg-[#2DD4BF]/30 dark:bg-[#2DD4BF]/10 blur-[120px] animate-pulse" />
        
        {/* Animated Gradient Orb 2 - White/Cyan for contrast */}
        <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-cyan-400/20 dark:bg-white/5 blur-[100px] animate-pulse" style={{ animationDelay: '2s' }} />
 
        {/* Animated Gradient Orb 3 - Center subtle */}
-       <div className="absolute top-[40%] left-[30%] w-[40vw] h-[40vw] rounded-full bg-[#ccff00]/10 blur-[150px] animate-pulse" style={{ animationDelay: '4s' }} />
+       <div className="absolute top-[40%] left-[30%] w-[40vw] h-[40vw] rounded-full bg-[#2DD4BF]/10 blur-[150px] animate-pulse" style={{ animationDelay: '4s' }} />
 
        {/* Grain Overlay for Texture */}
        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06]" 

@@ -33,9 +33,9 @@ export const GetInTouchSection = () => {
             />
             <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
             <div className="absolute bottom-8 left-8 p-6 bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-2xl max-w-xs shadow-xl border border-white/10">
-              <div className="flex items-center gap-3 mb-2 text-[#ccff00]">
-                <AnimatedMapPinIcon className="w-5 h-5" color="#ccff00" />
-                <span className="font-bold text-black dark:text-white">Main Entrance</span>
+              <div className="flex items-center gap-3 mb-2 text-[#2DD4BF]">
+                <AnimatedMapPinIcon className="w-5 h-5" color="#2DD4BF" />
+                <span className="font-bold text-[#0F172A] dark:text-white">Main Entrance</span>
               </div>
               <p className="text-sm text-zinc-600 dark:text-zinc-300">
                 123 Victory Lane, Sports District<br/>Metropolis, NY 10012
@@ -46,7 +46,7 @@ export const GetInTouchSection = () => {
           {/* Contact Info Card */}
           <div className="bg-zinc-100 dark:bg-zinc-900 p-8 rounded-3xl flex flex-col justify-between hover:shadow-xl transition-shadow border border-zinc-200 dark:border-white/5 group">
             <div>
-              <div className="w-12 h-12 bg-[#ccff00] rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 bg-[#2DD4BF] rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <AnimatedPhoneIcon className="w-6 h-6" color="#000" />
               </div>
               <h3 className="text-2xl font-bold mb-2">Book a Session</h3>
@@ -59,10 +59,10 @@ export const GetInTouchSection = () => {
           </div>
 
           {/* Opening Hours Card */}
-          <div className="group bg-zinc-900 dark:bg-zinc-900 text-white p-8 rounded-3xl flex flex-col justify-between border border-white/10 hover:border-[#ccff00]/50 transition-colors">
+          <div className="group bg-zinc-900 dark:bg-zinc-900 text-white p-8 rounded-3xl flex flex-col justify-between border border-white/10 hover:border-[#2DD4BF]/50 transition-colors">
             <div>
               <div className="mb-6">
-                <AnimatedClockIcon className="w-8 h-8" color="#ccff00" />
+                <AnimatedClockIcon className="w-8 h-8" color="#2DD4BF" />
               </div>
               <h3 className="text-2xl font-bold mb-2">Opening Hours</h3>
             </div>
@@ -83,11 +83,11 @@ export const GetInTouchSection = () => {
           </div>
 
           {/* Social Links Card */}
-          <div className="md:col-span-2 bg-[#ccff00] p-8 rounded-3xl flex items-center justify-between text-black relative overflow-hidden group">
+          <div className="md:col-span-2 bg-[#2DD4BF] p-8 rounded-3xl flex items-center justify-between text-[#0F172A] relative overflow-hidden group">
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
             <div className="relative z-10">
               <h3 className="text-3xl font-bold mb-2">Follow the Action</h3>
-              <p className="text-black/70 font-medium">Stay updated with tournaments and events.</p>
+              <p className="text-[#0F172A]/70 font-medium">Stay updated with tournaments and events.</p>
             </div>
             <div className="relative z-10 flex gap-4">
               {[

@@ -483,7 +483,7 @@ export default function AdminPage() {
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ccff00]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2DD4BF]"></div>
       </div>
     );
   }
@@ -495,7 +495,7 @@ export default function AdminPage() {
           <CardHeader>
             <div className="text-center">
               <div className="w-12 h-12 bg-white rounded-full mx-auto flex items-center justify-center mb-4">
-                <Lock className="w-6 h-6 text-black" />
+                <Lock className="w-6 h-6 text-[#0F172A]" />
               </div>
               <CardTitle className="text-3xl text-white">
                 Admin Access
@@ -542,7 +542,7 @@ export default function AdminPage() {
               </div>
               <Button
                 type="submit"
-                className="w-full bg-[#ccff00] text-black hover:bg-[#b3e600]"
+                className="w-full bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
               >
                 Sign In
               </Button>
@@ -594,8 +594,8 @@ export default function AdminPage() {
             <Card className="border-zinc-800 bg-zinc-950">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 bg-[#ccff00]/20 rounded-xl flex items-center justify-center">
-                    <Calendar className="w-6 h-6 text-[#ccff00]" />
+                  <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
+                    <Calendar className="w-6 h-6 text-[#2DD4BF]" />
                   </div>
                 </div>
                 <CardDescription className="text-zinc-400">
@@ -613,14 +613,14 @@ export default function AdminPage() {
             <Card className="border-zinc-800 bg-zinc-950">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 bg-[#ccff00]/20 rounded-xl flex items-center justify-center">
-                    <DollarSign className="w-6 h-6 text-[#ccff00]" />
+                  <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
+                    <DollarSign className="w-6 h-6 text-[#2DD4BF]" />
                   </div>
                 </div>
                 <CardDescription className="text-zinc-400">
                   Total Revenue
                 </CardDescription>
-                <CardTitle className="text-3xl text-[#ccff00]">
+                <CardTitle className="text-3xl text-[#2DD4BF]">
                   PKR{" "}
                   {totalRevenue.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
@@ -636,14 +636,14 @@ export default function AdminPage() {
             <Card className="border-zinc-800 bg-zinc-950">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 bg-[#ccff00]/20 rounded-xl flex items-center justify-center">
-                    <Activity className="w-6 h-6 text-[#ccff00]" />
+                  <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
+                    <Activity className="w-6 h-6 text-[#2DD4BF]" />
                   </div>
                 </div>
                 <CardDescription className="text-zinc-400">
                   Active Courts
                 </CardDescription>
-                <CardTitle className="text-3xl text-[#ccff00]">
+                <CardTitle className="text-3xl text-[#2DD4BF]">
                   {courts.filter((c) => c.isActive).length}
                 </CardTitle>
                 <p className="text-xs text-zinc-400 mt-2">
@@ -655,14 +655,14 @@ export default function AdminPage() {
             <Card className="border-zinc-800 bg-zinc-950">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 bg-[#ccff00]/20 rounded-xl flex items-center justify-center">
-                    <Users className="w-6 h-6 text-[#ccff00]" />
+                  <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
+                    <Users className="w-6 h-6 text-[#2DD4BF]" />
                   </div>
                 </div>
                 <CardDescription className="text-zinc-400">
                   Total Users
                 </CardDescription>
-                <CardTitle className="text-3xl text-[#ccff00]">
+                <CardTitle className="text-3xl text-[#2DD4BF]">
                   {users.length}
                 </CardTitle>
                 <p className="text-xs text-zinc-400 mt-2">
@@ -690,8 +690,8 @@ export default function AdminPage() {
                       Super Admin exclusive insights
                     </CardDescription>
                   </div>
-                  <div className="w-12 h-12 bg-[#ccff00]/20 rounded-xl flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-[#ccff00]" />
+                  <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-[#2DD4BF]" />
                   </div>
                 </div>
               </CardHeader>
@@ -702,7 +702,7 @@ export default function AdminPage() {
                       <CardDescription className="text-zinc-400">
                         Avg Booking Value
                       </CardDescription>
-                      <CardTitle className="text-2xl text-[#ccff00]">
+                      <CardTitle className="text-2xl text-[#2DD4BF]">
                         PKR{" "}
                         {superAdminStats.avgBookingValue.toLocaleString(
                           "en-US",
@@ -717,7 +717,7 @@ export default function AdminPage() {
                       <CardDescription className="text-zinc-400">
                         This Month Revenue
                       </CardDescription>
-                      <CardTitle className="text-2xl text-[#ccff00]">
+                      <CardTitle className="text-2xl text-[#2DD4BF]">
                         PKR{" "}
                         {superAdminStats.thisMonthRevenue.toLocaleString(
                           "en-US",
@@ -732,7 +732,7 @@ export default function AdminPage() {
                       <CardDescription className="text-zinc-400">
                         Most Popular Court
                       </CardDescription>
-                      <CardTitle className="text-2xl text-[#ccff00]">
+                      <CardTitle className="text-2xl text-[#2DD4BF]">
                         {superAdminStats.mostPopularCourtType}
                       </CardTitle>
                     </CardHeader>
@@ -743,7 +743,7 @@ export default function AdminPage() {
                   <Card className="border-zinc-800 bg-black/40">
                     <CardHeader>
                       <CardTitle className="text-lg flex items-center gap-2 text-white">
-                        <Users className="w-5 h-5 text-[#ccff00]" />
+                        <Users className="w-5 h-5 text-[#2DD4BF]" />
                         Top Users
                       </CardTitle>
                     </CardHeader>
@@ -760,7 +760,7 @@ export default function AdminPage() {
                               className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-lg"
                             >
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-[#ccff00]/20 rounded-full flex items-center justify-center text-[#ccff00] font-bold text-sm">
+                                <div className="w-8 h-8 bg-[#2DD4BF]/20 rounded-full flex items-center justify-center text-[#2DD4BF] font-bold text-sm">
                                   {index + 1}
                                 </div>
                                 <div>
@@ -776,7 +776,7 @@ export default function AdminPage() {
                                 <div className="text-sm font-semibold text-white">
                                   {user.count} bookings
                                 </div>
-                                <div className="text-xs text-[#ccff00]">
+                                <div className="text-xs text-[#2DD4BF]">
                                   PKR {user.revenue.toFixed(2)}
                                 </div>
                               </div>
@@ -808,7 +808,7 @@ export default function AdminPage() {
                                 >
                                   {type}
                                 </Badge>
-                                <span className="text-[#ccff00] font-semibold">
+                                <span className="text-[#2DD4BF] font-semibold">
                                   PKR{" "}
                                   {revenue.toLocaleString("en-US", {
                                     minimumFractionDigits: 2,
@@ -832,7 +832,7 @@ export default function AdminPage() {
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-[#ccff00]"></div>
+                              <div className="w-3 h-3 rounded-full bg-[#2DD4BF]"></div>
                               <span className="text-sm">Confirmed</span>
                             </div>
                             <span className="font-semibold">
@@ -967,7 +967,7 @@ export default function AdminPage() {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <span className="text-[#ccff00] font-semibold">
+                                <span className="text-[#2DD4BF] font-semibold">
                                   PKR {booking.totalPrice.toFixed(2)}
                                 </span>
                               </TableCell>
@@ -976,7 +976,7 @@ export default function AdminPage() {
                                   variant="outline"
                                   className={
                                     booking.status === "confirmed"
-                                      ? "bg-[#ccff00]/20 border-[#ccff00]/50 text-[#ccff00]"
+                                      ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF]"
                                       : booking.status === "cancelled"
                                         ? "bg-zinc-800 border-zinc-700 text-zinc-300"
                                         : "bg-zinc-800 border-zinc-700 text-zinc-300"
@@ -991,7 +991,7 @@ export default function AdminPage() {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => handleEditBooking(booking)}
-                                    className="text-zinc-400 hover:text-[#ccff00]"
+                                    className="text-zinc-400 hover:text-[#2DD4BF]"
                                   >
                                     <Edit2 className="w-4 h-4" />
                                   </Button>
@@ -1037,7 +1037,7 @@ export default function AdminPage() {
                     resetCourtForm();
                     setShowCourtModal(true);
                   }}
-                  className="bg-[#ccff00] text-black hover:bg-[#b3e600]"
+                  className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Court
@@ -1064,7 +1064,7 @@ export default function AdminPage() {
                           variant="outline"
                           className={
                             court.isActive
-                              ? "bg-[#ccff00]/20 border-[#ccff00]/50 text-[#ccff00]"
+                              ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF]"
                               : "bg-zinc-800 border-zinc-700 text-zinc-300"
                           }
                         >
@@ -1077,7 +1077,7 @@ export default function AdminPage() {
                         {court.description}
                       </p>
                       <div className="flex items-center justify-between mb-4">
-                        <span className="text-2xl font-bold text-[#ccff00]">
+                        <span className="text-2xl font-bold text-[#2DD4BF]">
                           PKR {court.pricePerHour}/hr
                         </span>
                         {court.pricePerHour === 0 && (
@@ -1093,7 +1093,7 @@ export default function AdminPage() {
                         <Button
                           size="sm"
                           onClick={() => handleEditCourt(court)}
-                          className="flex-1 bg-[#ccff00] text-black hover:bg-[#b3e600]"
+                          className="flex-1 bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
                         >
                           <Edit2 className="w-4 h-4 mr-2" />
                           Edit
@@ -1120,7 +1120,7 @@ export default function AdminPage() {
                     resetUserForm();
                     setShowUserModal(true);
                   }}
-                  className="bg-[#ccff00] text-black hover:bg-[#b3e600]"
+                  className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add User
@@ -1163,7 +1163,7 @@ export default function AdminPage() {
                                 variant="outline"
                                 className={
                                   user.role === "super_admin"
-                                    ? "bg-[#ccff00]/20 border-[#ccff00]/50 text-[#ccff00]"
+                                    ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF]"
                                     : user.role === "admin"
                                       ? "bg-zinc-900/50 border-zinc-800 text-zinc-200"
                                       : "bg-zinc-900/50 border-zinc-800 text-zinc-300"
@@ -1181,7 +1181,7 @@ export default function AdminPage() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => handleEditUser(user)}
-                                  className="text-zinc-400 hover:text-[#ccff00]"
+                                  className="text-zinc-400 hover:text-[#2DD4BF]"
                                 >
                                   <Edit2 className="w-4 h-4" />
                                 </Button>
@@ -1272,7 +1272,7 @@ export default function AdminPage() {
                   setCourtForm({ ...courtForm, description: e.target.value })
                 }
                 rows={3}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00] transition-all outline-none"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-[#2DD4BF]/50 focus:border-[#2DD4BF] transition-all outline-none"
                 placeholder="Professional court with premium features..."
               />
             </div>
@@ -1307,7 +1307,7 @@ export default function AdminPage() {
                     onChange={(e) =>
                       setCourtForm({ ...courtForm, isActive: e.target.checked })
                     }
-                    className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-[#ccff00] focus:ring-[#ccff00] focus:ring-2 accent-[#ccff00] cursor-pointer"
+                    className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-[#2DD4BF] focus:ring-[#2DD4BF] focus:ring-2 accent-[#2DD4BF] cursor-pointer"
                   />
                   <Label
                     htmlFor="court-active"
@@ -1332,7 +1332,7 @@ export default function AdminPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-[#ccff00] text-black hover:bg-[#b3e600]"
+                className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
               >
                 {editingCourt ? "Update Court" : "Create Court"}
               </Button>
@@ -1441,7 +1441,7 @@ export default function AdminPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-[#ccff00] text-black hover:bg-[#b3e600]"
+                className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
               >
                 {editingUser ? "Update User" : "Create User"}
               </Button>
@@ -1602,7 +1602,7 @@ export default function AdminPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-[#ccff00] text-black hover:bg-[#b3e600]"
+                className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
               >
                 Update Booking
               </Button>

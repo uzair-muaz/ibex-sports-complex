@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, ChevronRight, Calendar } from "lucide-react";
+import { CheckCircle, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { OPERATING_HOURS, CourtType } from "@/types";
 import { getCourts } from "../actions/courts";
 import { getBookingsByDate, createBooking } from "../actions/bookings";
@@ -11,9 +12,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 
 export default function BookingPage() {
-  const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
-  );
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedCourtType, setSelectedCourtType] =
     useState<CourtType>("PADEL");
   const [courts, setCourts] = useState<any[]>([]);
@@ -51,7 +50,8 @@ export default function BookingPage() {
   const loadBookings = async () => {
     setIsLoading(true);
     try {
-      const result = await getBookingsByDate(selectedDate);
+      const dateString = selectedDate.toISOString().split("T")[0];
+      const result = await getBookingsByDate(dateString);
       if (result.success) {
         // Filter bookings for selected court type
         const filtered = result.bookings.filter(
@@ -163,7 +163,7 @@ export default function BookingPage() {
 
       const result = await createBooking({
         courtType: selectedCourtType,
-        date: selectedDate,
+        date: selectedDate.toISOString().split("T")[0],
         startTime,
         duration,
         userName: formData.name,
@@ -206,7 +206,7 @@ export default function BookingPage() {
     <div className="min-h-screen bg-black text-white relative">
       <Navbar />
 
-      <div className="fixed top-0 left-0 w-full h-[50vh] bg-gradient-to-b from-[#ccff00]/10 to-transparent pointer-events-none" />
+      <div className="fixed top-0 left-0 w-full h-[50vh] bg-gradient-to-b from-[#2DD4BF]/10 to-transparent pointer-events-none" />
 
       <div className="pt-32 pb-24 px-6">
         <div className="max-w-7xl mx-auto space-y-12 relative z-10">
@@ -236,7 +236,7 @@ export default function BookingPage() {
                     }}
                     className={`px-8 py-3 rounded-xl text-sm font-semibold transition-all duration-300 ${
                       selectedCourtType === type
-                        ? "bg-[#ccff00] text-black shadow-[0_0_20px_rgba(204,255,0,0.3)] scale-[1.02]"
+                        ? "bg-[#2DD4BF] text-[#0F172A] shadow-[0_0_20px_rgba(45,212,191,0.3)] scale-[1.02]"
                         : "text-zinc-500 hover:text-zinc-300"
                     }`}
                   >
@@ -255,30 +255,27 @@ export default function BookingPage() {
 
           {/* Date & Info */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="relative w-full sm:w-auto">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
-                <Calendar className="w-5 h-5" />
-              </div>
-              <input
-                type="date"
-                value={selectedDate}
-                min={new Date().toISOString().split("T")[0]}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full sm:w-64 bg-zinc-900 border border-white/10 text-white pl-12 pr-4 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 text-lg font-medium appearance-none cursor-pointer hover:bg-zinc-800 transition-colors"
-              />
-            </div>
+            <DatePicker
+              date={selectedDate}
+              onDateChange={(date) => {
+                if (date) {
+                  setSelectedDate(date);
+                }
+              }}
+              minDate={new Date()}
+            />
 
             <div className="flex items-center gap-6 text-sm">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-zinc-800 border border-white/10" />
+                <div className="w-3 h-3 rounded-full bg-[#5EEAD4]/60 border border-[#5EEAD4]/80" />
                 <span className="text-zinc-500">Available</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-[#ccff00]" />
+                <div className="w-3 h-3 rounded-full bg-[#2DD4BF]" />
                 <span className="text-zinc-500">Selected</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-zinc-800 opacity-50 cursor-not-allowed" />
+                <div className="w-3 h-3 rounded-full bg-zinc-700/80 border border-zinc-600" />
                 <span className="text-zinc-500">Booked</span>
               </div>
             </div>
@@ -287,7 +284,7 @@ export default function BookingPage() {
           {/* Main Booking Grid */}
           {isLoading ? (
             <div className="flex items-center justify-center py-24">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ccff00]"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2DD4BF]"></div>
             </div>
           ) : (
             <div className="glass-panel rounded-3xl overflow-hidden p-1">
@@ -316,13 +313,13 @@ export default function BookingPage() {
                         className="flex-1 min-w-[200px] border-r border-white/5 last:border-0"
                       >
                         <div className="h-24 p-4 border-b border-white/5 flex flex-col justify-center bg-black/20 group">
-                          <h3 className="font-semibold text-white group-hover:text-[#ccff00] transition-colors">
+                          <h3 className="font-semibold text-white group-hover:text-[#2DD4BF] transition-colors">
                             {court.name}
                           </h3>
                           <p className="text-xs text-zinc-500 truncate mt-1">
                             {court.description}
                           </p>
-                          <p className="text-xs text-[#ccff00] mt-1">
+                          <p className="text-xs text-[#2DD4BF] mt-1">
                             PKR {court.pricePerHour}/hr{" "}
                             {court.pricePerHour === 0 && "(Free)"}
                           </p>
@@ -347,17 +344,17 @@ export default function BookingPage() {
                                     w-full h-full rounded-lg transition-all duration-300 relative overflow-hidden
                                     ${
                                       isBooked
-                                        ? "bg-zinc-900/50 opacity-30 cursor-not-allowed"
+                                        ? "bg-zinc-800/50 border border-zinc-700/60 cursor-not-allowed opacity-75"
                                         : isSelected
-                                          ? "bg-[#ccff00] shadow-[0_0_15px_rgba(204,255,0,0.5)]"
-                                          : "bg-white/5 hover:bg-white/10"
+                                          ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
+                                          : "bg-[#5EEAD4]/20 border border-[#5EEAD4]/40 hover:bg-[#5EEAD4]/30 hover:border-[#5EEAD4]/60"
                                     }
                                   `}
                                 >
                                   {isSelected && (
                                     <motion.div
                                       layoutId="check"
-                                      className="absolute inset-0 flex items-center justify-center text-black"
+                                      className="absolute inset-0 flex items-center justify-center text-[#0F172A]"
                                     >
                                       <CheckCircle className="w-4 h-4" />
                                     </motion.div>
@@ -414,7 +411,7 @@ export default function BookingPage() {
                 <Button
                   onClick={() => setShowModal(true)}
                   size="lg"
-                  className="flex-1 md:flex-none min-w-[200px] bg-[#ccff00] text-black hover:bg-[#b3e600]"
+                  className="flex-1 md:flex-none min-w-[200px] bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
                 >
                   Proceed to Checkout <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
@@ -439,14 +436,14 @@ export default function BookingPage() {
             className="relative bg-[#09090b] border border-white/10 p-8 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden"
           >
             {/* Glossy Effect */}
-            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-[#ccff00]/10 rounded-full blur-[80px]" />
+            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-[#2DD4BF]/10 rounded-full blur-[80px]" />
 
             {formStatus === "success" ? (
               <div className="text-center py-12 relative z-10">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="w-20 h-20 bg-[#ccff00] text-black rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(204,255,0,0.4)]"
+                  className="w-20 h-20 bg-[#2DD4BF] text-[#0F172A] rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(45,212,191,0.4)]"
                 >
                   <CheckCircle className="w-10 h-10" />
                 </motion.div>
@@ -466,7 +463,12 @@ export default function BookingPage() {
                   <h3 className="text-2xl font-bold text-white">Checkout</h3>
                   <div className="flex items-center gap-2 mt-2 text-zinc-400 text-sm">
                     <span className="bg-zinc-800 px-2 py-1 rounded text-white">
-                      {selectedDate}
+                      {selectedDate.toLocaleDateString("en-US", {
+                        weekday: "short",
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
                     </span>
                     <span>•</span>
                     <span>
@@ -496,7 +498,7 @@ export default function BookingPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, name: e.target.value })
                       }
-                      className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00] transition-all outline-none"
+                      className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-[#2DD4BF]/50 focus:border-[#2DD4BF] transition-all outline-none"
                       placeholder="Enter full name"
                     />
                   </div>
@@ -511,7 +513,7 @@ export default function BookingPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
                       }
-                      className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00] transition-all outline-none"
+                      className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-[#2DD4BF]/50 focus:border-[#2DD4BF] transition-all outline-none"
                       placeholder="name@example.com"
                     />
                   </div>
@@ -525,7 +527,7 @@ export default function BookingPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, phone: e.target.value })
                       }
-                      className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00] transition-all outline-none"
+                      className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-[#2DD4BF]/50 focus:border-[#2DD4BF] transition-all outline-none"
                       placeholder="+1 (555) 123-4567"
                     />
                   </div>
@@ -545,7 +547,7 @@ export default function BookingPage() {
                   </Button>
                   <Button
                     type="submit"
-                    className="flex-1 bg-[#ccff00] text-black hover:bg-[#b3e600]"
+                    className="flex-1 bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
                     isLoading={formStatus === "loading"}
                   >
                     Confirm Booking

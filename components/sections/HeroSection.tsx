@@ -43,7 +43,7 @@ export const HeroSection = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Button size="lg" className="group relative h-16 px-12 text-xl rounded-full bg-[#ccff00] text-black font-bold border-0 overflow-hidden shadow-2xl shadow-[#ccff00]/30 hover:shadow-[#ccff00]/50 transition-all duration-200 cursor-pointer">
+              <Button size="lg" className="group relative h-16 px-12 text-xl rounded-full bg-[#2DD4BF] text-[#0F172A] font-bold border-0 overflow-hidden shadow-2xl shadow-[#2DD4BF]/30 hover:shadow-[#2DD4BF]/50 transition-all duration-200 cursor-pointer">
                 <span className="relative z-10 flex items-center">
                   Book Court
                   <motion.div
@@ -55,7 +55,7 @@ export const HeroSection = () => {
                 </span>
                 {/* Hover gradient overlay */}
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-[#a8d600] to-[#ccff00] opacity-0 group-hover:opacity-100"
+                  className="absolute inset-0 bg-gradient-to-r from-[#14B8A6] to-[#2DD4BF] opacity-0 group-hover:opacity-100"
                   transition={{ duration: 0.2 }}
                 />
                 {/* Shine effect */}
@@ -66,7 +66,7 @@ export const HeroSection = () => {
                 />
                 {/* Glow on hover */}
                 <motion.div
-                  className="absolute -inset-1 bg-[#ccff00] rounded-full blur-xl opacity-0 group-hover:opacity-40"
+                  className="absolute -inset-1 bg-[#2DD4BF] rounded-full blur-xl opacity-0 group-hover:opacity-40"
                   transition={{ duration: 0.2 }}
                 />
               </Button>

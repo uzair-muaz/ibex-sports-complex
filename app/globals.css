@@ -94,7 +94,7 @@ body {
 
 /* Custom Utilities */
 .gradient-text {
-  background: linear-gradient(to right, #ccff00, #fef08a, #ccff00);
+  background: linear-gradient(to right, #2dd4bf, #5eead4, #2dd4bf);
   background-size: 200% 200%;
   background-clip: text;
   -webkit-background-clip: text;
@@ -266,12 +266,12 @@ body {
   }
 
   [data-slot="table-row"]:hover {
-    @apply bg-[#ccff00]/10;
+    @apply bg-[#2DD4BF]/10;
   }
 
   /* Input Focus States */
   [data-slot="input"]:focus-visible {
-    @apply border-[#ccff00] ring-[#ccff00]/50;
+    @apply border-[#2DD4BF] ring-[#2DD4BF]/50;
   }
 
   /* Select Styling */
@@ -284,7 +284,7 @@ body {
   }
 
   [data-slot="select-trigger"]:focus-visible {
-    @apply border-[#ccff00] ring-[#ccff00]/50;
+    @apply border-[#2DD4BF] ring-[#2DD4BF]/50;
   }
 
   [data-slot="select-content"] {
@@ -296,7 +296,7 @@ body {
   }
 
   [data-slot="select-item"]:focus {
-    @apply bg-[#ccff00] text-black;
+    @apply bg-[#2DD4BF] text-[#0F172A];
   }
 
   /* Tabs Styling */
@@ -313,7 +313,7 @@ body {
   }
 
   [data-slot="tabs-trigger"][data-state="active"] {
-    @apply bg-[#ccff00] text-black;
+    @apply bg-[#2DD4BF] text-[#0F172A];
   }
 
   /* Button Cursor */
@@ -327,7 +327,7 @@ body {
 
   /* Button Outline Variant */
   button[class*="outline"]:hover {
-    @apply bg-[#ccff00] text-black border-[#ccff00];
+    @apply bg-[#2DD4BF] text-[#0F172A] border-[#2DD4BF];
   }
 
   /* Card Styling */
