@@ -1,4 +1,4 @@
-export type CourtType = "PADEL" | "CRICKET" | "PICKLEBALL";
+export type CourtType = "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
 
 export interface Court {
   _id: string;

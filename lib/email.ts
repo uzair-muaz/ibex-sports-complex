@@ -32,7 +32,7 @@ export async function sendBookingConfirmationEmail(data: BookingConfirmationEmai
     const { data: emailData, error } = await resend.emails.send({
       from: fromEmail,
       to: data.userEmail,
-      subject: `Booking Confirmed - IBEX Arena`,
+      subject: `Booking Confirmed - IBEX Sports Arena`,
       html: `...`,
     });
 

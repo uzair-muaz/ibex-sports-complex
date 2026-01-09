@@ -1,32 +1,44 @@
-import { Metadata } from 'next';
-import { Navbar } from '@/components/Navbar';
-import { Footer } from '@/components/Footer';
-import { HeroSection } from '@/components/sections/HeroSection';
-import { MarqueeSection } from '@/components/sections/MarqueeSection';
-import { FacilitiesSection } from '@/components/sections/FacilitiesSection';
-import { AmenitiesSection } from '@/components/sections/AmenitiesSection';
-import { GetInTouchSection } from '@/components/sections/GetInTouchSection';
-import { InfiniteGallery } from '@/components/ui/InfiniteScroll';
-import { ParallaxSection } from '@/components/ui/ParallaxSection';
-import { TextReveal } from '@/components/ui/TextReveal';
-import { GALLERY_IMAGES } from '@/types';
-import { getCourts } from './actions/courts';
+import { Metadata } from "next";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
+import { HeroSection } from "@/components/sections/HeroSection";
+import { MarqueeSection } from "@/components/sections/MarqueeSection";
+import { FacilitiesSection } from "@/components/sections/FacilitiesSection";
+import { AmenitiesSection } from "@/components/sections/AmenitiesSection";
+import { GetInTouchSection } from "@/components/sections/GetInTouchSection";
+import { InfiniteGallery } from "@/components/ui/InfiniteScroll";
+import { ParallaxSection } from "@/components/ui/ParallaxSection";
+import { TextReveal } from "@/components/ui/TextReveal";
+import { GALLERY_IMAGES } from "@/types";
+import { getCourts } from "./actions/courts";
 
 export const metadata: Metadata = {
-  title: 'IBEX Arena - Premium Sports Court Booking',
-  description: 'Book premium Padel, Cricket, and Pickleball courts at IBEX Arena. Experience world-class facilities with professional-grade courts. Dynamic pricing available.',
-  keywords: ['sports arena', 'padel tennis', 'cricket', 'pickleball', 'court booking', 'IBEX Arena', 'sports facility', 'premium courts'],
+  title: "IBEX Sports Arena - Premium Sports Court Booking",
+  description:
+    "Book premium Padel, Cricket, Pickleball, and Futsal courts at IBEX Sports Arena. Experience world-class facilities with professional-grade courts. Dynamic pricing available.",
+  keywords: [
+    "sports arena",
+    "padel tennis",
+    "cricket",
+    "pickleball",
+    "futsal",
+    "court booking",
+    "IBEX Sports Arena",
+    "sports facility",
+    "premium courts",
+  ],
   openGraph: {
-    title: 'IBEX Arena - Premium Sports Court Booking',
-    description: 'Book premium sports courts at IBEX Arena. Experience world-class facilities with dynamic pricing.',
-    type: 'website',
-    locale: 'en_US',
-    siteName: 'IBEX Arena',
+    title: "IBEX Sports Arena - Premium Sports Court Booking",
+    description:
+      "Book premium sports courts at IBEX Sports Arena. Experience world-class facilities with dynamic pricing.",
+    type: "website",
+    locale: "en_US",
+    siteName: "IBEX Sports Arena",
   },
   twitter: {
-    card: 'summary_large_image',
-    title: 'IBEX Arena - Premium Sports Court Booking',
-    description: 'Book premium sports courts at IBEX Arena',
+    card: "summary_large_image",
+    title: "IBEX Sports Arena - Premium Sports Court Booking",
+    description: "Book premium sports courts at IBEX Sports Arena",
   },
 };
 
@@ -38,25 +50,27 @@ export default async function Home() {
   // Server-side: Fetch only prices from DB
   const result = await getCourts();
   const courts = result.success ? result.courts : [];
-  
-  const padelCourts = courts.filter((c: any) => c.type === 'PADEL');
-  const cricketCourts = courts.filter((c: any) => c.type === 'CRICKET');
-  const pickleballCourts = courts.filter((c: any) => c.type === 'PICKLEBALL');
+
+  const padelCourts = courts.filter((c: any) => c.type === "PADEL");
+  const cricketCourts = courts.filter((c: any) => c.type === "CRICKET");
+  const pickleballCourts = courts.filter((c: any) => c.type === "PICKLEBALL");
+  const futsalCourts = courts.filter((c: any) => c.type === "FUTSAL");
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white overflow-hidden transition-colors duration-200">
       <Navbar />
-      
+
       <HeroSection />
 
       <div className="relative z-30">
-        <MarqueeSection text="PADEL • CRICKET • PICKLEBALL • ELITE" />
+        <MarqueeSection text="PADEL • CRICKET • PICKLEBALL • FUTSAL" />
       </div>
 
-      <FacilitiesSection 
+      <FacilitiesSection
         padelCourts={padelCourts}
         cricketCourts={cricketCourts}
         pickleballCourts={pickleballCourts}
+        futsalCourts={futsalCourts}
       />
 
       <ParallaxSection speed={0.1}>

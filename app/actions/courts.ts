@@ -4,7 +4,7 @@ import connectDB from '@/lib/mongodb';
 import Court from '@/models/Court';
 import { revalidatePath } from 'next/cache';
 
-export async function getCourts(type?: 'PADEL' | 'CRICKET' | 'PICKLEBALL') {
+export async function getCourts(type?: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL') {
   try {
     await connectDB();
 
@@ -51,7 +51,7 @@ export async function getAllCourts() {
 
 export interface CreateCourtInput {
   name: string;
-  type: 'PADEL' | 'CRICKET' | 'PICKLEBALL';
+  type: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
   image?: string; // Images are hardcoded, optional
   description: string;
   pricePerHour: number;
@@ -89,7 +89,7 @@ export async function createCourt(input: CreateCourtInput) {
 export interface UpdateCourtInput {
   courtId: string;
   name?: string;
-  type?: 'PADEL' | 'CRICKET' | 'PICKLEBALL';
+  type?: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
   image?: string;
   description?: string;
   pricePerHour?: number;

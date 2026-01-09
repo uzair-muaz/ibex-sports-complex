@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, X, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -37,18 +38,22 @@ export const Navbar = () => {
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-3"
           >
-            <div className="relative">
-              <motion.div
-                className="w-10 h-10 md:w-12 md:h-12 bg-[#ccff00] rounded-xl flex items-center justify-center shadow-lg shadow-[#ccff00]/20"
-                whileHover={{
-                  rotate: [0, -5, 5, -5, 0],
-                  boxShadow: "0 0 30px rgba(204, 255, 0, 0.6)",
-                }}
-                transition={{ type: "spring", stiffness: 300 }}
-              >
-                <div className="w-0 h-0 border-l-[6px] md:border-l-[8px] border-l-transparent border-r-[6px] md:border-r-[8px] border-r-transparent border-b-[10px] md:border-b-[14px] border-b-black ml-0.5"></div>
-              </motion.div>
-            </div>
+            <motion.div
+              className="relative w-10 h-10 md:w-12 md:h-12"
+              whileHover={{
+                rotate: [0, -5, 5, -5, 0],
+              }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <Image
+                src="/logo.svg"
+                alt="IBEX Sports Complex Logo"
+                width={48}
+                height={48}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </motion.div>
             <motion.span
               className="text-xl md:text-2xl font-black tracking-tighter text-white dark:text-white"
               whileHover={{ color: "#ccff00" }}

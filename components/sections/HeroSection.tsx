@@ -21,14 +21,14 @@ export const HeroSection = () => {
           </div>
           <div className="overflow-hidden">
             <TextReveal className="text-8xl md:text-[11rem] font-black tracking-tighter leading-[0.85] gradient-text" delay={0.3}>
-              ARENA
+              SPORTS ARENA
             </TextReveal>
           </div>
         </div>
 
         <div className="max-w-xl mb-12">
           <TextReveal className="text-2xl md:text-3xl text-zinc-600 dark:text-zinc-300 font-light leading-relaxed" delay={0.6}>
-            Precision meets passion. The ultimate destination for Padel, Cricket & Pickleball.
+            Precision meets passion. The ultimate destination for Padel, Cricket, Pickleball & Futsal.
           </TextReveal>
         </div>
 

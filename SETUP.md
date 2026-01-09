@@ -1,4 +1,4 @@
-# IBEx Arena - Setup Guide
+# IBEX Sports Arena - Setup Guide
 
 ## 🚀 Quick Start Commands
 

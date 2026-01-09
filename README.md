@@ -1,4 +1,4 @@
-# IBEx Arena - Premium Sports Court Booking Platform
+# IBEX Sports Arena - Premium Sports Court Booking Platform
 
 A premium Next.js booking platform for sports courts (Padel, Cricket, Pickleball) built with modern technologies and Apple-inspired design.
 
@@ -246,4 +246,4 @@ For issues or questions, please contact the development team.
 
 ---
 
-**Built with ❤️ for IBEx Arena**
+**Built with ❤️ for IBEX Sports Arena**

@@ -6,7 +6,7 @@ import Court from '@/models/Court';
 import { revalidatePath } from 'next/cache';
 
 export interface CreateBookingInput {
-  courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL';
+  courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
   date: string;
   startTime: number;
   duration: number;

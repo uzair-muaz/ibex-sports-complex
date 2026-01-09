@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-export type CourtType = "PADEL" | "CRICKET" | "PICKLEBALL";
+export type CourtType = "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
 
 export interface ICourt extends Document {
   name: string;
@@ -22,7 +22,7 @@ const CourtSchema: Schema = new Schema(
     },
     type: {
       type: String,
-      enum: ["PADEL", "CRICKET", "PICKLEBALL"],
+      enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
       required: [true, "Court type is required"],
     },
     image: {

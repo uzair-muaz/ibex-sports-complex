@@ -16,28 +16,45 @@ export const authOptions = {
           throw new Error('Please enter your email and password');
         }
 
-        await connectDB();
-
-        const email = typeof credentials.email === 'string' ? credentials.email : String(credentials.email);
-        const password = typeof credentials.password === 'string' ? credentials.password : String(credentials.password);
-        const user = await User.findOne({ email: email.toLowerCase() });
-
-        if (!user) {
-          throw new Error('No user found with this email');
+        try {
+          await connectDB();
+        } catch (error: any) {
+          console.error('Database connection error:', error);
+          throw new Error(
+            'Unable to connect to database. Please check your MongoDB connection settings and ensure your IP is whitelisted in MongoDB Atlas.'
+          );
         }
 
-        const isPasswordValid = await bcrypt.compare(password, user.password);
+        try {
+          const email = typeof credentials.email === 'string' ? credentials.email : String(credentials.email);
+          const password = typeof credentials.password === 'string' ? credentials.password : String(credentials.password);
+          const user = await User.findOne({ email: email.toLowerCase() });
 
-        if (!isPasswordValid) {
-          throw new Error('Invalid password');
+          if (!user) {
+            throw new Error('No user found with this email');
+          }
+
+          const isPasswordValid = await bcrypt.compare(password, user.password);
+
+          if (!isPasswordValid) {
+            throw new Error('Invalid password');
+          }
+
+          return {
+            id: user._id.toString(),
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          };
+        } catch (error: any) {
+          // Re-throw authentication errors as-is
+          if (error.message.includes('No user found') || error.message.includes('Invalid password')) {
+            throw error;
+          }
+          // Wrap other errors
+          console.error('Authentication error:', error);
+          throw new Error('Authentication failed. Please try again.');
         }
-
-        return {
-          id: user._id.toString(),
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        };
       },
     }),
   ],

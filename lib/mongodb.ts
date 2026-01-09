@@ -30,6 +30,9 @@ async function connectDB(): Promise<typeof mongoose> {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      serverSelectionTimeoutMS: 10000, // 10 seconds timeout
+      socketTimeoutMS: 45000, // 45 seconds socket timeout
+      connectTimeoutMS: 10000, // 10 seconds connection timeout
     };
 
     const MONGODB_URI = getMongoDBUri();

@@ -42,6 +42,7 @@ async function seed() {
     // Create Courts - Only prices stored in DB, all other data is static/hardcoded
     // Images and descriptions are hardcoded in components, not stored in DB
     const courts = [
+      // PADEL Court
       {
         name: "Padel Court Alpha",
         type: "PADEL" as const,
@@ -50,14 +51,17 @@ async function seed() {
         pricePerHour: 5000, // PKR - Only this is dynamic from DB
         isActive: true,
       },
-      {
-        name: "Padel Court Beta",
-        type: "PADEL" as const,
-        image: "", // Images are hardcoded, not stored in DB
-        description: "Outdoor premium court with advanced shock absorption.", // Static data
-        pricePerHour: 5000, // PKR - Only this is dynamic from DB
-        isActive: true,
-      },
+      // Additional PADEL Court (commented out)
+      // {
+      //   name: "Padel Court Beta",
+      //   type: "PADEL" as const,
+      //   image: "", // Images are hardcoded, not stored in DB
+      //   description: "Outdoor premium court with advanced shock absorption.", // Static data
+      //   pricePerHour: 5000, // PKR - Only this is dynamic from DB
+      //   isActive: true,
+      // },
+
+      // CRICKET Court
       {
         name: "The Oval Net",
         type: "CRICKET" as const,
@@ -66,14 +70,17 @@ async function seed() {
         pricePerHour: 8000, // PKR - Only this is dynamic from DB
         isActive: true,
       },
-      {
-        name: "Lords Practice Area",
-        type: "CRICKET" as const,
-        image: "", // Images are hardcoded, not stored in DB
-        description: "Traditional turf net for spin practice.", // Static data
-        pricePerHour: 8000, // PKR - Only this is dynamic from DB
-        isActive: true,
-      },
+      // Additional CRICKET Court (commented out)
+      // {
+      //   name: "Lords Practice Area",
+      //   type: "CRICKET" as const,
+      //   image: "", // Images are hardcoded, not stored in DB
+      //   description: "Traditional turf net for spin practice.", // Static data
+      //   pricePerHour: 8000, // PKR - Only this is dynamic from DB
+      //   isActive: true,
+      // },
+
+      // PICKLEBALL Court
       {
         name: "Pickleball Court Prime",
         type: "PICKLEBALL" as const,
@@ -83,12 +90,24 @@ async function seed() {
         pricePerHour: 4000, // PKR - Only this is dynamic from DB
         isActive: true,
       },
+      // Additional PICKLEBALL Court (commented out)
+      // {
+      //   name: "Pickleball Court Elite",
+      //   type: "PICKLEBALL" as const,
+      //   image: "", // Images are hardcoded, not stored in DB
+      //   description: "Outdoor pickleball court with weather-resistant surface.", // Static data
+      //   pricePerHour: 0, // Free court - Only this is dynamic from DB
+      //   isActive: true,
+      // },
+
+      // FUTSAL Court
       {
-        name: "Pickleball Court Elite",
-        type: "PICKLEBALL" as const,
+        name: "Futsal Court Prime",
+        type: "FUTSAL" as const,
         image: "", // Images are hardcoded, not stored in DB
-        description: "Outdoor pickleball court with weather-resistant surface.", // Static data
-        pricePerHour: 0, // Free court - Only this is dynamic from DB
+        description:
+          "Professional indoor futsal court with FIFA-approved synthetic surface.", // Static data
+        pricePerHour: 6000, // PKR - Only this is dynamic from DB
         isActive: true,
       },
     ];

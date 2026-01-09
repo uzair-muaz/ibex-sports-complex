@@ -101,7 +101,7 @@ export default function AdminPage() {
   const [editingCourt, setEditingCourt] = useState<Court | null>(null);
   const [courtForm, setCourtForm] = useState({
     name: "",
-    type: "PADEL" as "PADEL" | "CRICKET" | "PICKLEBALL",
+    type: "PADEL" as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
     description: "",
     pricePerHour: 0,
     isActive: true,
@@ -1254,6 +1254,7 @@ export default function AdminPage() {
                     <SelectItem value="PADEL">Padel</SelectItem>
                     <SelectItem value="CRICKET">Cricket</SelectItem>
                     <SelectItem value="PICKLEBALL">Pickleball</SelectItem>
+                    <SelectItem value="FUTSAL">Futsal</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -19,6 +19,7 @@ interface FacilitiesSectionProps {
   padelCourts: PriceData[];
   cricketCourts: PriceData[];
   pickleballCourts: PriceData[];
+  futsalCourts: PriceData[];
 }
 
 // SWR fetcher for client-side price updates
@@ -35,6 +36,8 @@ const premiumImages = {
   cricket:
     "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1920&q=90&auto=format&fit=crop",
   pickleball:
+    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1920&q=90&auto=format&fit=crop",
+  futsal:
     "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1920&q=90&auto=format&fit=crop",
 };
 
@@ -54,12 +57,18 @@ const staticCourtData = {
     description:
       "Premium indoor pickleball court with professional-grade surface.",
   },
+  futsal: {
+    name: "Futsal Court",
+    description:
+      "Professional indoor futsal court with FIFA-approved synthetic surface.",
+  },
 };
 
 export const FacilitiesSection = ({
   padelCourts: initialPadelCourts,
   cricketCourts: initialCricketCourts,
   pickleballCourts: initialPickleballCourts,
+  futsalCourts: initialFutsalCourts,
 }: FacilitiesSectionProps) => {
   // SWR for real-time price updates (stale-while-revalidate)
   // Falls back to initial ISR data if fetch fails
@@ -79,11 +88,13 @@ export const FacilitiesSection = ({
     ...initialPadelCourts,
     ...initialCricketCourts,
     ...initialPickleballCourts,
+    ...initialFutsalCourts,
   ];
 
   const padelCourts = allCourts.filter((c) => c.type === "PADEL");
   const cricketCourts = allCourts.filter((c) => c.type === "CRICKET");
   const pickleballCourts = allCourts.filter((c) => c.type === "PICKLEBALL");
+  const futsalCourts = allCourts.filter((c) => c.type === "FUTSAL");
   return (
     <section className="py-32 px-6 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-200 relative z-20">
       <div className="max-w-7xl mx-auto space-y-24">
@@ -208,6 +219,43 @@ export const FacilitiesSection = ({
                   </h3>
                   <p className="text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
                     {staticCourtData.pickleball.description}
+                  </p>
+                </div>
+              </motion.div>
+            </ParallaxSection>
+          )}
+
+          {futsalCourts.length > 0 && (
+            <ParallaxSection speed={0.2}>
+              <motion.div
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-10%" }}
+                transition={{ duration: 0.8, delay: 0.6 }}
+                className="relative group overflow-hidden rounded-[2.5rem] h-[600px] mt-0 md:mt-24 shadow-2xl cursor-pointer"
+              >
+                <Image
+                  src={premiumImages.futsal}
+                  alt={staticCourtData.futsal.name}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-cover transition-transform duration-1000 group-hover:scale-110"
+                  priority
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[#ccff00] font-mono text-sm tracking-widest uppercase font-bold">
+                      04 — Futsal
+                    </span>
+                    <PricingBadge
+                      price={futsalCourts[0]?.pricePerHour || 6000}
+                    />
+                  </div>
+                  <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                    {staticCourtData.futsal.name}
+                  </h3>
+                  <p className="text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                    {staticCourtData.futsal.description}
                   </p>
                 </div>
               </motion.div>

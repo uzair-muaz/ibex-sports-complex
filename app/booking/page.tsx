@@ -1,28 +1,35 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, ChevronRight, Calendar } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { OPERATING_HOURS, CourtType } from '@/types';
-import { getCourts } from '../actions/courts';
-import { getBookingsByDate, createBooking } from '../actions/bookings';
-import { Navbar } from '@/components/Navbar';
-import { Footer } from '@/components/Footer';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle, ChevronRight, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { OPERATING_HOURS, CourtType } from "@/types";
+import { getCourts } from "../actions/courts";
+import { getBookingsByDate, createBooking } from "../actions/bookings";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 
 export default function BookingPage() {
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [selectedCourtType, setSelectedCourtType] = useState<CourtType>('PADEL');
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
+  const [selectedCourtType, setSelectedCourtType] =
+    useState<CourtType>("PADEL");
   const [courts, setCourts] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
-  const [selectedSlots, setSelectedSlots] = useState<{courtId: string, hour: number}[]>([]);
+  const [selectedSlots, setSelectedSlots] = useState<
+    { courtId: string; hour: number }[]
+  >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  
+
   // Form State
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '' });
-  const [formStatus, setFormStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [formData, setFormData] = useState({ name: "", email: "", phone: "" });
+  const [formStatus, setFormStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -47,8 +54,9 @@ export default function BookingPage() {
       const result = await getBookingsByDate(selectedDate);
       if (result.success) {
         // Filter bookings for selected court type
-        const filtered = result.bookings.filter((b: any) => 
-          b.courtId?.type === selectedCourtType && b.status !== 'cancelled'
+        const filtered = result.bookings.filter(
+          (b: any) =>
+            b.courtId?.type === selectedCourtType && b.status !== "cancelled"
         );
         setBookings(filtered);
       }
@@ -60,27 +68,30 @@ export default function BookingPage() {
   };
 
   const isSlotBooked = (courtId: string, hour: number) => {
-    return bookings.some(b => {
-      const bookingCourtId = typeof b.courtId === 'object' ? b.courtId._id : b.courtId;
+    return bookings.some((b) => {
+      const bookingCourtId =
+        typeof b.courtId === "object" ? b.courtId._id : b.courtId;
       if (bookingCourtId !== courtId) return false;
-      
+
       const bookingStart = b.startTime;
       const bookingEnd = b.startTime + b.duration;
-      
+
       // Check if hour falls within booking range
       return hour >= bookingStart && hour < bookingEnd;
     });
   };
 
   const isSlotSelected = (courtId: string, hour: number) => {
-    return selectedSlots.some(s => s.courtId === courtId && s.hour === hour);
+    return selectedSlots.some((s) => s.courtId === courtId && s.hour === hour);
   };
 
   const toggleSlot = (courtId: string, hour: number) => {
     if (isSlotBooked(courtId, hour)) return;
 
-    const existingIndex = selectedSlots.findIndex(s => s.courtId === courtId && s.hour === hour);
-    
+    const existingIndex = selectedSlots.findIndex(
+      (s) => s.courtId === courtId && s.hour === hour
+    );
+
     if (existingIndex >= 0) {
       const newSlots = [...selectedSlots];
       newSlots.splice(existingIndex, 1);
@@ -94,25 +105,29 @@ export default function BookingPage() {
           setSelectedSlots([{ courtId, hour }]);
           return;
         }
-        
+
         // Same court - check if contiguous
-        const sortedHours = [...selectedSlots.map(s => s.hour), hour].sort((a, b) => a - b);
+        const sortedHours = [...selectedSlots.map((s) => s.hour), hour].sort(
+          (a, b) => a - b
+        );
         let isContiguous = true;
         for (let i = 0; i < sortedHours.length - 1; i++) {
-          if (sortedHours[i+1] !== sortedHours[i] + 1) {
+          if (sortedHours[i + 1] !== sortedHours[i] + 1) {
             isContiguous = false;
             break;
           }
         }
-        
+
         if (!isContiguous) {
           // Not contiguous - start new selection from this hour
           setSelectedSlots([{ courtId, hour }]);
           return;
         }
       }
-      
-      setSelectedSlots(prev => [...prev, { courtId, hour }].sort((a, b) => a.hour - b.hour));
+
+      setSelectedSlots((prev) =>
+        [...prev, { courtId, hour }].sort((a, b) => a.hour - b.hour)
+      );
     }
   };
 
@@ -120,10 +135,10 @@ export default function BookingPage() {
     e.preventDefault();
     if (selectedSlots.length === 0) return;
 
-    const sortedHours = selectedSlots.map(s => s.hour).sort((a, b) => a - b);
+    const sortedHours = selectedSlots.map((s) => s.hour).sort((a, b) => a - b);
     let isContiguous = true;
     for (let i = 0; i < sortedHours.length - 1; i++) {
-      if (sortedHours[i+1] !== sortedHours[i] + 1) {
+      if (sortedHours[i + 1] !== sortedHours[i] + 1) {
         isContiguous = false;
         break;
       }
@@ -139,9 +154,9 @@ export default function BookingPage() {
       return;
     }
 
-    setFormStatus('loading');
-    setErrorMessage('');
-    
+    setFormStatus("loading");
+    setErrorMessage("");
+
     try {
       const startTime = sortedHours[0];
       const duration = selectedSlots.length;
@@ -157,50 +172,62 @@ export default function BookingPage() {
       });
 
       if (result.success) {
-        setFormStatus('success');
+        setFormStatus("success");
         setTimeout(() => {
           setShowModal(false);
-          setFormStatus('idle');
+          setFormStatus("idle");
           setSelectedSlots([]);
-          setFormData({ name: '', email: '', phone: '' });
+          setFormData({ name: "", email: "", phone: "" });
           loadBookings();
         }, 2000);
       } else {
-        setFormStatus('error');
-        setErrorMessage(result.error || 'Failed to create booking');
+        setFormStatus("error");
+        setErrorMessage(result.error || "Failed to create booking");
       }
     } catch (err: any) {
       console.error(err);
-      setFormStatus('error');
-      setErrorMessage(err.message || 'An error occurred');
+      setFormStatus("error");
+      setErrorMessage(err.message || "An error occurred");
     }
   };
 
-  const hours = Array.from({ length: OPERATING_HOURS.end - OPERATING_HOURS.start }, (_, i) => OPERATING_HOURS.start + i);
+  const hours = Array.from(
+    { length: OPERATING_HOURS.end - OPERATING_HOURS.start },
+    (_, i) => OPERATING_HOURS.start + i
+  );
 
   const selectedDuration = selectedSlots.length;
-  const selectedCourt = courts.find(c => c._id === selectedSlots[0]?.courtId);
-  const totalPrice = selectedCourt ? selectedCourt.pricePerHour * selectedDuration : 0;
+  const selectedCourt = courts.find((c) => c._id === selectedSlots[0]?.courtId);
+  const totalPrice = selectedCourt
+    ? selectedCourt.pricePerHour * selectedDuration
+    : 0;
 
   return (
     <div className="min-h-screen bg-black text-white relative">
       <Navbar />
-      
+
       <div className="fixed top-0 left-0 w-full h-[50vh] bg-gradient-to-b from-[#ccff00]/10 to-transparent pointer-events-none" />
-      
+
       <div className="pt-32 pb-24 px-6">
         <div className="max-w-7xl mx-auto space-y-12 relative z-10">
-          
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 pb-8 border-b border-white/5">
             <div className="space-y-4">
-              <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-white">Reserve<br/>Your Spot.</h1>
-              <p className="text-zinc-400 text-lg max-w-md">Real-time availability for our premium courts.</p>
+              <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-white">
+                Reserve
+                <br />
+                Your Spot.
+              </h1>
+              <p className="text-zinc-400 text-lg max-w-md">
+                Real-time availability for our premium courts.
+              </p>
             </div>
-            
+
             <div className="flex flex-col gap-4">
               <div className="bg-zinc-900/50 p-1 rounded-2xl border border-white/10 flex">
-                {(['PADEL', 'CRICKET', 'PICKLEBALL'] as CourtType[]).map(type => (
+                {(
+                  ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"] as CourtType[]
+                ).map((type) => (
                   <button
                     key={type}
                     onClick={() => {
@@ -208,12 +235,18 @@ export default function BookingPage() {
                       setSelectedSlots([]);
                     }}
                     className={`px-8 py-3 rounded-xl text-sm font-semibold transition-all duration-300 ${
-                      selectedCourtType === type 
-                        ? 'bg-[#ccff00] text-black shadow-[0_0_20px_rgba(204,255,0,0.3)] scale-[1.02]' 
-                        : 'text-zinc-500 hover:text-zinc-300'
+                      selectedCourtType === type
+                        ? "bg-[#ccff00] text-black shadow-[0_0_20px_rgba(204,255,0,0.3)] scale-[1.02]"
+                        : "text-zinc-500 hover:text-zinc-300"
                     }`}
                   >
-                    {type === 'PADEL' ? 'Padel Tennis' : type === 'CRICKET' ? 'Cricket Nets' : 'Pickleball'}
+                    {type === "PADEL"
+                      ? "Padel Tennis"
+                      : type === "CRICKET"
+                        ? "Cricket Nets"
+                        : type === "PICKLEBALL"
+                          ? "Pickleball"
+                          : "Futsal"}
                   </button>
                 ))}
               </div>
@@ -222,33 +255,33 @@ export default function BookingPage() {
 
           {/* Date & Info */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-             <div className="relative w-full sm:w-auto">
-               <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
-                  <Calendar className="w-5 h-5" />
-               </div>
-               <input 
-                 type="date" 
-                 value={selectedDate}
-                 min={new Date().toISOString().split('T')[0]}
-                 onChange={(e) => setSelectedDate(e.target.value)}
-                 className="w-full sm:w-64 bg-zinc-900 border border-white/10 text-white pl-12 pr-4 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 text-lg font-medium appearance-none cursor-pointer hover:bg-zinc-800 transition-colors"
-               />
-             </div>
-             
-             <div className="flex items-center gap-6 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-zinc-800 border border-white/10" />
-                  <span className="text-zinc-500">Available</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#ccff00]" />
-                  <span className="text-zinc-500">Selected</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-zinc-800 opacity-50 cursor-not-allowed" />
-                  <span className="text-zinc-500">Booked</span>
-                </div>
-             </div>
+            <div className="relative w-full sm:w-auto">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <input
+                type="date"
+                value={selectedDate}
+                min={new Date().toISOString().split("T")[0]}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full sm:w-64 bg-zinc-900 border border-white/10 text-white pl-12 pr-4 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 text-lg font-medium appearance-none cursor-pointer hover:bg-zinc-800 transition-colors"
+              />
+            </div>
+
+            <div className="flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-zinc-800 border border-white/10" />
+                <span className="text-zinc-500">Available</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#ccff00]" />
+                <span className="text-zinc-500">Selected</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-zinc-800 opacity-50 cursor-not-allowed" />
+                <span className="text-zinc-500">Booked</span>
+              </div>
+            </div>
           </div>
 
           {/* Main Booking Grid */}
@@ -260,38 +293,51 @@ export default function BookingPage() {
             <div className="glass-panel rounded-3xl overflow-hidden p-1">
               <div className="overflow-x-auto">
                 <div className="min-w-[800px] grid grid-cols-[100px_1fr]">
-                  
                   {/* Hours Column */}
                   <div className="border-r border-white/5 bg-black/20">
-                     <div className="h-24 flex items-center justify-center border-b border-white/5 text-zinc-500 text-xs font-mono uppercase tracking-widest">
-                       Time
-                     </div>
-                     {hours.map(hour => (
-                       <div key={hour} className="h-14 flex items-center justify-center text-xs text-zinc-600 font-mono border-b border-dashed border-white/5">
-                         {hour}:00
-                       </div>
-                     ))}
+                    <div className="h-24 flex items-center justify-center border-b border-white/5 text-zinc-500 text-xs font-mono uppercase tracking-widest">
+                      Time
+                    </div>
+                    {hours.map((hour) => (
+                      <div
+                        key={hour}
+                        className="h-14 flex items-center justify-center text-xs text-zinc-600 font-mono border-b border-dashed border-white/5"
+                      >
+                        {hour}:00
+                      </div>
+                    ))}
                   </div>
 
                   {/* Courts Columns */}
                   <div className="flex">
-                    {courts.map(court => (
-                      <div key={court._id} className="flex-1 min-w-[200px] border-r border-white/5 last:border-0">
+                    {courts.map((court) => (
+                      <div
+                        key={court._id}
+                        className="flex-1 min-w-[200px] border-r border-white/5 last:border-0"
+                      >
                         <div className="h-24 p-4 border-b border-white/5 flex flex-col justify-center bg-black/20 group">
-                          <h3 className="font-semibold text-white group-hover:text-[#ccff00] transition-colors">{court.name}</h3>
-                          <p className="text-xs text-zinc-500 truncate mt-1">{court.description}</p>
+                          <h3 className="font-semibold text-white group-hover:text-[#ccff00] transition-colors">
+                            {court.name}
+                          </h3>
+                          <p className="text-xs text-zinc-500 truncate mt-1">
+                            {court.description}
+                          </p>
                           <p className="text-xs text-[#ccff00] mt-1">
-                            PKR {court.pricePerHour}/hr {court.pricePerHour === 0 && '(Free)'}
+                            PKR {court.pricePerHour}/hr{" "}
+                            {court.pricePerHour === 0 && "(Free)"}
                           </p>
                         </div>
-                        
+
                         <div className="">
-                          {hours.map(hour => {
+                          {hours.map((hour) => {
                             const isBooked = isSlotBooked(court._id, hour);
                             const isSelected = isSlotSelected(court._id, hour);
-                            
+
                             return (
-                              <div key={hour} className="h-14 p-1 border-b border-white/5">
+                              <div
+                                key={hour}
+                                className="h-14 p-1 border-b border-white/5"
+                              >
                                 <motion.button
                                   whileHover={!isBooked ? { scale: 0.98 } : {}}
                                   whileTap={!isBooked ? { scale: 0.95 } : {}}
@@ -299,15 +345,23 @@ export default function BookingPage() {
                                   disabled={isBooked}
                                   className={`
                                     w-full h-full rounded-lg transition-all duration-300 relative overflow-hidden
-                                    ${isBooked 
-                                      ? 'bg-zinc-900/50 opacity-30 cursor-not-allowed' 
-                                      : isSelected
-                                        ? 'bg-[#ccff00] shadow-[0_0_15px_rgba(204,255,0,0.5)]'
-                                        : 'bg-white/5 hover:bg-white/10'
+                                    ${
+                                      isBooked
+                                        ? "bg-zinc-900/50 opacity-30 cursor-not-allowed"
+                                        : isSelected
+                                          ? "bg-[#ccff00] shadow-[0_0_15px_rgba(204,255,0,0.5)]"
+                                          : "bg-white/5 hover:bg-white/10"
                                     }
                                   `}
                                 >
-                                  {isSelected && <motion.div layoutId="check" className="absolute inset-0 flex items-center justify-center text-black"><CheckCircle className="w-4 h-4" /></motion.div>}
+                                  {isSelected && (
+                                    <motion.div
+                                      layoutId="check"
+                                      className="absolute inset-0 flex items-center justify-center text-black"
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                    </motion.div>
+                                  )}
                                 </motion.button>
                               </div>
                             );
@@ -316,19 +370,17 @@ export default function BookingPage() {
                       </div>
                     ))}
                   </div>
-
                 </div>
               </div>
             </div>
           )}
-
         </div>
       </div>
 
       {/* Booking Drawer / Modal */}
       <AnimatePresence>
         {selectedSlots.length > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ y: 100 }}
             animate={{ y: 0 }}
             exit={{ y: 100 }}
@@ -337,19 +389,33 @@ export default function BookingPage() {
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-6">
                 <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center border border-white/10">
-                   <span className="text-2xl font-bold text-white">{selectedDuration}</span>
+                  <span className="text-2xl font-bold text-white">
+                    {selectedDuration}
+                  </span>
                 </div>
                 <div>
-                   <h3 className="text-lg font-semibold text-white">Hours Selected</h3>
-                   <p className="text-zinc-400 text-sm">
-                     {selectedCourt ? `${selectedCourt.name} • ` : ''}
-                     Total: PKR {totalPrice.toFixed(2)}
-                   </p>
+                  <h3 className="text-lg font-semibold text-white">
+                    Hours Selected
+                  </h3>
+                  <p className="text-zinc-400 text-sm">
+                    {selectedCourt ? `${selectedCourt.name} • ` : ""}
+                    Total: PKR {totalPrice.toFixed(2)}
+                  </p>
                 </div>
               </div>
               <div className="flex gap-4 w-full md:w-auto">
-                <Button variant="ghost" onClick={() => setSelectedSlots([])} className="flex-1 md:flex-none">Clear</Button>
-                <Button onClick={() => setShowModal(true)} size="lg" className="flex-1 md:flex-none min-w-[200px] bg-[#ccff00] text-black hover:bg-[#b3e600]">
+                <Button
+                  variant="ghost"
+                  onClick={() => setSelectedSlots([])}
+                  className="flex-1 md:flex-none"
+                >
+                  Clear
+                </Button>
+                <Button
+                  onClick={() => setShowModal(true)}
+                  size="lg"
+                  className="flex-1 md:flex-none min-w-[200px] bg-[#ccff00] text-black hover:bg-[#b3e600]"
+                >
                   Proceed to Checkout <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
@@ -361,10 +427,13 @@ export default function BookingPage() {
       {/* Confirmation Modal */}
       {showModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => {
-            if (formStatus !== 'loading') setShowModal(false);
-          }} />
-          <motion.div 
+          <div
+            className="absolute inset-0 bg-black/90 backdrop-blur-md"
+            onClick={() => {
+              if (formStatus !== "loading") setShowModal(false);
+            }}
+          />
+          <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className="relative bg-[#09090b] border border-white/10 p-8 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden"
@@ -372,26 +441,38 @@ export default function BookingPage() {
             {/* Glossy Effect */}
             <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-[#ccff00]/10 rounded-full blur-[80px]" />
 
-            {formStatus === 'success' ? (
+            {formStatus === "success" ? (
               <div className="text-center py-12 relative z-10">
-                <motion.div 
-                   initial={{ scale: 0 }} 
-                   animate={{ scale: 1 }} 
-                   className="w-20 h-20 bg-[#ccff00] text-black rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(204,255,0,0.4)]"
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="w-20 h-20 bg-[#ccff00] text-black rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(204,255,0,0.4)]"
                 >
                   <CheckCircle className="w-10 h-10" />
                 </motion.div>
-                <h3 className="text-3xl font-bold mb-3 text-white">Confirmed</h3>
-                <p className="text-zinc-400">Your booking has been confirmed successfully.</p>
+                <h3 className="text-3xl font-bold mb-3 text-white">
+                  Confirmed
+                </h3>
+                <p className="text-zinc-400">
+                  Your booking has been confirmed successfully.
+                </p>
               </div>
             ) : (
-              <form onSubmit={handleBookingSubmit} className="space-y-6 relative z-10">
+              <form
+                onSubmit={handleBookingSubmit}
+                className="space-y-6 relative z-10"
+              >
                 <div>
                   <h3 className="text-2xl font-bold text-white">Checkout</h3>
                   <div className="flex items-center gap-2 mt-2 text-zinc-400 text-sm">
-                    <span className="bg-zinc-800 px-2 py-1 rounded text-white">{selectedDate}</span>
+                    <span className="bg-zinc-800 px-2 py-1 rounded text-white">
+                      {selectedDate}
+                    </span>
                     <span>•</span>
-                    <span>{selectedDuration} {selectedDuration === 1 ? 'Hour' : 'Hours'}</span>
+                    <span>
+                      {selectedDuration}{" "}
+                      {selectedDuration === 1 ? "Hour" : "Hours"}
+                    </span>
                     {selectedCourt && <span>•</span>}
                     {selectedCourt && <span>PKR {totalPrice.toFixed(2)}</span>}
                   </div>
@@ -405,33 +486,45 @@ export default function BookingPage() {
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Player Name</label>
-                    <input 
+                    <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                      Player Name
+                    </label>
+                    <input
                       required
                       type="text"
                       value={formData.name}
-                      onChange={e => setFormData({...formData, name: e.target.value})}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
                       className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00] transition-all outline-none"
                       placeholder="Enter full name"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Email Address</label>
-                    <input 
+                    <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                      Email Address
+                    </label>
+                    <input
                       required
                       type="email"
                       value={formData.email}
-                      onChange={e => setFormData({...formData, email: e.target.value})}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
                       className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00] transition-all outline-none"
                       placeholder="name@example.com"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Phone (Optional)</label>
-                    <input 
+                    <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                      Phone (Optional)
+                    </label>
+                    <input
                       type="tel"
                       value={formData.phone}
-                      onChange={e => setFormData({...formData, phone: e.target.value})}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
                       className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00] transition-all outline-none"
                       placeholder="+1 (555) 123-4567"
                     />
@@ -439,10 +532,22 @@ export default function BookingPage() {
                 </div>
 
                 <div className="pt-4 flex gap-3">
-                  <Button type="button" variant="ghost" className="flex-1" onClick={() => {
-                    if (formStatus !== 'loading') setShowModal(false);
-                  }} disabled={formStatus === 'loading'}>Cancel</Button>
-                  <Button type="submit" className="flex-1 bg-[#ccff00] text-black hover:bg-[#b3e600]" isLoading={formStatus === 'loading'}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="flex-1"
+                    onClick={() => {
+                      if (formStatus !== "loading") setShowModal(false);
+                    }}
+                    disabled={formStatus === "loading"}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-[#ccff00] text-black hover:bg-[#b3e600]"
+                    isLoading={formStatus === "loading"}
+                  >
                     Confirm Booking
                   </Button>
                 </div>
@@ -451,9 +556,8 @@ export default function BookingPage() {
           </motion.div>
         </div>
       )}
-      
+
       <Footer />
     </div>
   );
 }
-
