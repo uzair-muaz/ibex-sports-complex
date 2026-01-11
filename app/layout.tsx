@@ -3,36 +3,48 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { getBaseUrl } from "@/lib/utils";
+import { WhatsAppFloat } from "@/components/WhatsAppFloat";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: {
-    default: "IBEX Sports Arena - Premium Sports Court Booking",
-    template: "%s | IBEX Sports Arena",
+    default: "Ibex sports Complex - Premium Sports Court Booking",
+    template: "%s | Ibex sports Complex",
   },
-  description: "Book premium Padel, Cricket, Pickleball, and Futsal courts at IBEX Sports Arena. Experience world-class facilities with professional-grade courts. Dynamic pricing available.",
-  keywords: ["sports arena", "padel tennis", "cricket", "pickleball", "futsal", "court booking", "IBEX Sports Arena", "sports facility", "premium courts", "sports booking"],
-  authors: [{ name: "IBEX Sports Arena" }],
-  creator: "IBEX Sports Arena",
-  publisher: "IBEX Sports Arena",
+  description:
+    "Book premium Padel, Cricket, Pickleball, and Futsal courts at Ibex sports Complex. Experience world-class facilities with professional-grade courts. Dynamic pricing available.",
+  keywords: [
+    "sports arena",
+    "padel tennis",
+    "cricket",
+    "pickleball",
+    "futsal",
+    "court booking",
+    "Ibex sports Complex",
+    "sports facility",
+    "premium courts",
+    "sports booking",
+  ],
+  authors: [{ name: "Ibex sports Complex" }],
+  creator: "Ibex sports Complex",
+  publisher: "Ibex sports Complex",
   metadataBase: new URL(getBaseUrl()),
   icons: {
     icon: [
       { url: "/logo.svg", type: "image/svg+xml" },
       { url: "/logo.png", type: "image/png" },
     ],
-    apple: [
-      { url: "/logo.png", type: "image/png" },
-    ],
+    apple: [{ url: "/logo.png", type: "image/png" }],
     shortcut: "/logo.png",
   },
   openGraph: {
-    title: "IBEX Sports Arena - Premium Sports Court Booking",
-    description: "Book premium sports courts at IBEX Sports Arena. Experience world-class facilities with dynamic pricing.",
+    title: "Ibex sports Complex - Premium Sports Court Booking",
+    description:
+      "Book premium sports courts at Ibex sports Complex. Experience world-class facilities with dynamic pricing.",
     type: "website",
     locale: "en_US",
-    siteName: "IBEX Sports Arena",
+    siteName: "Ibex sports Complex",
     url: getBaseUrl(),
     images: [
       {
@@ -45,8 +57,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "IBEX Sports Arena - Premium Sports Court Booking",
-    description: "Book premium sports courts at IBEX Sports Arena. Dynamic pricing available.",
+    title: "Ibex sports Complex - Premium Sports Court Booking",
+    description:
+      "Book premium sports courts at Ibex sports Complex. Dynamic pricing available.",
     images: ["/logo.png"],
   },
   robots: {
@@ -55,9 +68,9 @@ export const metadata: Metadata = {
     googleBot: {
       index: true,
       follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
   alternates: {
@@ -73,9 +86,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <WhatsAppFloat />
+        </Providers>
       </body>
     </html>
   );
 }
-

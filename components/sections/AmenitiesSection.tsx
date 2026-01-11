@@ -8,9 +8,8 @@ import { AnimatedCoffeeIcon, AnimatedFoodTruckIcon } from '@/components/ui/Lotti
 
 export const AmenitiesSection = () => {
   const premiumImages = {
-    // Temporary: using food image everywhere
-    cafe: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1920&q=90&auto=format&fit=crop',
-    food: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1920&q=90&auto=format&fit=crop',
+    cafe: '/images/coffee.jpg',
+    food: '/images/food-truck.jpg',
   };
 
   return (

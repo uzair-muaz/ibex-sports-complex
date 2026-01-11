@@ -9,14 +9,14 @@ export const Footer = () => {
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="relative w-8 h-8">
             <Image
-              src="/logo.svg"
+              src="/logo.png"
               alt="IBEX Sports Complex Logo"
               width={32}
               height={32}
-              className="w-full h-full object-contain"
+              className="w-full h-full"
             />
           </div>
-          <span>IBEX Systems v1.0</span>
+          <span>Ibex sports Complex</span>
         </Link>
         
         <div className="flex gap-8">
@@ -24,7 +24,7 @@ export const Footer = () => {
         </div>
 
         <div>
-            © {new Date().getFullYear()} IBEX Sports Arena.
+            © {new Date().getFullYear()} Ibex sports Complex.
         </div>
       </div>
     </footer>

@@ -38,22 +38,16 @@ export const Navbar = () => {
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-3"
           >
-            <motion.div
-              className="relative w-10 h-10 md:w-12 md:h-12"
-              whileHover={{
-                rotate: [0, -5, 5, -5, 0],
-              }}
-              transition={{ type: "spring", stiffness: 300 }}
-            >
+            <div className="relative w-10 h-10 md:w-12 md:h-12">
               <Image
-                src="/logo.svg"
+                src="/logo.png"
                 alt="IBEX Sports Complex Logo"
                 width={48}
                 height={48}
-                className="w-full h-full object-contain"
+                className="w-full h-full"
                 priority
               />
-            </motion.div>
+            </div>
             <motion.span
               className="text-xl md:text-2xl font-black tracking-tighter text-white dark:text-white"
               whileHover={{ color: "#2DD4BF" }}

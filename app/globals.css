@@ -325,6 +325,7 @@ body {
     @apply cursor-not-allowed;
   }
 
+
   /* Button Outline Variant */
   button[class*="outline"]:hover {
     @apply bg-[#2DD4BF] text-[#0F172A] border-[#2DD4BF];

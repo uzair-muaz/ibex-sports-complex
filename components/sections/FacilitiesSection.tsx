@@ -31,14 +31,10 @@ const fetcher = async (url: string) => {
 
 // Static images - hardcoded, not from DB
 const premiumImages = {
-  padel:
-    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1920&q=90&auto=format&fit=crop",
-  cricket:
-    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1920&q=90&auto=format&fit=crop",
-  pickleball:
-    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1920&q=90&auto=format&fit=crop",
-  futsal:
-    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1920&q=90&auto=format&fit=crop",
+  padel: "/images/paddle.jpg",
+  cricket: "/images/cricket.webp",
+  pickleball: "/images/pickleball.jpg",
+  futsal: "/images/futsal.jpg",
 };
 
 // Static court data - hardcoded
@@ -151,7 +147,7 @@ export const FacilitiesSection = ({
             </ParallaxSection>
           )}
 
-          {cricketCourts.length > 0 && (
+          {futsalCourts.length > 0 && (
             <ParallaxSection speed={0.2}>
               <motion.div
                 initial={{ opacity: 0, y: 50 }}
@@ -161,8 +157,8 @@ export const FacilitiesSection = ({
                 className="relative group overflow-hidden rounded-[2.5rem] h-[600px] mt-0 md:mt-24 shadow-2xl cursor-pointer"
               >
                 <Image
-                  src={premiumImages.cricket}
-                  alt={staticCourtData.cricket.name}
+                  src={premiumImages.futsal}
+                  alt={staticCourtData.futsal.name}
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-cover transition-transform duration-1000 group-hover:scale-110"
@@ -171,17 +167,17 @@ export const FacilitiesSection = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
-                      02 — Cricket
+                      02 — Futsal
                     </span>
                     <PricingBadge
-                      price={cricketCourts[0]?.pricePerHour || 8000}
+                      price={futsalCourts[0]?.pricePerHour || 6000}
                     />
                   </div>
                   <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">
-                    {staticCourtData.cricket.name}
+                    {staticCourtData.futsal.name}
                   </h3>
                   <p className="text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
-                    {staticCourtData.cricket.description}
+                    {staticCourtData.futsal.description}
                   </p>
                 </div>
               </motion.div>
@@ -225,7 +221,7 @@ export const FacilitiesSection = ({
             </ParallaxSection>
           )}
 
-          {futsalCourts.length > 0 && (
+          {cricketCourts.length > 0 && (
             <ParallaxSection speed={0.2}>
               <motion.div
                 initial={{ opacity: 0, y: 50 }}
@@ -235,8 +231,8 @@ export const FacilitiesSection = ({
                 className="relative group overflow-hidden rounded-[2.5rem] h-[600px] mt-0 md:mt-24 shadow-2xl cursor-pointer"
               >
                 <Image
-                  src={premiumImages.futsal}
-                  alt={staticCourtData.futsal.name}
+                  src={premiumImages.cricket}
+                  alt={staticCourtData.cricket.name}
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-cover transition-transform duration-1000 group-hover:scale-110"
@@ -245,17 +241,17 @@ export const FacilitiesSection = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
-                      04 — Futsal
+                      04 — Cricket
                     </span>
                     <PricingBadge
-                      price={futsalCourts[0]?.pricePerHour || 6000}
+                      price={cricketCourts[0]?.pricePerHour || 8000}
                     />
                   </div>
                   <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">
-                    {staticCourtData.futsal.name}
+                    {staticCourtData.cricket.name}
                   </h3>
                   <p className="text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
-                    {staticCourtData.futsal.description}
+                    {staticCourtData.cricket.description}
                   </p>
                 </div>
               </motion.div>

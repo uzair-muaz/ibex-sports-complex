@@ -13,9 +13,9 @@ import { GALLERY_IMAGES } from "@/types";
 import { getCourts } from "./actions/courts";
 
 export const metadata: Metadata = {
-  title: "IBEX Sports Arena - Premium Sports Court Booking",
+  title: "Ibex sports Complex - Premium Sports Court Booking",
   description:
-    "Book premium Padel, Cricket, Pickleball, and Futsal courts at IBEX Sports Arena. Experience world-class facilities with professional-grade courts. Dynamic pricing available.",
+    "Book premium Padel, Cricket, Pickleball, and Futsal courts at Ibex sports Complex. Experience world-class facilities with professional-grade courts. Dynamic pricing available.",
   keywords: [
     "sports arena",
     "padel tennis",
@@ -23,22 +23,22 @@ export const metadata: Metadata = {
     "pickleball",
     "futsal",
     "court booking",
-    "IBEX Sports Arena",
+    "Ibex sports Complex",
     "sports facility",
     "premium courts",
   ],
   openGraph: {
-    title: "IBEX Sports Arena - Premium Sports Court Booking",
+    title: "Ibex sports Complex - Premium Sports Court Booking",
     description:
-      "Book premium sports courts at IBEX Sports Arena. Experience world-class facilities with dynamic pricing.",
+      "Book premium sports courts at Ibex sports Complex. Experience world-class facilities with dynamic pricing.",
     type: "website",
     locale: "en_US",
-    siteName: "IBEX Sports Arena",
+    siteName: "Ibex sports Complex",
   },
   twitter: {
     card: "summary_large_image",
-    title: "IBEX Sports Arena - Premium Sports Court Booking",
-    description: "Book premium sports courts at IBEX Sports Arena",
+    title: "Ibex sports Complex - Premium Sports Court Booking",
+    description: "Book premium sports courts at Ibex sports Complex",
   },
 };
 

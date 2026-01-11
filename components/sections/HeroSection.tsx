@@ -21,7 +21,7 @@ export const HeroSection = () => {
           </div>
           <div className="overflow-hidden">
             <TextReveal className="text-8xl md:text-[11rem] font-black tracking-tighter leading-[0.85] gradient-text" delay={0.3}>
-              SPORTS ARENA
+              SPORTS COMPLEX
             </TextReveal>
           </div>
         </div>

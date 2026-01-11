@@ -38,34 +38,33 @@ export const OPERATING_HOURS = {
 
 export const GALLERY_IMAGES = [
   {
-    // Temporary: using food image everywhere
-    url: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1200&q=90&auto=format&fit=crop",
+    url: "/images/paddle.jpg",
     title: "Elite Padel Court",
     category: "Padel",
   },
   {
-    url: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1200&q=90&auto=format&fit=crop",
+    url: "/images/cricket.webp",
     title: "Professional Cricket",
     category: "Cricket",
   },
   {
-    url: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1200&q=90&auto=format&fit=crop",
+    url: "/images/pickleball.jpg",
     title: "Premium Pickleball",
     category: "Pickleball",
   },
   {
-    url: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1200&q=90&auto=format&fit=crop",
-    title: "Padel Action",
+    url: "/images/futsal.jpg",
+    title: "Futsal Action",
+    category: "Futsal",
+  },
+  {
+    url: "/images/paddle.jpg",
+    title: "Padel Excellence",
     category: "Padel",
   },
   {
-    url: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1200&q=90&auto=format&fit=crop",
+    url: "/images/cricket.webp",
     title: "Cricket Training",
     category: "Cricket",
-  },
-  {
-    url: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1200&q=90&auto=format&fit=crop",
-    title: "Pickleball Excellence",
-    category: "Pickleball",
   },
 ];
