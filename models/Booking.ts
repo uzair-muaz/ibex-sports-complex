@@ -9,7 +9,7 @@ export interface IBooking extends Document {
   duration: number; // Hours (minimum 1, can add 0.5 for 30 min)
   userName: string;
   userEmail: string;
-  userPhone?: string;
+  userPhone: string;
   status: BookingStatus;
   totalPrice: number;
   createdAt: Date;
@@ -53,6 +53,7 @@ const BookingSchema: Schema = new Schema(
     },
     userPhone: {
       type: String,
+      required: [true, 'User phone is required'],
       trim: true,
     },
     status: {

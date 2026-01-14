@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, ChevronRight } from "lucide-react";
+import { CheckCircle, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import { QRCode } from "@/components/ui/qr-code";
+import { Skeleton } from "@/components/ui/skeleton";
 import { OPERATING_HOURS, CourtType } from "@/types";
 import { getCourts } from "../actions/courts";
 import { getBookingsByDate, createBooking } from "../actions/bookings";
@@ -21,8 +23,10 @@ export default function BookingPage() {
     { courtId: string; slotTime: number }[]
   >([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCourts, setIsLoadingCourts] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectionError, setSelectionError] = useState<string>("");
+  const [createdBooking, setCreatedBooking] = useState<any>(null);
 
   // Form State
   const [formData, setFormData] = useState({ name: "", email: "", phone: "" });
@@ -41,10 +45,17 @@ export default function BookingPage() {
   }, [selectedDate, selectedCourtType]);
 
   const loadCourts = async () => {
-    const result = await getCourts(selectedCourtType);
-    if (result.success) {
-      setCourts(result.courts);
-      setSelectedSlots([]); // Reset selection when court type changes
+    setIsLoadingCourts(true);
+    try {
+      const result = await getCourts(selectedCourtType);
+      if (result.success) {
+        setCourts(result.courts);
+        setSelectedSlots([]); // Reset selection when court type changes
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoadingCourts(false);
     }
   };
 
@@ -229,13 +240,7 @@ export default function BookingPage() {
 
       if (result.success) {
         setFormStatus("success");
-        setTimeout(() => {
-          setShowModal(false);
-          setFormStatus("idle");
-          setSelectedSlots([]);
-          setFormData({ name: "", email: "", phone: "" });
-          loadBookings();
-        }, 2000);
+        setCreatedBooking(result.booking);
       } else {
         setFormStatus("error");
         setErrorMessage(result.error || "Failed to create booking");
@@ -320,7 +325,6 @@ export default function BookingPage() {
                   setSelectedDate(date);
                 }
               }}
-              minDate={new Date()}
             />
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -348,9 +352,46 @@ export default function BookingPage() {
           </div>
 
           {/* Main Booking Grid */}
-          {isLoading ? (
+          {isLoadingCourts ? (
+            <div className="space-y-4">
+              {/* Desktop Skeleton */}
+              <div className="hidden lg:block glass-panel rounded-3xl overflow-hidden p-1">
+                <div className="grid grid-cols-[130px_1fr]">
+                  <div className="border-r border-white/5 bg-black/20 p-4">
+                    <Skeleton className="h-24 w-full mb-2" />
+                    {[...Array(34)].map((_, i) => (
+                      <Skeleton key={i} className="h-7 w-full mb-0.5" />
+                    ))}
+                  </div>
+                  <div className="flex">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="flex-1 min-w-[200px] border-r border-white/5 last:border-0 p-4">
+                        <Skeleton className="h-24 w-full mb-2" />
+                        {[...Array(34)].map((_, j) => (
+                          <Skeleton key={j} className="h-7 w-full mb-0.5" />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {/* Mobile Skeleton */}
+              <div className="lg:hidden space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="glass-panel rounded-2xl overflow-hidden p-4">
+                    <Skeleton className="h-20 w-full mb-4" />
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {[...Array(24)].map((_, j) => (
+                        <Skeleton key={j} className="aspect-square rounded-lg" />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : isLoading ? (
             <div className="flex items-center justify-center py-24">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2DD4BF]"></div>
+              <Loader2 className="h-12 w-12 animate-spin text-[#2DD4BF]" />
             </div>
           ) : (
             <>
@@ -621,26 +662,135 @@ export default function BookingPage() {
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="relative bg-[#09090b] border border-white/10 p-4 md:p-6 lg:p-8 rounded-2xl md:rounded-3xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+            className="relative bg-[#09090b] border border-white/10 p-4 md:p-6 lg:p-8 rounded-2xl md:rounded-3xl w-full max-w-md lg:max-w-5xl shadow-2xl overflow-hidden"
           >
             {/* Glossy Effect */}
             <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-[#2DD4BF]/10 rounded-full blur-[80px]" />
 
-            {formStatus === "success" ? (
-              <div className="text-center py-8 md:py-12 relative z-10">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="w-16 h-16 md:w-20 md:h-20 bg-[#2DD4BF] text-[#0F172A] rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-[0_0_30px_rgba(45,212,191,0.4)]"
-                >
-                  <CheckCircle className="w-8 h-8 md:w-10 md:h-10" />
-                </motion.div>
-                <h3 className="text-2xl md:text-3xl font-bold mb-2 md:mb-3 text-white">
-                  Confirmed
-                </h3>
-                <p className="text-sm md:text-base text-zinc-400">
-                  Your booking has been confirmed successfully.
-                </p>
+            {formStatus === "success" && createdBooking ? (
+              <div className="relative z-10">
+                {/* Header - Same for all screen sizes */}
+                <div className="text-center mb-6 lg:mb-8">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="w-16 h-16 md:w-20 md:h-20 bg-[#2DD4BF] text-[#0F172A] rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-[0_0_30px_rgba(45,212,191,0.4)]"
+                  >
+                    <CheckCircle className="w-8 h-8 md:w-10 md:h-10" />
+                  </motion.div>
+                  <h3 className="text-2xl md:text-3xl font-bold mb-2 md:mb-3 text-white">
+                    Booking Confirmed!
+                  </h3>
+                  <p className="text-sm md:text-base text-zinc-400">
+                    Your booking has been confirmed successfully.
+                  </p>
+                </div>
+
+                {/* Content Layout - Responsive */}
+                <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+                  {/* Left Column - Booking Details */}
+                  <div className="flex-1 space-y-6">
+                    <div className="bg-zinc-900/50 rounded-xl p-4 md:p-6 space-y-3 text-left">
+                      <h4 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-4">Booking Details</h4>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-zinc-400 text-sm">Booking ID:</span>
+                          <span className="text-white font-mono text-sm font-semibold">#{createdBooking._id.slice(-8)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-zinc-400 text-sm">Court:</span>
+                          <span className="text-white text-sm">
+                            {typeof createdBooking.courtId === "object" && createdBooking.courtId?.name
+                              ? createdBooking.courtId.name
+                              : "Court"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-zinc-400 text-sm">Date:</span>
+                          <span className="text-white text-sm">
+                            {new Date(createdBooking.date).toLocaleDateString("en-US", {
+                              weekday: "short",
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-zinc-400 text-sm">Time:</span>
+                          <span className="text-white text-sm">
+                            {Math.floor(createdBooking.startTime)
+                              .toString()
+                              .padStart(2, "0")}
+                            :{createdBooking.startTime % 1 === 0 ? "00" : "30"} -{" "}
+                            {Math.floor(createdBooking.startTime + createdBooking.duration)
+                              .toString()
+                              .padStart(2, "0")}
+                            :{(createdBooking.startTime + createdBooking.duration) % 1 === 0 ? "00" : "30"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-zinc-400 text-sm">Duration:</span>
+                          <span className="text-white text-sm">{createdBooking.duration} hour{createdBooking.duration !== 1 ? "s" : ""}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t border-zinc-800">
+                          <span className="text-zinc-400 text-sm font-semibold">Total Price:</span>
+                          <span className="text-[#2DD4BF] font-bold text-lg">PKR {createdBooking.totalPrice.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column - QR Codes */}
+                  <div className="flex-1 space-y-4 lg:space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                      <div>
+                        <h4 className="text-sm font-semibold text-zinc-300 mb-3 text-center lg:text-left">Entry Verification QR Code</h4>
+                        <div className="flex justify-center lg:justify-start">
+                          <div className="bg-white p-3 md:p-4 rounded-xl inline-block">
+                            <QRCode
+                              value={`${typeof window !== "undefined" ? window.location.origin : ""}/booking/verify/${createdBooking._id}`}
+                              size={160}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-sm font-semibold text-zinc-300 mb-3 text-center lg:text-left">Feedback QR Code</h4>
+                        <div className="flex justify-center lg:justify-start">
+                          <div className="bg-white p-3 md:p-4 rounded-xl inline-block">
+                            <QRCode
+                              value={`${typeof window !== "undefined" ? window.location.origin : ""}/feedback/${createdBooking._id}`}
+                              size={160}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <p className="text-xs md:text-sm text-yellow-400 bg-yellow-500/10 border border-yellow-500/50 rounded-lg px-3 md:px-4 py-2 md:py-3 text-center lg:text-left">
+                      📸 Please take screenshots of both QR codes. Use the first for entry verification and the second to share your feedback after your booking.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Done Button */}
+                <div className="mt-6 lg:mt-8">
+                  <Button
+                    onClick={() => {
+                      setShowModal(false);
+                      setFormStatus("idle");
+                      setSelectedSlots([]);
+                      setFormData({ name: "", email: "", phone: "" });
+                      setCreatedBooking(null);
+                      loadBookings();
+                    }}
+                    className="w-full bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
+                  >
+                    Done
+                  </Button>
+                </div>
               </div>
             ) : (
               <form
@@ -727,16 +877,19 @@ export default function BookingPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                      Phone (Optional)
+                      Phone Number <span className="text-red-400">*</span>
                     </label>
                     <input
                       type="tel"
+                      required
                       value={formData.phone}
                       onChange={(e) =>
                         setFormData({ ...formData, phone: e.target.value })
                       }
                       className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-[#2DD4BF]/50 focus:border-[#2DD4BF] transition-all outline-none"
-                      placeholder="+1 (555) 123-4567"
+                      placeholder="+92 300 1234567"
+                      pattern="[+]?[0-9\s\-()]{10,}"
+                      title="Please enter a valid phone number"
                     />
                   </div>
                 </div>
@@ -758,9 +911,14 @@ export default function BookingPage() {
                     className="flex-1 order-1 sm:order-2 bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
                     disabled={formStatus === "loading"}
                   >
-                    {formStatus === "loading"
-                      ? "Processing..."
-                      : "Confirm Booking"}
+                    {formStatus === "loading" ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      "Confirm Booking"
+                    )}
                   </Button>
                 </div>
               </form>

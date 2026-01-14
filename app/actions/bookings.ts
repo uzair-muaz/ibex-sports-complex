@@ -12,12 +12,17 @@ export interface CreateBookingInput {
   duration: number;
   userName: string;
   userEmail: string;
-  userPhone?: string;
+  userPhone: string;
 }
 
 export async function createBooking(input: CreateBookingInput) {
   try {
     await connectDB();
+
+    // Validate phone number
+    if (!input.userPhone || input.userPhone.trim().length === 0) {
+      throw new Error('Phone number is required');
+    }
 
     // Validate minimum booking time (1 hour)
     if (input.duration < 1) {
