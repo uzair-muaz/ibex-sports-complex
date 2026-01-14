@@ -1,8 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Lock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,53 +15,79 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
+const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Please enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(6, "Password must be at least 6 characters"),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    mode: "onBlur", // Validate on blur for better UX
+  });
 
   useEffect(() => {
     // Redirect based on user role if already logged in
-    if (session) {
-      const userRole = (session.user as any)?.role;
+    if (session?.user) {
+      const userRole = session.user.role;
       if (userRole === "super_admin") {
         router.push("/admin/analytics");
       } else {
         router.push("/admin/bookings");
       }
-      setIsLoggingIn(false);
     }
   }, [session, router]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError("");
-    setIsLoggingIn(true);
-
+  const onSubmit = async (values: LoginFormValues) => {
     try {
       const result = await signIn("credentials", {
-        email,
-        password,
+        email: values.email,
+        password: values.password,
         redirect: false,
       });
 
       if (result?.error) {
-        setLoginError(result.error);
-        setIsLoggingIn(false);
+        // Set form-level error
+        form.setError("root", {
+          type: "manual",
+          message: result.error,
+        });
       } else if (result?.ok) {
         // Session will be updated by useSession hook
         // The useEffect above will handle the redirect based on role
-        // Keep loading state until redirect happens
       }
-    } catch (error: any) {
-      setLoginError(error.message || "Login failed");
-      setIsLoggingIn(false);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Login failed";
+      form.setError("root", {
+        type: "manual",
+        message: errorMessage,
+      });
     }
   };
 
@@ -96,55 +125,65 @@ export default function AdminPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            {loginError && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-zinc-200 text-sm">
-                {loginError}
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-zinc-200">
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@ibex.com"
-                required
-                className="bg-zinc-900 border-zinc-800"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-zinc-200">
-                Password
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                required
-                className="bg-zinc-900 border-zinc-800"
-              />
-            </div>
-            <Button
-              type="submit"
-              className="w-full bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-              disabled={isLoggingIn}
-            >
-              {isLoggingIn ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign In"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {form.formState.errors.root && (
+                <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm">
+                  {form.formState.errors.root.message}
+                </div>
               )}
-            </Button>
-          </form>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-zinc-200">Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="admin@ibex.com"
+                        className="bg-zinc-900 border-zinc-800"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-red-400" />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-zinc-200">Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Password"
+                        className="bg-zinc-900 border-zinc-800"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-red-400" />
+                  </FormItem>
+                )}
+              />
+              <Button
+                type="submit"
+                className="w-full bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
+                disabled={form.formState.isSubmitting}
+              >
+                {form.formState.isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>
