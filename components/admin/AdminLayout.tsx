@@ -158,7 +158,20 @@ export function AdminLayout({
             <Button
               variant="ghost"
               className="w-full justify-start text-zinc-400 hover:text-white text-sm"
-              onClick={() => signOut()}
+              onClick={async () => {
+                await signOut({ redirect: false });
+                // Use replace instead of push to prevent back button navigation
+                // Also clear any cached data
+                if (typeof window !== 'undefined') {
+                  // Clear any cached API responses
+                  window.localStorage.clear();
+                  window.sessionStorage.clear();
+                  // Force a hard redirect to prevent back button issues
+                  window.location.replace('/admin');
+                } else {
+                  router.replace('/admin');
+                }
+              }}
             >
               <LogOut className="w-4 h-4 mr-2" />
               Logout

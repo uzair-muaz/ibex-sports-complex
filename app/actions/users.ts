@@ -4,6 +4,7 @@ import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import bcrypt from 'bcryptjs';
 import { revalidatePath } from 'next/cache';
+import { isBuildTime } from '@/lib/build-utils';
 
 export interface CreateUserInput {
   email: string;
@@ -13,6 +14,13 @@ export interface CreateUserInput {
 }
 
 export async function createUser(input: CreateUserInput) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot create user during build',
+    };
+  }
+
   try {
     await connectDB();
 
@@ -59,6 +67,13 @@ export interface UpdateUserInput {
 }
 
 export async function updateUser(input: UpdateUserInput) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot update user during build',
+    };
+  }
+
   try {
     await connectDB();
 
@@ -108,6 +123,13 @@ export async function updateUser(input: UpdateUserInput) {
 }
 
 export async function deleteUser(userId: string) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot delete user during build',
+    };
+  }
+
   try {
     await connectDB();
 
@@ -132,6 +154,13 @@ export async function deleteUser(userId: string) {
 }
 
 export async function getAllUsers() {
+  if (isBuildTime()) {
+    return {
+      success: true,
+      users: [],
+    };
+  }
+
   try {
     await connectDB();
 

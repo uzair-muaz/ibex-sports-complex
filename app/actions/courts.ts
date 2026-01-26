@@ -3,8 +3,18 @@
 import connectDB from '@/lib/mongodb';
 import Court from '@/models/Court';
 import { revalidatePath } from 'next/cache';
+import { isBuildTime } from '@/lib/build-utils';
 
 export async function getCourts(type?: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL') {
+  // CRITICAL: Skip database connection during build to prevent hanging
+  // Next.js analyzes pages during build even with force-dynamic
+  if (isBuildTime()) {
+    return {
+      success: true,
+      courts: [],
+    };
+  }
+  
   try {
     await connectDB();
 
@@ -30,6 +40,13 @@ export async function getCourts(type?: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUT
 }
 
 export async function getAllCourts() {
+  if (isBuildTime()) {
+    return {
+      success: true,
+      courts: [],
+    };
+  }
+
   try {
     await connectDB();
 
@@ -58,6 +75,13 @@ export interface CreateCourtInput {
 }
 
 export async function createCourt(input: CreateCourtInput) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot create court during build',
+    };
+  }
+
   try {
     await connectDB();
 
@@ -97,6 +121,13 @@ export interface UpdateCourtInput {
 }
 
 export async function updateCourt(input: UpdateCourtInput) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot update court during build',
+    };
+  }
+
   try {
     await connectDB();
 
@@ -129,6 +160,13 @@ export async function updateCourt(input: UpdateCourtInput) {
 }
 
 export async function deleteCourt(courtId: string) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot delete court during build',
+    };
+  }
+
   try {
     await connectDB();
 

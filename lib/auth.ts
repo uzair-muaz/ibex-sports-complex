@@ -19,9 +19,10 @@ export const authOptions = {
         try {
           await connectDB();
         } catch (error: any) {
-          console.error('Database connection error:', error);
+          console.error('[Auth] Database connection error:', error.message || error);
+          // Return a more specific error that NextAuth can handle
           throw new Error(
-            'Unable to connect to database. Please check your MongoDB connection settings and ensure your IP is whitelisted in MongoDB Atlas.'
+            `Database connection failed: ${error.message || 'Unable to connect to database. Please check your MongoDB connection settings and ensure your IP is whitelisted in MongoDB Atlas.'}`
           );
         }
 
@@ -79,7 +80,21 @@ export const authOptions = {
   },
   session: {
     strategy: 'jwt' as const,
+    maxAge: 30 * 24 * 60 * 60,
   },
   secret: process.env.NEXTAUTH_SECRET,
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production' 
+        ? '__Secure-next-auth.session-token' 
+        : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
 };
 

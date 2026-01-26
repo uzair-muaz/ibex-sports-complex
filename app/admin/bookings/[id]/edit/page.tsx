@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth-utils";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,19 +17,12 @@ import {
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { DatePicker } from "@/components/ui/date-picker";
 import { motion } from "framer-motion";
-import {
-  getCourts,
-} from "../../../../actions/courts";
-import {
-  getBookingsByDate,
-  updateBooking,
-  getAllBookings,
-} from "../../../../actions/bookings";
+import api from "@/lib/api";
 import { OPERATING_HOURS } from "@/types";
 import type { Court, Booking } from "@/types";
 
 export default function EditBookingPage() {
-  const { data: session } = useSession();
+  useAuth(['admin', 'super_admin']);
   const router = useRouter();
   const params = useParams();
   const bookingId = params.id as string;
@@ -50,35 +43,27 @@ export default function EditBookingPage() {
     userName: "",
     userEmail: "",
     userPhone: "",
-    status: "confirmed" as "confirmed" | "cancelled" | "completed",
+    status: "pending_payment" as "pending_payment" | "confirmed" | "cancelled" | "completed",
+    amountPaid: 0,
   });
 
-  const userRole = (session?.user as any)?.role;
-  const isAdmin = userRole === "admin" || userRole === "super_admin";
-
   useEffect(() => {
-    if (session && !isAdmin) {
-      router.push("/admin/bookings");
-    }
-  }, [session, isAdmin, router]);
-
-  useEffect(() => {
-    if (session && isAdmin && bookingId) {
+    if (bookingId) {
       loadBooking();
     }
-  }, [session, isAdmin, bookingId]);
+  }, [bookingId]);
 
   useEffect(() => {
-    if (session && isAdmin && formData.courtType) {
+    if (formData.courtType) {
       loadCourts();
     }
-  }, [session, isAdmin, formData.courtType]);
+  }, [formData.courtType]);
 
   useEffect(() => {
-    if (session && isAdmin && formData.date) {
+    if (formData.date) {
       loadBookingsForDate();
     }
-  }, [session, isAdmin, formData.date]);
+  }, [formData.date]);
 
   useEffect(() => {
     // Pre-select slots when booking and courts are loaded
@@ -90,32 +75,31 @@ export default function EditBookingPage() {
   const loadBooking = async () => {
     setIsLoadingBooking(true);
     try {
-      const result = await getAllBookings();
-      if (result.success) {
-        const booking = result.bookings.find((b: Booking) => b._id === bookingId);
-        if (booking) {
-          const courtType = typeof booking.courtId === "object" &&
-            booking.courtId &&
-            "type" in booking.courtId
-              ? (booking.courtId as Court).type
-              : "PADEL";
-          
-          setFormData({
-            date: new Date(booking.date),
-            courtType: courtType as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
-            userName: booking.userName,
-            userEmail: booking.userEmail,
-            userPhone: booking.userPhone || "",
-            status: booking.status,
-          });
-        } else {
-          alert("Booking not found");
-          router.push("/admin/bookings");
-        }
+      const response = await api.get(`/api/bookings/${bookingId}`);
+      if (response.data?.success && response.data.booking) {
+        const booking = response.data.booking;
+        const courtType = typeof booking.courtId === "object" &&
+          booking.courtId &&
+          "type" in booking.courtId
+            ? (booking.courtId as Court).type
+            : "PADEL";
+        
+        setFormData({
+          date: new Date(booking.date),
+          courtType: courtType as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
+          userName: booking.userName,
+          userEmail: booking.userEmail,
+          userPhone: booking.userPhone || "",
+          status: booking.status as "pending_payment" | "confirmed" | "cancelled" | "completed",
+          amountPaid: booking.amountPaid || 0,
+        });
+      } else {
+        alert("Booking not found");
+        router.push("/admin/bookings");
       }
-    } catch (error) {
-      console.error(error);
-      alert("Failed to load booking");
+    } catch (error: any) {
+      console.error('Failed to load booking:', error);
+      alert(error.response?.data?.error || "Failed to load booking");
       router.push("/admin/bookings");
     } finally {
       setIsLoadingBooking(false);
@@ -124,9 +108,9 @@ export default function EditBookingPage() {
 
   const loadBookingForSlots = async () => {
     try {
-      const result = await getAllBookings();
-      if (result.success) {
-        const booking = result.bookings.find((b: Booking) => b._id === bookingId);
+      const response = await api.get(`/api/bookings/${bookingId}`);
+      if (response.data?.success && response.data.booking) {
+        const booking = response.data.booking;
         if (booking && courts.length > 0) {
           const court = courts.find((c) => {
             if (typeof booking.courtId === "string") {
@@ -148,19 +132,22 @@ export default function EditBookingPage() {
         }
       }
     } catch (error) {
-      console.error(error);
+      console.error('Failed to load booking for slots:', error);
     }
   };
 
   const loadCourts = async () => {
     setIsLoadingCourts(true);
     try {
-      const result = await getCourts(formData.courtType);
-      if (result.success) {
-        setCourts(result.courts);
+      const response = await api.get(`/api/courts?type=${formData.courtType}`);
+      if (response.data) {
+        setCourts(response.data);
+      } else {
+        setCourts([]);
       }
     } catch (error) {
-      console.error(error);
+      console.error('Failed to load courts:', error);
+      setCourts([]);
     } finally {
       setIsLoadingCourts(false);
     }
@@ -172,18 +159,21 @@ export default function EditBookingPage() {
       const dateString = formData.date instanceof Date
         ? formData.date.toISOString().split("T")[0]
         : formData.date;
-      const result = await getBookingsByDate(dateString);
-      if (result.success) {
-        const filtered = result.bookings.filter(
+      const response = await api.get(`/api/bookings?date=${dateString}`);
+      if (response.data?.success) {
+        const filtered = response.data.bookings.filter(
           (b: any) =>
             b.courtId?.type === formData.courtType && 
             b.status !== "cancelled" &&
-            b._id !== bookingId // Exclude current booking
+            b._id !== bookingId
         );
         setDateBookings(filtered);
+      } else {
+        setDateBookings([]);
       }
     } catch (error) {
-      console.error(error);
+      console.error('Failed to load bookings for date:', error);
+      setDateBookings([]);
     } finally {
       setIsLoadingDateBookings(false);
     }
@@ -288,7 +278,7 @@ export default function EditBookingPage() {
         ? formData.date.toISOString().split("T")[0]
         : formData.date;
 
-      const result = await updateBooking({
+      const response = await api.put('/api/admin/bookings', {
         bookingId,
         date: dateString,
         startTime,
@@ -297,24 +287,20 @@ export default function EditBookingPage() {
         userEmail: formData.userEmail,
         userPhone: formData.userPhone,
         status: formData.status,
+        amountPaid: formData.amountPaid,
       });
 
-      if (result.success) {
+      if (response.data?.success) {
         router.replace("/admin/bookings");
       } else {
-        alert(result.error || "Failed to update booking");
+        alert(response.data?.error || "Failed to update booking");
         setIsSubmitting(false);
       }
     } catch (error: any) {
-      alert(error.message || "An error occurred");
-    } finally {
+      alert(error.response?.data?.error || error.message || "An error occurred");
       setIsSubmitting(false);
     }
   };
-
-  if (!isAdmin) {
-    return null;
-  }
 
   if (isLoadingBooking) {
     return (
@@ -374,12 +360,41 @@ export default function EditBookingPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="pending_payment">Pending Payment</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Amount Paid */}
+          <div className="space-y-2">
+            <Label htmlFor="amount-paid" className="text-zinc-200 text-sm">
+              Amount Paid (PKR)
+            </Label>
+            <Input
+              id="amount-paid"
+              type="number"
+              min="0"
+              step="0.01"
+              value={formData.amountPaid}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value) || 0;
+                setFormData({ 
+                  ...formData, 
+                  amountPaid: value,
+                  // Auto-update status to confirmed if amount paid > 0
+                  status: value > 0 ? "confirmed" : formData.status === "confirmed" ? "pending_payment" : formData.status
+                });
+              }}
+              className="text-sm"
+              placeholder="0.00"
+            />
+            <p className="text-xs text-zinc-400">
+              Entering an amount will automatically change status to "Confirmed"
+            </p>
           </div>
 
           {/* Slot Selection */}

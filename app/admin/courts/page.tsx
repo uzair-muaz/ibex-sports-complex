@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { Plus, Edit2, Trash2, Loader2, Eye, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,17 +35,12 @@ import {
 } from "@/components/ui/select";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  getAllCourts,
-  createCourt,
-  updateCourt,
-  deleteCourt,
-} from "../../actions/courts";
+import api from "@/lib/api";
 import type { Court } from "@/types";
+import { useAuth } from "@/lib/auth-utils";
 
 export default function CourtsPage() {
-  const { data: session } = useSession();
-  const router = useRouter();
+  useAuth(['super_admin']);
   const [courts, setCourts] = useState<Court[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showCourtModal, setShowCourtModal] = useState(false);
@@ -66,28 +59,20 @@ export default function CourtsPage() {
     isActive: true,
   });
 
-  const userRole = (session?.user as any)?.role;
-  const isSuperAdmin = userRole === "super_admin";
-
   useEffect(() => {
-    if (session) {
-      if (!isSuperAdmin) {
-        router.push("/admin/bookings");
-        return;
-      }
-      loadData();
-    }
-  }, [session, isSuperAdmin, router]);
+    loadData();
+  }, []);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const result = await getAllCourts();
-      if (result.success) {
-        setCourts(result.courts);
+      const response = await api.get('/api/courts?all=true');
+      if (response.data?.success) {
+        setCourts(response.data.courts || []);
       }
     } catch (error) {
-      console.error(error);
+      console.error('Failed to load courts:', error);
+      setCourts([]);
     } finally {
       setIsLoading(false);
     }
@@ -99,35 +84,35 @@ export default function CourtsPage() {
 
     try {
       if (editingCourt) {
-        const result = await updateCourt({
+        const response = await api.put('/api/courts', {
           courtId: editingCourt._id,
           ...courtForm,
         });
 
-        if (result.success) {
+        if (response.data?.success) {
           setShowCourtModal(false);
           setEditingCourt(null);
           resetCourtForm();
           loadData();
         } else {
-          alert(result.error || "Failed to update court");
+          alert(response.data?.error || "Failed to update court");
         }
       } else {
-        const result = await createCourt({
+        const response = await api.post('/api/courts', {
           ...courtForm,
           image: "",
         });
 
-        if (result.success) {
+        if (response.data?.success) {
           setShowCourtModal(false);
           resetCourtForm();
           loadData();
         } else {
-          alert(result.error || "Failed to create court");
+          alert(response.data?.error || "Failed to create court");
         }
       }
     } catch (error: any) {
-      alert(error.message || "An error occurred");
+      alert(error.response?.data?.error || error.message || "An error occurred");
     } finally {
       setIsSubmittingCourt(false);
     }
@@ -166,17 +151,17 @@ export default function CourtsPage() {
 
     setIsDeleting(true);
     try {
-      const result = await deleteCourt(deletingCourt._id);
-      if (result.success) {
+      const response = await api.delete(`/api/courts?id=${deletingCourt._id}`);
+      if (response.data?.success) {
         setShowDeleteModal(false);
         setDeletingCourt(null);
         loadData();
       } else {
-        alert(result.error || "Failed to delete court");
-        setIsDeleting(false);
+        alert(response.data?.error || "Failed to delete court");
       }
     } catch (error: any) {
-      alert(error.message || "An error occurred");
+      alert(error.response?.data?.error || error.message || "An error occurred");
+    } finally {
       setIsDeleting(false);
     }
   };
@@ -232,10 +217,6 @@ export default function CourtsPage() {
       <ArrowDown className="w-3 h-3 ml-1 text-[#2DD4BF]" />
     );
   };
-
-  if (!isSuperAdmin) {
-    return null;
-  }
 
   return (
     <AdminLayout

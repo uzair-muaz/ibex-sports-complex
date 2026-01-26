@@ -6,7 +6,7 @@ import { Star, CheckCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { createFeedback, getFeedbackByBookingId, getBookingById } from "@/app/actions/feedback";
+import api from "@/lib/api";
 import { useParams } from "next/navigation";
 
 export default function FeedbackPage() {
@@ -43,25 +43,25 @@ export default function FeedbackPage() {
       }
 
       // First check if feedback already exists
-      const feedbackResult = await getFeedbackByBookingId(bookingId);
-      if (feedbackResult.success && feedbackResult.feedback) {
+      const feedbackResponse = await api.get(`/api/feedback?bookingId=${bookingId}`);
+      if (feedbackResponse.data?.success && feedbackResponse.data.feedback) {
         setIsSubmitted(true);
-        setRating(feedbackResult.feedback.rating);
-        setComment(feedbackResult.feedback.comment || "");
-        setUserName(feedbackResult.feedback.userName);
-        setUserEmail(feedbackResult.feedback.userEmail);
-        setUserPhone(feedbackResult.feedback.userPhone);
-        setBookingInfo(feedbackResult.feedback.bookingId);
+        setRating(feedbackResponse.data.feedback.rating);
+        setComment(feedbackResponse.data.feedback.comment || "");
+        setUserName(feedbackResponse.data.feedback.userName);
+        setUserEmail(feedbackResponse.data.feedback.userEmail);
+        setUserPhone(feedbackResponse.data.feedback.userPhone);
+        setBookingInfo(feedbackResponse.data.feedback.bookingId);
       } else {
         // Get booking info to pre-fill form
-        const bookingResult = await getBookingById(bookingId);
-        if (bookingResult.success && bookingResult.booking) {
-          setBookingInfo(bookingResult.booking);
-          setUserName(bookingResult.booking.userName);
-          setUserEmail(bookingResult.booking.userEmail);
-          setUserPhone(bookingResult.booking.userPhone);
+        const bookingResponse = await api.get(`/api/bookings/${bookingId}`);
+        if (bookingResponse.data?.success && bookingResponse.data.booking) {
+          setBookingInfo(bookingResponse.data.booking);
+          setUserName(bookingResponse.data.booking.userName);
+          setUserEmail(bookingResponse.data.booking.userEmail);
+          setUserPhone(bookingResponse.data.booking.userPhone);
         } else {
-          setError(bookingResult.error || "Booking not found. Please check the QR code or link.");
+          setError(bookingResponse.data?.error || "Booking not found. Please check the QR code or link.");
         }
       }
     } catch (error: any) {
@@ -89,7 +89,7 @@ export default function FeedbackPage() {
     setIsSubmitting(true);
 
     try {
-      const result = await createFeedback({
+      const response = await api.post('/api/feedback', {
         bookingId,
         userName: userName.trim(),
         userEmail: userEmail.trim(),
@@ -98,14 +98,14 @@ export default function FeedbackPage() {
         comment: comment.trim(),
       });
 
-      if (result.success) {
+      if (response.data?.success) {
         setIsSubmitted(true);
-        setBookingInfo(result.feedback.bookingId);
+        setBookingInfo(response.data.feedback.bookingId);
       } else {
-        setError(result.error || "Failed to submit feedback");
+        setError(response.data?.error || "Failed to submit feedback");
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred");
+      setError(err.response?.data?.error || err.message || "An error occurred");
     } finally {
       setIsSubmitting(false);
     }

@@ -5,7 +5,6 @@ import Image from "next/image";
 import useSWR from "swr";
 import { ParallaxSection } from "@/components/ui/ParallaxSection";
 import { TextReveal } from "@/components/ui/TextReveal";
-import { PricingBadge } from "@/components/ui/PricingBadge";
 
 // Static data - all court information is hardcoded
 // Only prices come from DB via ISR + SWR hybrid rendering
@@ -26,7 +25,13 @@ interface FacilitiesSectionProps {
 const fetcher = async (url: string) => {
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch");
-  return res.json();
+  const data = await res.json();
+  // Handle both old format (array) and new format ({ success, courts })
+  if (Array.isArray(data)) {
+    return data;
+  }
+  // New API format returns { success: true, courts: [...] }
+  return Array.isArray(data.courts) ? data.courts : [];
 };
 
 // Static images - hardcoded, not from DB
@@ -80,36 +85,44 @@ export const FacilitiesSection = ({
   });
 
   // Use SWR data if available, otherwise fall back to initial ISR data
-  const allCourts = courtsData || [
-    ...initialPadelCourts,
-    ...initialCricketCourts,
-    ...initialPickleballCourts,
-    ...initialFutsalCourts,
-  ];
+  // Ensure allCourts is always an array
+  const allCourts = Array.isArray(courtsData) 
+    ? courtsData 
+    : Array.isArray(courtsData?.courts)
+    ? courtsData.courts
+    : [
+        ...initialPadelCourts,
+        ...initialCricketCourts,
+        ...initialPickleballCourts,
+        ...initialFutsalCourts,
+      ];
 
-  const padelCourts = allCourts.filter((c) => c.type === "PADEL");
-  const cricketCourts = allCourts.filter((c) => c.type === "CRICKET");
-  const pickleballCourts = allCourts.filter((c) => c.type === "PICKLEBALL");
-  const futsalCourts = allCourts.filter((c) => c.type === "FUTSAL");
+  // Ensure allCourts is an array before filtering
+  const safeCourts = Array.isArray(allCourts) ? allCourts : [];
+
+  const padelCourts = safeCourts.filter((c) => c.type === "PADEL");
+  const cricketCourts = safeCourts.filter((c) => c.type === "CRICKET");
+  const pickleballCourts = safeCourts.filter((c) => c.type === "PICKLEBALL");
+  const futsalCourts = safeCourts.filter((c) => c.type === "FUTSAL");
   return (
-    <section className="py-32 px-6 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-200 relative z-20">
-      <div className="max-w-7xl mx-auto space-y-24">
+    <section className="py-16 sm:py-24 md:py-32 px-4 sm:px-6 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-200 relative z-20">
+      <div className="max-w-7xl mx-auto space-y-12 sm:space-y-16 md:space-y-24">
         <ParallaxSection speed={0.3}>
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-12">
-            <div className="space-y-4">
-              <TextReveal className="text-7xl md:text-8xl font-bold tracking-tighter gradient-text">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 sm:gap-8 md:gap-12">
+            <div className="space-y-3 sm:space-y-4">
+              <TextReveal className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold tracking-tighter gradient-text">
                 THE FACILITIES
               </TextReveal>
-              <div className="h-2 w-32 bg-[#2DD4BF] rounded-full" />
+              <div className="h-2 w-24 sm:w-32 bg-[#2DD4BF] rounded-full" />
             </div>
-            <p className="text-zinc-600 dark:text-zinc-400 max-w-sm text-xl font-light leading-relaxed">
+            <p className="text-zinc-600 dark:text-zinc-400 max-w-sm text-base sm:text-lg md:text-xl font-light leading-relaxed">
               Immerse yourself in our world-class courts designed for optimal
               performance.
             </p>
           </div>
         </ParallaxSection>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
           {padelCourts.length > 0 && (
             <ParallaxSection speed={0.2}>
               <motion.div
@@ -117,7 +130,7 @@ export const FacilitiesSection = ({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-10%" }}
                 transition={{ duration: 0.8 }}
-                className="relative group overflow-hidden rounded-[2.5rem] h-[600px] shadow-2xl cursor-pointer"
+                className="relative group overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] h-[400px] sm:h-[500px] md:h-[600px] shadow-2xl cursor-pointer"
               >
                 <Image
                   src={premiumImages.padel}
@@ -127,19 +140,16 @@ export const FacilitiesSection = ({
                   className="object-cover transition-transform duration-1000 group-hover:scale-110"
                   priority
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-6 sm:p-8 md:p-12 flex flex-col justify-end">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <span className="text-[#2DD4BF] font-mono text-xs sm:text-sm tracking-widest uppercase font-bold">
                       01 — Padel
                     </span>
-                    <PricingBadge
-                      price={padelCourts[0]?.pricePerHour || 5000}
-                    />
                   </div>
-                  <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                  <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-3 sm:mb-4">
                     {staticCourtData.padel.name}
                   </h3>
-                  <p className="text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                  <p className="text-sm sm:text-base text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
                     {staticCourtData.padel.description}
                   </p>
                 </div>
@@ -164,19 +174,16 @@ export const FacilitiesSection = ({
                   className="object-cover transition-transform duration-1000 group-hover:scale-110"
                   priority
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-6 sm:p-8 md:p-12 flex flex-col justify-end">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <span className="text-[#2DD4BF] font-mono text-xs sm:text-sm tracking-widest uppercase font-bold">
                       02 — Futsal
                     </span>
-                    <PricingBadge
-                      price={futsalCourts[0]?.pricePerHour || 6000}
-                    />
                   </div>
-                  <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                  <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-3 sm:mb-4">
                     {staticCourtData.futsal.name}
                   </h3>
-                  <p className="text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                  <p className="text-sm sm:text-base text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
                     {staticCourtData.futsal.description}
                   </p>
                 </div>
@@ -191,7 +198,7 @@ export const FacilitiesSection = ({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-10%" }}
                 transition={{ duration: 0.8, delay: 0.4 }}
-                className="relative group overflow-hidden rounded-[2.5rem] h-[600px] shadow-2xl cursor-pointer"
+                className="relative group overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] h-[400px] sm:h-[500px] md:h-[600px] shadow-2xl cursor-pointer"
               >
                 <Image
                   src={premiumImages.pickleball}
@@ -201,19 +208,16 @@ export const FacilitiesSection = ({
                   className="object-cover transition-transform duration-1000 group-hover:scale-110"
                   priority
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-6 sm:p-8 md:p-12 flex flex-col justify-end">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <span className="text-[#2DD4BF] font-mono text-xs sm:text-sm tracking-widest uppercase font-bold">
                       03 — Pickleball
                     </span>
-                    <PricingBadge
-                      price={pickleballCourts[0]?.pricePerHour || 4000}
-                    />
                   </div>
-                  <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                  <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-3 sm:mb-4">
                     {staticCourtData.pickleball.name}
                   </h3>
-                  <p className="text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                  <p className="text-sm sm:text-base text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
                     {staticCourtData.pickleball.description}
                   </p>
                 </div>
@@ -238,19 +242,16 @@ export const FacilitiesSection = ({
                   className="object-cover transition-transform duration-1000 group-hover:scale-110"
                   priority
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-6 sm:p-8 md:p-12 flex flex-col justify-end">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <span className="text-[#2DD4BF] font-mono text-xs sm:text-sm tracking-widest uppercase font-bold">
                       04 — Cricket
                     </span>
-                    <PricingBadge
-                      price={cricketCourts[0]?.pricePerHour || 8000}
-                    />
                   </div>
-                  <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                  <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-3 sm:mb-4">
                     {staticCourtData.cricket.name}
                   </h3>
-                  <p className="text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                  <p className="text-sm sm:text-base text-zinc-300 max-w-md transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
                     {staticCourtData.cricket.description}
                   </p>
                 </div>
