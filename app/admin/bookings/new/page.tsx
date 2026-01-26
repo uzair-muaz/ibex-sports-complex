@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth-utils";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,18 +17,12 @@ import {
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { DatePicker } from "@/components/ui/date-picker";
 import { motion } from "framer-motion";
-import {
-  getCourts,
-} from "../../../actions/courts";
-import {
-  getBookingsByDate,
-  createBooking,
-} from "../../../actions/bookings";
+import api from "@/lib/api";
 import { OPERATING_HOURS } from "@/types";
 import type { Court } from "@/types";
 
 export default function NewBookingPage() {
-  const { data: session } = useSession();
+  useAuth(['admin', 'super_admin']);
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -47,31 +41,28 @@ export default function NewBookingPage() {
     userPhone: "",
   });
 
-  const userRole = (session?.user as any)?.role;
-  const isAdmin = userRole === "admin" || userRole === "super_admin";
+  useEffect(() => {
+    loadCourts();
+  }, []);
 
   useEffect(() => {
-    if (session && !isAdmin) {
-      router.push("/admin/bookings");
-    }
-  }, [session, isAdmin, router]);
-
-  useEffect(() => {
-    if (session && isAdmin) {
-      loadCourts();
+    if (formData.date && formData.courtType) {
       loadBookingsForDate();
     }
-  }, [session, isAdmin, formData.date, formData.courtType]);
+  }, [formData.date, formData.courtType]);
 
   const loadCourts = async () => {
     setIsLoadingCourts(true);
     try {
-      const result = await getCourts(formData.courtType);
-      if (result.success) {
-        setCourts(result.courts);
+      const response = await api.get(`/api/courts?type=${formData.courtType}`);
+      if (response.data) {
+        setCourts(response.data);
+      } else {
+        setCourts([]);
       }
     } catch (error) {
-      console.error(error);
+      console.error('Failed to load courts:', error);
+      setCourts([]);
     } finally {
       setIsLoadingCourts(false);
     }
@@ -83,17 +74,20 @@ export default function NewBookingPage() {
       const dateString = formData.date instanceof Date
         ? formData.date.toISOString().split("T")[0]
         : formData.date;
-      const result = await getBookingsByDate(dateString);
-      if (result.success) {
-        const filtered = result.bookings.filter(
+      const response = await api.get(`/api/bookings?date=${dateString}`);
+      if (response.data?.success) {
+        const filtered = response.data.bookings.filter(
           (b: any) =>
             b.courtId?.type === formData.courtType && 
             b.status !== "cancelled"
         );
         setDateBookings(filtered);
+      } else {
+        setDateBookings([]);
       }
     } catch (error) {
-      console.error(error);
+      console.error('Failed to load bookings for date:', error);
+      setDateBookings([]);
     } finally {
       setIsLoadingDateBookings(false);
     }
@@ -198,7 +192,7 @@ export default function NewBookingPage() {
         ? formData.date.toISOString().split("T")[0]
         : formData.date;
 
-      const result = await createBooking({
+      const response = await api.post('/api/bookings', {
         courtType: formData.courtType,
         date: dateString,
         startTime,
@@ -208,22 +202,17 @@ export default function NewBookingPage() {
         userPhone: formData.userPhone,
       });
 
-      if (result.success) {
+      if (response.data?.success) {
         router.replace("/admin/bookings");
       } else {
-        alert(result.error || "Failed to create booking");
+        alert(response.data?.error || "Failed to create booking");
         setIsSubmitting(false);
       }
     } catch (error: any) {
-      alert(error.message || "An error occurred");
-    } finally {
+      alert(error.response?.data?.error || error.message || "An error occurred");
       setIsSubmitting(false);
     }
   };
-
-  if (!isAdmin) {
-    return null;
-  }
 
   return (
     <AdminLayout

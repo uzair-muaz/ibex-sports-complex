@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { Star, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Input } from "@/components/ui/input";
@@ -20,11 +18,11 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getAllFeedback } from "../../actions/feedback";
+import api from "@/lib/api";
+import { useAuth } from "@/lib/auth-utils";
 
 export default function FeedbackPage() {
-  const { data: session } = useSession();
-  const router = useRouter();
+  useAuth(['admin', 'super_admin']);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState("");
@@ -32,17 +30,15 @@ export default function FeedbackPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   useEffect(() => {
-    if (session) {
-      loadData();
-    }
-  }, [session]);
+    loadData();
+  }, []);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const result = await getAllFeedback();
-      if (result.success) {
-        setFeedbacks(result.feedbacks);
+      const response = await api.get('/api/feedback?all=true');
+      if (response.data?.success) {
+        setFeedbacks(response.data.feedbacks || []);
       }
     } catch (error) {
       console.error(error);

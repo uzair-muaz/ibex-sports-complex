@@ -5,6 +5,7 @@ import Feedback from '@/models/Feedback';
 import Booking from '@/models/Booking';
 import Court from '@/models/Court';
 import { revalidatePath } from 'next/cache';
+import { isBuildTime } from '@/lib/build-utils';
 
 export interface CreateFeedbackInput {
   bookingId: string;
@@ -16,6 +17,13 @@ export interface CreateFeedbackInput {
 }
 
 export async function createFeedback(input: CreateFeedbackInput) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot create feedback during build',
+    };
+  }
+
   try {
     await connectDB();
 
@@ -79,6 +87,13 @@ export async function createFeedback(input: CreateFeedbackInput) {
 }
 
 export async function getAllFeedback() {
+  if (isBuildTime()) {
+    return {
+      success: true,
+      feedbacks: [],
+    };
+  }
+
   try {
     await connectDB();
 
@@ -132,6 +147,14 @@ export async function getAllFeedback() {
 }
 
 export async function getFeedbackByBookingId(bookingId: string) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot fetch feedback during build',
+      feedback: null,
+    };
+  }
+
   try {
     await connectDB();
 
@@ -170,6 +193,14 @@ export async function getFeedbackByBookingId(bookingId: string) {
 }
 
 export async function getBookingById(bookingId: string) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot fetch booking during build',
+      booking: null,
+    };
+  }
+
   try {
     await connectDB();
 

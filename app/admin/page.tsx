@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { useSession, signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter, usePathname } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -24,6 +24,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { authService } from "@/lib/auth-client";
 
 const loginSchema = z.object({
   email: z
@@ -41,6 +42,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -48,38 +50,49 @@ export default function AdminPage() {
       email: "",
       password: "",
     },
-    mode: "onBlur", // Validate on blur for better UX
+    mode: "onBlur",
   });
 
   useEffect(() => {
-    // Redirect based on user role if already logged in
-    if (session?.user) {
-      const userRole = session.user.role;
+    if (status === "authenticated" && session?.user && pathname === "/admin") {
+      const userRole = (session.user as { role?: string })?.role;
       if (userRole === "super_admin") {
-        router.push("/admin/analytics");
-      } else {
-        router.push("/admin/bookings");
+        router.replace("/admin/analytics");
+      } else if (userRole === "admin") {
+        router.replace("/admin/bookings");
       }
     }
-  }, [session, router]);
+  }, [status, session, pathname, router]);
 
   const onSubmit = async (values: LoginFormValues) => {
     try {
-      const result = await signIn("credentials", {
-        email: values.email,
-        password: values.password,
-        redirect: false,
-      });
+      const result = await authService.login(values);
 
-      if (result?.error) {
-        // Set form-level error
+      if (!result.success) {
         form.setError("root", {
           type: "manual",
-          message: result.error,
+          message: result.error || "Login failed",
         });
-      } else if (result?.ok) {
-        // Session will be updated by useSession hook
-        // The useEffect above will handle the redirect based on role
+        return;
+      }
+
+      // If login was successful, redirect
+      if (result.success) {
+        // Wait a moment for session cookie to be fully set
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // If we have session with role, redirect based on role
+        if (result.user?.role && result.user.role !== 'user') {
+          const userRole = result.user.role;
+          if (userRole === "super_admin") {
+            router.replace('/admin/analytics');
+          } else {
+            router.replace('/admin/bookings');
+          }
+        } else {
+          // Default redirect - proxy will handle role-based redirect
+          router.replace('/admin/bookings');
+        }
       }
     } catch (error) {
       const errorMessage =
@@ -92,15 +105,6 @@ export default function AdminPage() {
   };
 
   if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <Loader2 className="h-12 w-12 animate-spin text-[#2DD4BF]" />
-      </div>
-    );
-  }
-
-  if (session) {
-    // Show loading while redirecting
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
         <Loader2 className="h-12 w-12 animate-spin text-[#2DD4BF]" />

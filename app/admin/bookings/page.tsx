@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth-utils";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -42,15 +42,11 @@ import { Label } from "@/components/ui/label";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { QRCode } from "@/components/ui/qr-code";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  getAllBookings,
-  deleteBooking,
-  updateBooking,
-} from "../../actions/bookings";
+import api from "@/lib/api";
 import type { Booking, Court } from "@/types";
 
 export default function BookingsPage() {
-  const { data: session } = useSession();
+  const { isSuperAdmin, isAdmin } = useAuth(['admin', 'super_admin']);
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -63,25 +59,22 @@ export default function BookingsPage() {
   const [sortColumn, setSortColumn] = useState<keyof Booking | "courtName" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  const userRole = (session?.user as any)?.role;
-  const isSuperAdmin = userRole === "super_admin";
-  const isAdmin = userRole === "admin" || isSuperAdmin;
-
   useEffect(() => {
-    if (session) {
-      loadData();
-    }
-  }, [session]);
+    loadData();
+  }, []);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const result = await getAllBookings();
-      if (result.success) {
-        setBookings(result.bookings);
+      const response = await api.get('/api/admin/bookings');
+      if (response.data?.success) {
+        setBookings(response.data.bookings || []);
+      } else {
+        setBookings([]);
       }
     } catch (error) {
-      console.error(error);
+      console.error('Failed to load bookings:', error);
+      setBookings([]);
     } finally {
       setIsLoading(false);
     }
@@ -102,20 +95,20 @@ export default function BookingsPage() {
 
     setIsCancelling(true);
     try {
-      const result = await updateBooking({
+      const response = await api.put('/api/admin/bookings', {
         bookingId: cancellingBooking._id,
         status: "cancelled",
       });
 
-      if (result.success) {
+      if (response.data?.success) {
         setShowCancelModal(false);
         setCancellingBooking(null);
         loadData();
       } else {
-        alert(result.error || "Failed to cancel booking");
+        alert(response.data?.error || "Failed to cancel booking");
       }
     } catch (error: any) {
-      alert(error.message || "An error occurred");
+      alert(error.response?.data?.error || error.message || "An error occurred");
     } finally {
       setIsCancelling(false);
     }
@@ -127,11 +120,15 @@ export default function BookingsPage() {
         "Are you sure you want to permanently delete this booking? This action cannot be undone."
       )
     ) {
-      const result = await deleteBooking(id);
-      if (result.success) {
-        loadData();
-      } else {
-        alert(result.error || "Failed to delete booking");
+      try {
+        const response = await api.delete(`/api/admin/bookings?id=${id}`);
+        if (response.data?.success) {
+          loadData();
+        } else {
+          alert(response.data?.error || "Failed to delete booking");
+        }
+      } catch (error: any) {
+        alert(error.response?.data?.error || error.message || "Failed to delete booking");
       }
     }
   };
@@ -210,11 +207,6 @@ export default function BookingsPage() {
       <ArrowDown className="w-3 h-3 ml-1 text-[#2DD4BF]" />
     );
   };
-
-  if (!isAdmin) {
-    router.push("/admin");
-    return null;
-  }
 
   return (
     <AdminLayout
@@ -300,6 +292,7 @@ export default function BookingsPage() {
                         <SortIcon column="totalPrice" />
                       </div>
                     </TableHead>
+                    <TableHead className="min-w-[100px]">Amount Paid</TableHead>
                     <TableHead 
                       className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("status")}
@@ -329,6 +322,7 @@ export default function BookingsPage() {
                             <Skeleton className="h-3 w-32" />
                           </TableCell>
                           <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                           <TableCell><Skeleton className="h-6 w-16" /></TableCell>
                           <TableCell>
                             <div className="flex gap-2 justify-end">
@@ -343,7 +337,7 @@ export default function BookingsPage() {
                   ) : sortedBookings.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={8}
+                        colSpan={9}
                         className="text-center text-zinc-400 py-8"
                       >
                         No bookings found.
@@ -406,11 +400,18 @@ export default function BookingsPage() {
                             </span>
                           </TableCell>
                           <TableCell>
+                            <span className="text-zinc-200 text-sm">
+                              PKR {(booking.amountPaid || 0).toFixed(2)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
                             <Badge
                               variant="outline"
                               className={
                                 booking.status === "confirmed"
                                   ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF] text-xs"
+                                  : booking.status === "pending_payment"
+                                    ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-400 text-xs"
                                   : booking.status === "cancelled"
                                     ? "bg-red-500/20 border-red-500/50 text-red-400 text-xs"
                                     : booking.status === "completed"
@@ -418,7 +419,9 @@ export default function BookingsPage() {
                                       : "bg-zinc-800 border-zinc-700 text-zinc-300 text-xs"
                               }
                             >
-                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                              {booking.status === "pending_payment" 
+                                ? "Pending Payment" 
+                                : booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
@@ -497,6 +500,8 @@ export default function BookingsPage() {
                     className={
                       viewingBooking.status === "confirmed"
                         ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF]"
+                        : viewingBooking.status === "pending_payment"
+                          ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-400"
                         : viewingBooking.status === "cancelled"
                           ? "bg-red-500/20 border-red-500/50 text-red-400"
                           : viewingBooking.status === "completed"
@@ -504,7 +509,9 @@ export default function BookingsPage() {
                             : "bg-zinc-800 border-zinc-700 text-zinc-300"
                     }
                   >
-                    {viewingBooking.status.charAt(0).toUpperCase() + viewingBooking.status.slice(1)}
+                    {viewingBooking.status === "pending_payment" 
+                      ? "Pending Payment" 
+                      : viewingBooking.status.charAt(0).toUpperCase() + viewingBooking.status.slice(1)}
                   </Badge>
                 </div>
                 <div className="space-y-1">
@@ -560,6 +567,10 @@ export default function BookingsPage() {
                 <div className="space-y-1">
                   <Label className="text-zinc-400 text-xs">Total Price</Label>
                   <p className="text-[#2DD4BF] font-semibold">PKR {viewingBooking.totalPrice.toFixed(2)}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-zinc-400 text-xs">Amount Paid</Label>
+                  <p className="text-white font-semibold">PKR {(viewingBooking.amountPaid || 0).toFixed(2)}</p>
                 </div>
               </div>
 

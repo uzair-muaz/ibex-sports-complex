@@ -10,7 +10,6 @@ import { InfiniteGallery } from "@/components/ui/InfiniteScroll";
 import { ParallaxSection } from "@/components/ui/ParallaxSection";
 import { TextReveal } from "@/components/ui/TextReveal";
 import { GALLERY_IMAGES } from "@/types";
-import { getCourts } from "./actions/courts";
 
 export const metadata: Metadata = {
   title: "Ibex sports Complex - Premium Sports Court Booking",
@@ -42,19 +41,9 @@ export const metadata: Metadata = {
   },
 };
 
-// ISR (Incremental Static Regeneration) - Revalidate every 15 minutes
-// This enables hybrid rendering: static HTML for SEO + dynamic data updates
-export const revalidate = 900; // 15 minutes = 900 seconds
-
-export default async function Home() {
-  // Server-side: Fetch only prices from DB
-  const result = await getCourts();
-  const courts = result.success ? result.courts : [];
-
-  const padelCourts = courts.filter((c: any) => c.type === "PADEL");
-  const cricketCourts = courts.filter((c: any) => c.type === "CRICKET");
-  const pickleballCourts = courts.filter((c: any) => c.type === "PICKLEBALL");
-  const futsalCourts = courts.filter((c: any) => c.type === "FUTSAL");
+// Static page - no server-side data fetching
+// FacilitiesSection uses SWR to fetch courts client-side
+export default function Home() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white overflow-hidden transition-colors duration-200">
@@ -67,16 +56,16 @@ export default async function Home() {
       </div>
 
       <FacilitiesSection
-        padelCourts={padelCourts}
-        cricketCourts={cricketCourts}
-        pickleballCourts={pickleballCourts}
-        futsalCourts={futsalCourts}
+        padelCourts={[]}
+        cricketCourts={[]}
+        pickleballCourts={[]}
+        futsalCourts={[]}
       />
 
       <ParallaxSection speed={0.1}>
-        <section className="py-24 bg-white dark:bg-black overflow-hidden transition-colors duration-200">
-          <div className="px-6 mb-12 max-w-7xl mx-auto">
-            <TextReveal className="text-5xl md:text-6xl font-bold tracking-tighter gradient-text">
+        <section className="py-12 sm:py-16 md:py-24 bg-white dark:bg-black overflow-hidden transition-colors duration-200">
+          <div className="px-4 sm:px-6 mb-8 sm:mb-10 md:mb-12 max-w-7xl mx-auto">
+            <TextReveal className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter gradient-text">
               LIFESTYLE
             </TextReveal>
           </div>

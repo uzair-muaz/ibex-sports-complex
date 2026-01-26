@@ -13,17 +13,17 @@ export const AmenitiesSection = () => {
   };
 
   return (
-    <section className="py-32 px-6 bg-zinc-50 dark:bg-[#080808] transition-colors duration-200">
+    <section className="py-16 sm:py-24 md:py-32 px-4 sm:px-6 bg-zinc-50 dark:bg-[#080808] transition-colors duration-200">
       <div className="max-w-7xl mx-auto">
         <ParallaxSection speed={0.2}>
-          <div className="mb-24">
-            <TextReveal className="text-6xl md:text-8xl font-bold tracking-tighter gradient-text">
+          <div className="mb-12 sm:mb-16 md:mb-24">
+            <TextReveal className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-bold tracking-tighter gradient-text">
               BEYOND THE GAME.
             </TextReveal>
           </div>
         </ParallaxSection>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12 md:gap-16">
           <ParallaxSection speed={0.15}>
             <motion.div 
               initial={{ opacity: 0, x: -50 }}
@@ -45,8 +45,8 @@ export const AmenitiesSection = () => {
                 </div>
               </div>
               <div>
-                <h3 className="text-4xl font-bold mb-4 text-black dark:text-white">Courtside Café</h3>
-                <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-lg">
+                <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 text-black dark:text-white">Courtside Café</h3>
+                <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-base sm:text-lg">
                   Refuel with our specialty grade coffee and fresh pastries. 
                   The perfect spot to analyze your match or relax before the game.
                 </p>
@@ -75,8 +75,8 @@ export const AmenitiesSection = () => {
                 </div>
               </div>
               <div>
-                <h3 className="text-4xl font-bold mb-4 text-black dark:text-white">Gourmet Nutrition</h3>
-                <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-lg">
+                <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 text-black dark:text-white">Gourmet Nutrition</h3>
+                <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-base sm:text-lg">
                   Healthy bowls, wraps, and energizing snacks. 
                   Curated nutrition to keep you performing at your peak.
                 </p>

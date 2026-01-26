@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { DollarSign, Users, TrendingUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { DollarSign, Users, TrendingUp, Loader2 } from "lucide-react";
+import { useAuth } from "@/lib/auth-utils";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
   Card,
@@ -13,53 +12,58 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getAllBookings } from "../../actions/bookings";
-import { getAllCourts } from "../../actions/courts";
+import api from "@/lib/api";
 import type { Booking, Court } from "@/types";
 
 export default function AnalyticsPage() {
-  const { data: session } = useSession();
-  const router = useRouter();
+  const { isSuperAdmin, isLoading: authLoading } = useAuth(['super_admin']);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const userRole = (session?.user as any)?.role;
-  const isSuperAdmin = userRole === "super_admin";
-
   useEffect(() => {
-    if (session) {
-      if (!isSuperAdmin) {
-        router.push("/admin/bookings");
-        return;
-      }
+    if (authLoading) {
+      return;
+    }
+    
+    if (isSuperAdmin) {
       loadData();
     }
-  }, [session, isSuperAdmin, router]);
+  }, [authLoading, isSuperAdmin]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [bookingsResult, courtsResult] = await Promise.all([
-        getAllBookings(),
-        getAllCourts(),
+      const [bookingsResponse, courtsResponse] = await Promise.all([
+        api.get('/api/admin/bookings').catch((err) => {
+          console.error('Failed to fetch bookings:', err);
+          return { data: { success: false, bookings: [] } };
+        }),
+        api.get('/api/admin/courts').catch((err) => {
+          console.error('Failed to fetch courts:', err);
+          return { data: { success: false, courts: [] } };
+        }),
       ]);
 
-      if (bookingsResult.success) {
-        setBookings(bookingsResult.bookings);
+      if (bookingsResponse.data?.success) {
+        setBookings(bookingsResponse.data.bookings || []);
       }
-      if (courtsResult.success) {
-        setCourts(courtsResult.courts);
+      if (courtsResponse.data?.success) {
+        setCourts(courtsResponse.data.courts || []);
       }
     } catch (error) {
-      console.error(error);
+      console.error('Failed to load analytics data:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!isSuperAdmin) {
-    return null;
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <Loader2 className="h-12 w-12 animate-spin text-[#2DD4BF]" />
+      </div>
+    );
   }
 
   const calculateStats = () => {

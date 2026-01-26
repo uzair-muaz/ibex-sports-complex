@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-utils";
 import { Plus, Edit2, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,12 +37,7 @@ import {
 } from "@/components/ui/select";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  getAllUsers,
-  createUser,
-  updateUser,
-  deleteUser,
-} from "../../actions/users";
+import api from "@/lib/api";
 
 interface User {
   _id: string;
@@ -53,7 +48,7 @@ interface User {
 }
 
 export default function UsersPage() {
-  const { data: session } = useSession();
+  const { session, isSuperAdmin } = useAuth(['super_admin']);
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -68,9 +63,6 @@ export default function UsersPage() {
     name: "",
     role: "admin" as "super_admin" | "admin" | "user",
   });
-
-  const userRole = (session?.user as any)?.role;
-  const isSuperAdmin = userRole === "super_admin";
 
   const handleSort = (column: keyof User) => {
     if (sortColumn === column) {
@@ -122,21 +114,15 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    if (session) {
-      if (!isSuperAdmin) {
-        router.push("/admin/bookings");
-        return;
-      }
-      loadData();
-    }
-  }, [session, isSuperAdmin, router]);
+    loadData();
+  }, []);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const result = await getAllUsers();
-      if (result.success) {
-        setUsers(result.users);
+      const response = await api.get('/api/admin/users');
+      if (response.data?.success) {
+        setUsers(response.data.users || []);
       }
     } catch (error) {
       console.error(error);
@@ -151,37 +137,37 @@ export default function UsersPage() {
 
     try {
       if (editingUser) {
-        const result = await updateUser({
+        const response = await api.put('/api/admin/users', {
           userId: editingUser._id,
           ...userForm,
           ...(userForm.password ? {} : { password: undefined }),
         });
 
-        if (result.success) {
+        if (response.data?.success) {
           setShowUserModal(false);
           setEditingUser(null);
           resetUserForm();
           loadData();
         } else {
-          alert(result.error || "Failed to update user");
+          alert(response.data?.error || "Failed to update user");
         }
       } else {
         if (!userForm.password) {
           alert("Password is required for new users");
           return;
         }
-        const result = await createUser(userForm);
+        const response = await api.post('/api/admin/users', userForm);
 
-        if (result.success) {
+        if (response.data?.success) {
           setShowUserModal(false);
           resetUserForm();
           loadData();
         } else {
-          alert(result.error || "Failed to create user");
+          alert(response.data?.error || "Failed to create user");
         }
       }
     } catch (error: any) {
-      alert(error.message || "An error occurred");
+      alert(error.response?.data?.error || error.message || "An error occurred");
     } finally {
       setIsSubmittingUser(false);
     }
@@ -214,18 +200,14 @@ export default function UsersPage() {
         "Are you sure you want to delete this user? This action cannot be undone."
       )
     ) {
-      const result = await deleteUser(userId);
-      if (result.success) {
+      const response = await api.delete(`/api/admin/users?id=${userId}`);
+      if (response.data?.success) {
         loadData();
       } else {
-        alert(result.error || "Failed to delete user");
+        alert(response.data?.error || "Failed to delete user");
       }
     }
   };
-
-  if (!isSuperAdmin) {
-    return null;
-  }
 
   return (
     <AdminLayout

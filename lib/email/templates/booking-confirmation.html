@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Confirmed - IBEX Sports Arena</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #050505; color: #ffffff;">
+  <!-- Outer wrapper table for email client compatibility -->
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #050505;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <!-- Main email container with dark theme matching website design -->
+        <table role="presentation" style="max-width: 600px; width: 100%; border-collapse: collapse; background-color: #0F172A; border-radius: 16px; overflow: hidden;">
+          
+          <!-- Email header with brand name and confirmation message -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); padding: 40px 30px; text-align: center; border-bottom: 2px solid #2DD4BF;">
+              <h1 style="margin: 0; font-size: 32px; font-weight: 700; color: #2DD4BF; letter-spacing: -0.5px;">
+                IBEX SPORTS ARENA
+              </h1>
+              <p style="margin: 10px 0 0 0; font-size: 18px; color: #94A3B8; font-weight: 500;">
+                Booking Confirmed
+              </p>
+            </td>
+          </tr>
+
+          <!-- Success checkmark icon -->
+          <tr>
+            <td align="center" style="padding: 30px 30px 20px 30px;">
+              <div style="width: 80px; height: 80px; background-color: #2DD4BF; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
+                <span style="font-size: 40px; color: #0F172A;">✓</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Main email content section -->
+          <tr>
+            <td style="padding: 0 30px 30px 30px;">
+              <h2 style="margin: 0 0 20px 0; font-size: 24px; font-weight: 600; color: #ffffff; text-align: center;">
+                Your Booking is Confirmed!
+              </h2>
+              
+              <p style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CBD5E1; text-align: center;">
+                Hello {{userName}}, your booking has been successfully confirmed. Please find your booking details and QR codes below.
+              </p>
+
+              <!-- Booking details card displaying court, date, time, duration, price, and booking ID -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #1E293B; border-radius: 12px; margin-bottom: 30px; border: 1px solid #334155;">
+                <tr>
+                  <td style="padding: 25px;">
+                    <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #2DD4BF; border-bottom: 1px solid #334155; padding-bottom: 10px;">
+                      Booking Details
+                    </h3>
+                    
+                    <!-- Table for booking information key-value pairs -->
+                    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 8px 0; color: #94A3B8; font-size: 14px; width: 40%;">Court:</td>
+                        <td style="padding: 8px 0; color: #ffffff; font-size: 14px; font-weight: 500;">{{courtName}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #94A3B8; font-size: 14px;">Date:</td>
+                        <td style="padding: 8px 0; color: #ffffff; font-size: 14px; font-weight: 500;">{{date}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #94A3B8; font-size: 14px;">Time:</td>
+                        <td style="padding: 8px 0; color: #ffffff; font-size: 14px; font-weight: 500;">{{time}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #94A3B8; font-size: 14px;">Duration:</td>
+                        <td style="padding: 8px 0; color: #ffffff; font-size: 14px; font-weight: 500;">{{duration}} hour(s)</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #94A3B8; font-size: 14px;">Total Price:</td>
+                        <td style="padding: 8px 0; color: #2DD4BF; font-size: 16px; font-weight: 600;">PKR {{totalPrice}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #94A3B8; font-size: 14px;">Booking ID:</td>
+                        <td style="padding: 8px 0; color: #94A3B8; font-size: 12px; font-family: monospace;">#{{bookingId}}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- QR codes section: Two QR codes side by side for entry verification and feedback -->
+              <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #2DD4BF; text-align: center;">
+                Your QR Codes
+              </h3>
+              
+              <p style="margin: 0 0 25px 0; font-size: 14px; line-height: 1.6; color: #CBD5E1; text-align: center;">
+                Use the Entry Verification QR code at the venue, and the Feedback QR code after your session.
+              </p>
+
+              <!-- Two-column layout for QR codes: Entry Verification (left) and Feedback (right) -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+                <tr>
+                  <!-- Entry Verification QR Code: Links to /booking/verify/{bookingId} -->
+                  <td align="center" style="padding: 0 10px; width: 50%;">
+                    <div style="background-color: #1E293B; border-radius: 12px; padding: 20px; border: 1px solid #334155;">
+                      <h4 style="margin: 0 0 15px 0; font-size: 14px; font-weight: 600; color: #2DD4BF; text-align: center;">
+                        Entry Verification
+                      </h4>
+                      <!-- QR code embedded as base64 data URL from template variable -->
+                      <div style="background-color: #ffffff; padding: 15px; border-radius: 8px; display: inline-block;">
+                        <img src="{{entryQRCode}}" alt="Entry Verification QR Code" style="width: 150px; height: 150px; display: block;" />
+                      </div>
+                      <p style="margin: 15px 0 0 0; font-size: 12px; color: #94A3B8; text-align: center;">
+                        Show this at entry
+                      </p>
+                    </div>
+                  </td>
+                  
+                  <!-- Feedback QR Code: Links to /feedback/{bookingId} -->
+                  <td align="center" style="padding: 0 10px; width: 50%;">
+                    <div style="background-color: #1E293B; border-radius: 12px; padding: 20px; border: 1px solid #334155;">
+                      <h4 style="margin: 0 0 15px 0; font-size: 14px; font-weight: 600; color: #2DD4BF; text-align: center;">
+                        Feedback
+                      </h4>
+                      <!-- QR code embedded as base64 data URL from template variable -->
+                      <div style="background-color: #ffffff; padding: 15px; border-radius: 8px; display: inline-block;">
+                        <img src="{{feedbackQRCode}}" alt="Feedback QR Code" style="width: 150px; height: 150px; display: block;" />
+                      </div>
+                      <p style="margin: 15px 0 0 0; font-size: 12px; color: #94A3B8; text-align: center;">
+                        Use after session
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Contact information section with phone and email links -->
+              <div style="text-align: center; padding: 20px 0; border-top: 1px solid #334155;">
+                <p style="margin: 0 0 10px 0; font-size: 14px; color: #94A3B8;">
+                  Need help? Contact us:
+                </p>
+                <p style="margin: 0; font-size: 14px;">
+                  <a href="tel:+923255429429" style="color: #2DD4BF; text-decoration: none;">+92 325 5429429</a>
+                  <span style="color: #475569; margin: 0 10px;">|</span>
+                  <a href="mailto:ibexsportscomplex@gmail.com" style="color: #2DD4BF; text-decoration: none;">ibexsportscomplex@gmail.com</a>
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Email footer with copyright and address -->
+          <tr>
+            <td style="background-color: #0F172A; padding: 25px 30px; text-align: center; border-top: 1px solid #334155;">
+              <p style="margin: 0 0 10px 0; font-size: 12px; color: #64748B;">
+                © 2024 IBEX Sports Arena. All rights reserved.
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #64748B;">
+                Toot Stop Near Orchid Marquee, Wild Life Park Road, Main Islamabad Expy, Islamabad
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

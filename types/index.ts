@@ -19,8 +19,9 @@ export interface Booking {
   userName: string;
   userEmail: string;
   userPhone?: string;
-  status: "confirmed" | "cancelled" | "completed";
+  status: "pending_payment" | "confirmed" | "cancelled" | "completed";
   totalPrice: number;
+  amountPaid: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { QRCode } from "@/components/ui/qr-code";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OPERATING_HOURS, CourtType } from "@/types";
-import { getCourts } from "../actions/courts";
-import { getBookingsByDate, createBooking } from "../actions/bookings";
+import api from "@/lib/api";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 
@@ -47,13 +46,20 @@ export default function BookingPage() {
   const loadCourts = async () => {
     setIsLoadingCourts(true);
     try {
-      const result = await getCourts(selectedCourtType);
-      if (result.success) {
-        setCourts(result.courts);
-        setSelectedSlots([]); // Reset selection when court type changes
+      const response = await api.get(`/api/courts?type=${selectedCourtType}`);
+      // Handle both old format (array) and new format ({ success, courts })
+      if (response.data) {
+        const courtsData = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data.courts || []);
+        setCourts(Array.isArray(courtsData) ? courtsData : []);
+        setSelectedSlots([]);
+      } else {
+        setCourts([]);
       }
     } catch (error) {
-      console.error(error);
+      console.error('Failed to load courts:', error);
+      setCourts([]);
     } finally {
       setIsLoadingCourts(false);
     }
@@ -63,17 +69,37 @@ export default function BookingPage() {
     setIsLoading(true);
     try {
       const dateString = selectedDate.toISOString().split("T")[0];
-      const result = await getBookingsByDate(dateString);
-      if (result.success) {
-        // Filter bookings for selected court type
-        const filtered = result.bookings.filter(
-          (b: any) =>
-            b.courtId?.type === selectedCourtType && b.status !== "cancelled"
-        );
+      console.log('[BookingPage] Loading bookings for date:', dateString);
+      console.log('[BookingPage] Making GET request to:', `/api/bookings?date=${dateString}`);
+      
+      const response = await api.get(`/api/bookings?date=${dateString}`);
+      
+      console.log('[BookingPage] Response received:', {
+        status: response?.status,
+        data: response?.data,
+        success: response?.data?.success,
+        bookingsCount: response?.data?.bookings?.length || 0
+      });
+      
+      if (response?.data?.success) {
+        const bookings = Array.isArray(response.data.bookings) ? response.data.bookings : [];
+        console.log('[BookingPage] Processing bookings:', bookings.length);
+        // Simple filter - just exclude cancelled
+        // Note: We can't filter by court type yet since we don't have court data
+        // We'll add that in the next step
+        const filtered = bookings.filter((b: any) => b.status !== "cancelled");
+        console.log('[BookingPage] Filtered bookings (non-cancelled):', filtered.length);
         setBookings(filtered);
+      } else {
+        console.log('[BookingPage] Response not successful, setting empty bookings');
+        setBookings([]);
       }
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error('[BookingPage] ERROR loading bookings:', error);
+      console.error('[BookingPage] Error message:', error?.message);
+      console.error('[BookingPage] Error response:', error?.response?.data);
+      console.error('[BookingPage] Error status:', error?.response?.status);
+      setBookings([]);
     } finally {
       setIsLoading(false);
     }
@@ -81,8 +107,8 @@ export default function BookingPage() {
 
   const isSlotBooked = (courtId: string, slotTime: number) => {
     return bookings.some((b) => {
-      const bookingCourtId =
-        typeof b.courtId === "object" ? b.courtId._id : b.courtId;
+      // courtId is now just a string/ObjectId
+      const bookingCourtId = b.courtId?.toString() || b.courtId;
       if (bookingCourtId !== courtId) return false;
 
       const bookingStart = b.startTime;
@@ -225,10 +251,9 @@ export default function BookingPage() {
 
     try {
       const startTime = sortedTimes[0];
-      // Duration in hours: number of slots * 0.5 hours per slot
       const duration = selectedSlots.length * 0.5;
 
-      const result = await createBooking({
+      const response = await api.post('/api/bookings', {
         courtType: selectedCourtType,
         date: selectedDate.toISOString().split("T")[0],
         startTime,
@@ -238,17 +263,18 @@ export default function BookingPage() {
         userPhone: formData.phone,
       });
 
-      if (result.success) {
+      if (response.data?.success) {
         setFormStatus("success");
-        setCreatedBooking(result.booking);
+        setCreatedBooking(response.data.booking);
+        loadBookings();
       } else {
         setFormStatus("error");
-        setErrorMessage(result.error || "Failed to create booking");
+        setErrorMessage(response.data?.error || "Failed to create booking");
       }
     } catch (err: any) {
-      console.error(err);
+      console.error('Failed to create booking:', err);
       setFormStatus("error");
-      setErrorMessage(err.message || "An error occurred");
+      setErrorMessage(err.response?.data?.error || err.message || "An error occurred");
     }
   };
 

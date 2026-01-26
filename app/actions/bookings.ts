@@ -4,6 +4,8 @@ import connectDB from '@/lib/mongodb';
 import Booking from '@/models/Booking';
 import Court from '@/models/Court';
 import { revalidatePath } from 'next/cache';
+import { sendBookingConfirmationEmail } from '@/lib/email';
+import { isBuildTime } from '@/lib/build-utils';
 
 export interface CreateBookingInput {
   courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
@@ -16,6 +18,13 @@ export interface CreateBookingInput {
 }
 
 export async function createBooking(input: CreateBookingInput) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot create booking during build',
+    };
+  }
+
   try {
     await connectDB();
 
@@ -94,17 +103,38 @@ export async function createBooking(input: CreateBookingInput) {
       userEmail: input.userEmail.toLowerCase(),
       userPhone: input.userPhone,
       totalPrice,
-      status: 'confirmed',
+      amountPaid: 0,
+      status: 'pending_payment',
     });
 
     await booking.populate('courtId');
+
+    // Send confirmation email (non-blocking)
+    const populatedBooking = JSON.parse(JSON.stringify(booking));
+    const court = populatedBooking.courtId;
+    const courtName = court?.name || 'Unknown Court';
+    
+    sendBookingConfirmationEmail({
+      userName: input.userName,
+      userEmail: input.userEmail.toLowerCase(),
+      courtName,
+      date: input.date,
+      startTime: input.startTime,
+      duration: input.duration,
+      totalPrice,
+      bookingId: populatedBooking._id,
+      amountPaid: 0,
+    }).catch((error) => {
+      // Log error but don't fail the booking
+      console.error('Failed to send booking confirmation email:', error);
+    });
 
     revalidatePath('/booking');
     revalidatePath('/admin');
 
     return {
       success: true,
-      booking: JSON.parse(JSON.stringify(booking)),
+      booking: populatedBooking,
     };
   } catch (error: any) {
     console.error('Booking creation error:', error);
@@ -116,6 +146,13 @@ export async function createBooking(input: CreateBookingInput) {
 }
 
 export async function getBookingsByDate(date: string) {
+  if (isBuildTime()) {
+    return {
+      success: true,
+      bookings: [],
+    };
+  }
+
   try {
     await connectDB();
 
@@ -141,6 +178,13 @@ export async function getBookingsByDate(date: string) {
 }
 
 export async function getAllBookings() {
+  if (isBuildTime()) {
+    return {
+      success: true,
+      bookings: [],
+    };
+  }
+
   try {
     await connectDB();
 
@@ -163,6 +207,13 @@ export async function getAllBookings() {
 }
 
 export async function cancelBooking(bookingId: string) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot cancel booking during build',
+    };
+  }
+
   try {
     await connectDB();
 
@@ -200,11 +251,19 @@ export interface UpdateBookingInput {
   userName?: string;
   userEmail?: string;
   userPhone?: string;
-  status?: 'confirmed' | 'cancelled' | 'completed';
+  status?: 'pending_payment' | 'confirmed' | 'cancelled' | 'completed';
   totalPrice?: number;
+  amountPaid?: number;
 }
 
 export async function updateBooking(input: UpdateBookingInput) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot update booking during build',
+    };
+  }
+
   try {
     await connectDB();
 
@@ -213,6 +272,11 @@ export async function updateBooking(input: UpdateBookingInput) {
     // If email is provided, lowercase it
     if (updateData.userEmail) {
       updateData.userEmail = updateData.userEmail.toLowerCase();
+    }
+
+    // If amountPaid is provided and > 0, automatically change status to confirmed
+    if (updateData.amountPaid !== undefined && updateData.amountPaid > 0) {
+      updateData.status = 'confirmed';
     }
 
     // If date or time changed, recalculate price
@@ -284,6 +348,13 @@ export async function updateBooking(input: UpdateBookingInput) {
 }
 
 export async function deleteBooking(bookingId: string) {
+  if (isBuildTime()) {
+    return {
+      success: false,
+      error: 'Cannot delete booking during build',
+    };
+  }
+
   try {
     await connectDB();
 
