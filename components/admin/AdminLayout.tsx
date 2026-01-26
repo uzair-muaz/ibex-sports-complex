@@ -45,14 +45,34 @@ export function AdminLayout({
   const sidebarItems = [
     ...(isSuperAdmin
       ? [
-          { id: "analytics", label: "Analytics", icon: TrendingUp, path: "/admin/analytics" },
+          {
+            id: "analytics",
+            label: "Analytics",
+            icon: TrendingUp,
+            path: "/admin/analytics",
+          },
         ]
       : []),
-    { id: "bookings", label: "Bookings", icon: Calendar, path: "/admin/bookings" },
-    { id: "feedback", label: "Feedback", icon: MessageSquare, path: "/admin/feedback" },
+    {
+      id: "bookings",
+      label: "Bookings",
+      icon: Calendar,
+      path: "/admin/bookings",
+    },
+    {
+      id: "feedback",
+      label: "Feedback",
+      icon: MessageSquare,
+      path: "/admin/feedback",
+    },
     ...(isSuperAdmin
       ? [
-          { id: "courts", label: "Courts", icon: Activity, path: "/admin/courts" },
+          {
+            id: "courts",
+            label: "Courts",
+            icon: Activity,
+            path: "/admin/courts",
+          },
           { id: "users", label: "Users", icon: Users, path: "/admin/users" },
         ]
       : []),
@@ -61,7 +81,7 @@ export function AdminLayout({
   useEffect(() => {
     if (typeof window !== "undefined") {
       setSidebarOpen(window.innerWidth >= 1024);
-      
+
       const handleResize = () => {
         if (window.innerWidth >= 1024) {
           setSidebarOpen(true);
@@ -69,7 +89,7 @@ export function AdminLayout({
           setSidebarOpen(false);
         }
       };
-      
+
       window.addEventListener("resize", handleResize);
       return () => window.removeEventListener("resize", handleResize);
     }
@@ -110,7 +130,9 @@ export function AdminLayout({
                 <LayoutDashboard className="w-6 h-6 text-[#0F172A]" />
               </div>
               <div>
-                <h2 className="font-bold text-white text-base sm:text-lg">Admin Panel</h2>
+                <h2 className="font-bold text-white text-base sm:text-lg">
+                  Admin Panel
+                </h2>
                 <p className="text-xs text-zinc-400">
                   {isSuperAdmin ? "Super Admin" : "Admin"}
                 </p>
@@ -212,9 +234,7 @@ export function AdminLayout({
 
         {/* Content Area */}
         <main className="flex-1 overflow-y-auto bg-black">
-          <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
-            {children}
-          </div>
+          <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">{children}</div>
         </main>
       </div>
     </div>

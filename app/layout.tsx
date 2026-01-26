@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { getBaseUrl } from "@/lib/utils";
 import { WhatsAppFloat } from "@/components/WhatsAppFloat";
+import { ConditionalWhatsApp } from "@/components/ConditionalWhatsApp";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -88,7 +89,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <Providers>
           {children}
-          <WhatsAppFloat />
+          <ConditionalWhatsApp />
         </Providers>
       </body>
     </html>

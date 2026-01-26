@@ -12,7 +12,6 @@ import { getCourts } from "../actions/courts";
 import { getBookingsByDate, createBooking } from "../actions/bookings";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-
 export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedCourtType, setSelectedCourtType] =
@@ -241,6 +240,7 @@ export default function BookingPage() {
       if (result.success) {
         setFormStatus("success");
         setCreatedBooking(result.booking);
+        
       } else {
         setFormStatus("error");
         setErrorMessage(result.error || "Failed to create booking");
@@ -769,9 +769,6 @@ export default function BookingPage() {
                       </div>
                     </div>
                     
-                    <p className="text-xs md:text-sm text-yellow-400 bg-yellow-500/10 border border-yellow-500/50 rounded-lg px-3 md:px-4 py-2 md:py-3 text-center lg:text-left">
-                      📸 Please take screenshots of both QR codes. Use the first for entry verification and the second to share your feedback after your booking.
-                    </p>
                   </div>
                 </div>
 

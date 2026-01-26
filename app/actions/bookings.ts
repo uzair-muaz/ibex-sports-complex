@@ -4,6 +4,8 @@ import connectDB from '@/lib/mongodb';
 import Booking from '@/models/Booking';
 import Court from '@/models/Court';
 import { revalidatePath } from 'next/cache';
+import { sendBookingConfirmationEmail } from '@/lib/email';
+import { getBaseUrl } from '@/lib/utils';
 
 export interface CreateBookingInput {
   courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
@@ -94,10 +96,29 @@ export async function createBooking(input: CreateBookingInput) {
       userEmail: input.userEmail.toLowerCase(),
       userPhone: input.userPhone,
       totalPrice,
-      status: 'confirmed',
+      status: 'pending_payment',
+      amountPaid: 0,
     });
 
     await booking.populate('courtId');
+
+    // Send confirmation email (non-blocking)
+    const court = booking.courtId as any;
+    const emailResult = await sendBookingConfirmationEmail({
+      userName: input.userName,
+      userEmail: input.userEmail.toLowerCase(),
+      courtName: court?.name || 'Court',
+      date: input.date,
+      startTime: input.startTime,
+      duration: input.duration,
+      totalPrice,
+      bookingId: booking._id.toString(),
+      baseUrl: getBaseUrl(),
+    }).catch((error) => {
+      // Log error but don't fail the booking creation
+      console.error('Failed to send confirmation email:', error);
+      return { success: false, message: error.message || 'Failed to send email' };
+    });
 
     revalidatePath('/booking');
     revalidatePath('/admin');
@@ -105,6 +126,8 @@ export async function createBooking(input: CreateBookingInput) {
     return {
       success: true,
       booking: JSON.parse(JSON.stringify(booking)),
+      emailSent: emailResult?.success || false,
+      emailMessage: emailResult?.message,
     };
   } catch (error: any) {
     console.error('Booking creation error:', error);
@@ -200,8 +223,9 @@ export interface UpdateBookingInput {
   userName?: string;
   userEmail?: string;
   userPhone?: string;
-  status?: 'confirmed' | 'cancelled' | 'completed';
+  status?: 'pending_payment' | 'confirmed' | 'cancelled' | 'completed';
   totalPrice?: number;
+  amountPaid?: number;
 }
 
 export async function updateBooking(input: UpdateBookingInput) {
@@ -213,6 +237,11 @@ export async function updateBooking(input: UpdateBookingInput) {
     // If email is provided, lowercase it
     if (updateData.userEmail) {
       updateData.userEmail = updateData.userEmail.toLowerCase();
+    }
+
+    // If amountPaid is provided and > 0, automatically change status to confirmed
+    if (updateData.amountPaid !== undefined && updateData.amountPaid > 0) {
+      updateData.status = 'confirmed';
     }
 
     // If date or time changed, recalculate price

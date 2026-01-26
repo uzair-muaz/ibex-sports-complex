@@ -411,14 +411,18 @@ export default function BookingsPage() {
                               className={
                                 booking.status === "confirmed"
                                   ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF] text-xs"
-                                  : booking.status === "cancelled"
-                                    ? "bg-red-500/20 border-red-500/50 text-red-400 text-xs"
-                                    : booking.status === "completed"
-                                      ? "bg-green-500/20 border-green-500/50 text-green-400 text-xs"
-                                      : "bg-zinc-800 border-zinc-700 text-zinc-300 text-xs"
+                                  : booking.status === "pending_payment"
+                                    ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-400 text-xs"
+                                    : booking.status === "cancelled"
+                                      ? "bg-red-500/20 border-red-500/50 text-red-400 text-xs"
+                                      : booking.status === "completed"
+                                        ? "bg-green-500/20 border-green-500/50 text-green-400 text-xs"
+                                        : "bg-zinc-800 border-zinc-700 text-zinc-300 text-xs"
                               }
                             >
-                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                              {booking.status === "pending_payment" 
+                                ? "Pending Payment"
+                                : booking.status.charAt(0).toUpperCase() + booking.status.slice(1).replace(/_/g, " ")}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
@@ -441,7 +445,7 @@ export default function BookingsPage() {
                               >
                                 <Edit2 className="w-4 h-4" />
                               </Button>
-                              {booking.status === "confirmed" && (
+                              {(booking.status === "confirmed" || booking.status === "pending_payment") && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -497,14 +501,18 @@ export default function BookingsPage() {
                     className={
                       viewingBooking.status === "confirmed"
                         ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF]"
-                        : viewingBooking.status === "cancelled"
-                          ? "bg-red-500/20 border-red-500/50 text-red-400"
-                          : viewingBooking.status === "completed"
-                            ? "bg-green-500/20 border-green-500/50 text-green-400"
-                            : "bg-zinc-800 border-zinc-700 text-zinc-300"
+                        : viewingBooking.status === "pending_payment"
+                          ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-400"
+                          : viewingBooking.status === "cancelled"
+                            ? "bg-red-500/20 border-red-500/50 text-red-400"
+                            : viewingBooking.status === "completed"
+                              ? "bg-green-500/20 border-green-500/50 text-green-400"
+                              : "bg-zinc-800 border-zinc-700 text-zinc-300"
                     }
                   >
-                    {viewingBooking.status.charAt(0).toUpperCase() + viewingBooking.status.slice(1)}
+                    {viewingBooking.status === "pending_payment" 
+                      ? "Pending Payment"
+                      : viewingBooking.status.charAt(0).toUpperCase() + viewingBooking.status.slice(1).replace(/_/g, " ")}
                   </Badge>
                 </div>
                 <div className="space-y-1">
@@ -561,6 +569,16 @@ export default function BookingsPage() {
                   <Label className="text-zinc-400 text-xs">Total Price</Label>
                   <p className="text-[#2DD4BF] font-semibold">PKR {viewingBooking.totalPrice.toFixed(2)}</p>
                 </div>
+                <div className="space-y-1">
+                  <Label className="text-zinc-400 text-xs">Amount Paid</Label>
+                  <p className="text-white font-semibold">PKR {(viewingBooking.amountPaid || 0).toFixed(2)}</p>
+                </div>
+                {(viewingBooking.amountPaid || 0) < viewingBooking.totalPrice && (
+                  <div className="space-y-1">
+                    <Label className="text-zinc-400 text-xs">Remaining Balance</Label>
+                    <p className="text-yellow-400 font-semibold">PKR {(viewingBooking.totalPrice - (viewingBooking.amountPaid || 0)).toFixed(2)}</p>
+                  </div>
+                )}
               </div>
 
               {/* QR Codes */}

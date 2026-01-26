@@ -5,7 +5,6 @@ import Image from "next/image";
 import useSWR from "swr";
 import { ParallaxSection } from "@/components/ui/ParallaxSection";
 import { TextReveal } from "@/components/ui/TextReveal";
-import { PricingBadge } from "@/components/ui/PricingBadge";
 
 // Static data - all court information is hardcoded
 // Only prices come from DB via ISR + SWR hybrid rendering
@@ -132,9 +131,6 @@ export const FacilitiesSection = ({
                     <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
                       01 — Padel
                     </span>
-                    <PricingBadge
-                      price={padelCourts[0]?.pricePerHour || 5000}
-                    />
                   </div>
                   <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">
                     {staticCourtData.padel.name}
@@ -169,9 +165,6 @@ export const FacilitiesSection = ({
                     <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
                       02 — Futsal
                     </span>
-                    <PricingBadge
-                      price={futsalCourts[0]?.pricePerHour || 6000}
-                    />
                   </div>
                   <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">
                     {staticCourtData.futsal.name}
@@ -206,9 +199,6 @@ export const FacilitiesSection = ({
                     <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
                       03 — Pickleball
                     </span>
-                    <PricingBadge
-                      price={pickleballCourts[0]?.pricePerHour || 4000}
-                    />
                   </div>
                   <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">
                     {staticCourtData.pickleball.name}
@@ -243,9 +233,6 @@ export const FacilitiesSection = ({
                     <span className="text-[#2DD4BF] font-mono text-sm tracking-widest uppercase font-bold">
                       04 — Cricket
                     </span>
-                    <PricingBadge
-                      price={cricketCourts[0]?.pricePerHour || 8000}
-                    />
                   </div>
                   <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">
                     {staticCourtData.cricket.name}

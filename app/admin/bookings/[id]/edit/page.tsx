@@ -50,7 +50,8 @@ export default function EditBookingPage() {
     userName: "",
     userEmail: "",
     userPhone: "",
-    status: "confirmed" as "confirmed" | "cancelled" | "completed",
+    status: "pending_payment" as "pending_payment" | "confirmed" | "cancelled" | "completed",
+    amountPaid: 0,
   });
 
   const userRole = (session?.user as any)?.role;
@@ -107,6 +108,7 @@ export default function EditBookingPage() {
             userEmail: booking.userEmail,
             userPhone: booking.userPhone || "",
             status: booking.status,
+            amountPaid: booking.amountPaid || 0,
           });
         } else {
           alert("Booking not found");
@@ -297,6 +299,7 @@ export default function EditBookingPage() {
         userEmail: formData.userEmail,
         userPhone: formData.userPhone,
         status: formData.status,
+        amountPaid: formData.amountPaid,
       });
 
       if (result.success) {
@@ -374,6 +377,7 @@ export default function EditBookingPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="pending_payment">Pending Payment</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
@@ -545,6 +549,59 @@ export default function EditBookingPage() {
                   pattern="[+]?[0-9\s\-()]{10,}"
                   className="text-sm"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Details */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-white">Payment Details</h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="total-price" className="text-zinc-200 text-sm">
+                  Total Price
+                </Label>
+                <Input
+                  id="total-price"
+                  type="text"
+                  value={`PKR ${(courts.find(c => c.type === formData.courtType)?.pricePerHour || 0) * (selectedSlots.length * 0.5 || 1)}`}
+                  disabled
+                  className="text-sm bg-zinc-800"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount-paid" className="text-zinc-200 text-sm">
+                  Amount Paid <span className="text-zinc-400 text-xs">(PKR)</span>
+                </Label>
+                <Input
+                  id="amount-paid"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.amountPaid}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value) || 0;
+                    setFormData({ ...formData, amountPaid: value });
+                    // Auto-update status to confirmed if amount paid > 0
+                    if (value > 0 && formData.status === 'pending_payment') {
+                      setFormData({ ...formData, amountPaid: value, status: 'confirmed' });
+                    } else if (value === 0 && formData.status === 'confirmed') {
+                      setFormData({ ...formData, amountPaid: value, status: 'pending_payment' });
+                    } else {
+                      setFormData({ ...formData, amountPaid: value });
+                    }
+                  }}
+                  className="text-sm"
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-zinc-400">
+                  {formData.amountPaid > 0 && formData.status === 'pending_payment' 
+                    ? 'Status will change to "Confirmed" when saved'
+                    : formData.amountPaid === 0 && formData.status === 'confirmed'
+                    ? 'Status will change to "Pending Payment" when saved'
+                    : ''}
+                </p>
               </div>
             </div>
           </div>

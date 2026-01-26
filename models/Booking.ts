@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
-export type BookingStatus = 'confirmed' | 'cancelled' | 'completed';
+export type BookingStatus = 'pending_payment' | 'confirmed' | 'cancelled' | 'completed';
 
 export interface IBooking extends Document {
   courtId: mongoose.Types.ObjectId;
@@ -12,6 +12,7 @@ export interface IBooking extends Document {
   userPhone: string;
   status: BookingStatus;
   totalPrice: number;
+  amountPaid: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,12 +59,17 @@ const BookingSchema: Schema = new Schema(
     },
     status: {
       type: String,
-      enum: ['confirmed', 'cancelled', 'completed'],
-      default: 'confirmed',
+      enum: ['pending_payment', 'confirmed', 'cancelled', 'completed'],
+      default: 'pending_payment',
     },
     totalPrice: {
       type: Number,
       required: true,
+      min: 0,
+    },
+    amountPaid: {
+      type: Number,
+      default: 0,
       min: 0,
     },
   },
@@ -76,7 +82,12 @@ const BookingSchema: Schema = new Schema(
 BookingSchema.index({ courtId: 1, date: 1, startTime: 1 });
 BookingSchema.index({ date: 1, status: 1 });
 
-const Booking: Model<IBooking> = mongoose.models.Booking || mongoose.model<IBooking>('Booking', BookingSchema);
+// Delete the model if it exists to force recompilation with new schema
+if (mongoose.models.Booking) {
+  delete mongoose.models.Booking;
+}
+
+const Booking: Model<IBooking> = mongoose.model<IBooking>('Booking', BookingSchema);
 
 export default Booking;
 

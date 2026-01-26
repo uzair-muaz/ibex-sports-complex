@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Lock, Loader2 } from "lucide-react";
+import { Lock, Loader2, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -109,7 +110,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-black px-4">
       <Card className="w-full max-w-sm border-zinc-800 bg-zinc-950">
         <CardHeader>
           <div className="text-center">
@@ -186,6 +187,18 @@ export default function AdminPage() {
           </Form>
         </CardContent>
       </Card>
+      
+      <div className="w-full max-w-sm mt-4">
+        <Link href="/" className="block">
+          <Button
+            variant="ghost"
+            className="w-full text-zinc-200 hover:text-white hover:bg-zinc-800 justify-center"
+          >
+            <Home className="w-4 h-4 mr-2" />
+            Go to Home
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }
