@@ -5,6 +5,7 @@ import { Providers } from "./providers";
 import { getBaseUrl } from "@/lib/utils";
 import { WhatsAppFloat } from "@/components/WhatsAppFloat";
 import { ConditionalWhatsApp } from "@/components/ConditionalWhatsApp";
+import { Analytics } from "@vercel/analytics/react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -90,6 +91,7 @@ export default function RootLayout({
         <Providers>
           {children}
           <ConditionalWhatsApp />
+          <Analytics />
         </Providers>
       </body>
     </html>
