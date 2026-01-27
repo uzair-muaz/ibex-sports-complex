@@ -160,14 +160,13 @@ export const Navbar = () => {
 
         {/* Mobile Menu Toggle */}
         <div className="md:hidden flex items-center gap-3">
-          {/* Admin Button Mobile */}
-          <Link href="/admin">
+          {/* Book Now Mobile (primary action) */}
+          <Link href="/booking">
             <motion.button
               whileTap={{ scale: 0.9 }}
-              className="relative px-3 py-2 rounded-lg text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-2"
+              className="relative px-3 py-2 rounded-lg bg-[#2DD4BF] text-[#0F172A] font-semibold text-sm hover:bg-[#14B8A6] transition-colors cursor-pointer flex items-center gap-2"
             >
-              <Lock className="w-4 h-4" />
-              <span className="text-sm font-medium">Admin</span>
+              <span>Book Now</span>
             </motion.button>
           </Link>
 
@@ -242,17 +241,16 @@ export const Navbar = () => {
                   </motion.div>
                 );
               })}
+              {/* Admin inside mobile menu */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 }}
               >
-                <Link
-                  href="/booking"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <Button className="w-full bg-[#2DD4BF] text-[#0F172A] font-bold py-6 text-lg rounded-xl hover:bg-[#14B8A6] transition-all duration-200 shadow-lg shadow-[#2DD4BF]/30 cursor-pointer">
-                    Book Now
+                <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)}>
+                  <Button className="w-full bg-white/5 text-white font-medium py-4 text-base rounded-xl hover:bg-white/10 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2">
+                    <Lock className="w-4 h-4" />
+                    <span>Admin</span>
                   </Button>
                 </Link>
               </motion.div>

@@ -63,7 +63,7 @@ export default async function Home() {
       <HeroSection />
 
       <div className="relative z-30">
-        <MarqueeSection text="PADEL • CRICKET • PICKLEBALL • FUTSAL" />
+        <MarqueeSection text="PADEL • PICKLEBALL • FUTSAL" />
       </div>
 
       <FacilitiesSection

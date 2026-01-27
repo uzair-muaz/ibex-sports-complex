@@ -67,7 +67,7 @@ export default function BookingPage() {
         // Filter bookings for selected court type
         const filtered = result.bookings.filter(
           (b: any) =>
-            b.courtId?.type === selectedCourtType && b.status !== "cancelled"
+            b.courtId?.type === selectedCourtType && b.status !== "cancelled",
         );
         setBookings(filtered);
       }
@@ -94,18 +94,20 @@ export default function BookingPage() {
 
   const isSlotSelected = (courtId: string, slotTime: number) => {
     return selectedSlots.some(
-      (s) => s.courtId === courtId && s.slotTime === slotTime
+      (s) => s.courtId === courtId && s.slotTime === slotTime,
     );
   };
 
   const isSlotConsecutive = (courtId: string, slotTime: number) => {
     if (selectedSlots.length === 0) return true;
     if (selectedSlots[0].courtId !== courtId) return false;
-    
-    const sortedTimes = selectedSlots.map((s) => s.slotTime).sort((a, b) => a - b);
+
+    const sortedTimes = selectedSlots
+      .map((s) => s.slotTime)
+      .sort((a, b) => a - b);
     const minTime = sortedTimes[0];
     const maxTime = sortedTimes[sortedTimes.length - 1];
-    
+
     // Check if slotTime is exactly 0.5 hours before min or after max
     return (
       Math.abs(slotTime - (minTime - 0.5)) < 0.01 ||
@@ -121,14 +123,14 @@ export default function BookingPage() {
     }
 
     const existingIndex = selectedSlots.findIndex(
-      (s) => s.courtId === courtId && s.slotTime === slotTime
+      (s) => s.courtId === courtId && s.slotTime === slotTime,
     );
 
     if (existingIndex >= 0) {
       // Deselecting a slot
       const newSlots = [...selectedSlots];
       newSlots.splice(existingIndex, 1);
-      
+
       // If removing a slot leaves less than 2 slots, clear all
       if (newSlots.length < 2) {
         setSelectedSlots([]);
@@ -141,11 +143,13 @@ export default function BookingPage() {
     } else {
       // Selecting a new slot
       setSelectionError("");
-      
+
       // If no slots selected yet, start with this one
       if (selectedSlots.length === 0) {
         setSelectedSlots([{ courtId, slotTime }]);
-        setSelectionError("Select another consecutive slot to complete 1 hour minimum booking.");
+        setSelectionError(
+          "Select another consecutive slot to complete 1 hour minimum booking.",
+        );
         setTimeout(() => setSelectionError(""), 3000);
         return;
       }
@@ -155,7 +159,9 @@ export default function BookingPage() {
       if (firstCourt !== courtId) {
         // Different court - replace selection
         setSelectedSlots([{ courtId, slotTime }]);
-        setSelectionError("Select another consecutive slot to complete 1 hour minimum booking.");
+        setSelectionError(
+          "Select another consecutive slot to complete 1 hour minimum booking.",
+        );
         setTimeout(() => setSelectionError(""), 3000);
         return;
       }
@@ -165,7 +171,7 @@ export default function BookingPage() {
         ...selectedSlots.map((s) => s.slotTime),
         slotTime,
       ].sort((a, b) => a - b);
-      
+
       let isConsecutive = true;
       for (let i = 0; i < sortedTimes.length - 1; i++) {
         // Check if next slot is exactly 0.5 hours after current slot
@@ -185,7 +191,9 @@ export default function BookingPage() {
 
       // Consecutive slot - add it
       setSelectedSlots((prev) =>
-        [...prev, { courtId, slotTime }].sort((a, b) => a.slotTime - b.slotTime)
+        [...prev, { courtId, slotTime }].sort(
+          (a, b) => a.slotTime - b.slotTime,
+        ),
       );
       setSelectionError("");
     }
@@ -240,7 +248,6 @@ export default function BookingPage() {
       if (result.success) {
         setFormStatus("success");
         setCreatedBooking(result.booking);
-        
       } else {
         setFormStatus("error");
         setErrorMessage(result.error || "Failed to create booking");
@@ -266,12 +273,12 @@ export default function BookingPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-black text-white relative">
+    <div className="min-h-screen bg-black text-white relative overflow-x-hidden">
       <Navbar />
 
       <div className="fixed top-0 left-0 w-full h-[50vh] bg-gradient-to-b from-[#2DD4BF]/10 to-transparent pointer-events-none" />
 
-      <div className="pt-20 md:pt-24 lg:pt-32 pb-20 md:pb-24 px-4 md:px-6">
+      <div className="pt-20  md:pt-24 lg:pt-32 pb-20 md:pb-24 px-4 md:px-6">
         <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 lg:space-y-12 relative z-10">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 md:gap-8 pb-6 md:pb-8 border-b border-white/5">
@@ -342,7 +349,7 @@ export default function BookingPage() {
                   <span className="text-zinc-500">Booked</span>
                 </div>
               </div>
-              
+
               {selectionError && (
                 <div className="bg-yellow-500/10 border border-yellow-500/50 rounded-lg px-4 py-2 text-xs md:text-sm text-yellow-400 max-w-md">
                   {selectionError}
@@ -365,7 +372,10 @@ export default function BookingPage() {
                   </div>
                   <div className="flex">
                     {[...Array(3)].map((_, i) => (
-                      <div key={i} className="flex-1 min-w-[200px] border-r border-white/5 last:border-0 p-4">
+                      <div
+                        key={i}
+                        className="flex-1 min-w-[200px] border-r border-white/5 last:border-0 p-4"
+                      >
                         <Skeleton className="h-24 w-full mb-2" />
                         {[...Array(34)].map((_, j) => (
                           <Skeleton key={j} className="h-7 w-full mb-0.5" />
@@ -378,11 +388,17 @@ export default function BookingPage() {
               {/* Mobile Skeleton */}
               <div className="lg:hidden space-y-4">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="glass-panel rounded-2xl overflow-hidden p-4">
+                  <div
+                    key={i}
+                    className="glass-panel rounded-2xl overflow-hidden p-4"
+                  >
                     <Skeleton className="h-20 w-full mb-4" />
                     <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                       {[...Array(24)].map((_, j) => (
-                        <Skeleton key={j} className="aspect-square rounded-lg" />
+                        <Skeleton
+                          key={j}
+                          className="aspect-square rounded-lg"
+                        />
                       ))}
                     </div>
                   </div>
@@ -398,7 +414,7 @@ export default function BookingPage() {
               {/* Desktop Grid View */}
               <div className="hidden lg:block glass-panel rounded-3xl overflow-hidden p-1">
                 <div className="overflow-x-auto">
-                  <div className="min-w-[800px] grid grid-cols-[130px_1fr]">
+                  <div className="grid grid-cols-[130px_1fr]">
                     {/* Time Slots Column */}
                     <div className="border-r border-white/5 bg-black/20">
                       <div className="h-24 flex items-center justify-center border-b border-white/5 text-zinc-500 text-xs font-mono uppercase tracking-widest">
@@ -443,10 +459,13 @@ export default function BookingPage() {
 
                           <div className="">
                             {timeSlots.map((slotTime) => {
-                              const isBooked = isSlotBooked(court._id, slotTime);
+                              const isBooked = isSlotBooked(
+                                court._id,
+                                slotTime,
+                              );
                               const isSelected = isSlotSelected(
                                 court._id,
-                                slotTime
+                                slotTime,
                               );
 
                               return (
@@ -454,36 +473,52 @@ export default function BookingPage() {
                                   key={slotTime}
                                   className="h-7 p-0.5 border-b border-white/5"
                                 >
-                                <motion.button
-                                  whileHover={!isBooked && (selectedSlots.length === 0 || isSlotConsecutive(court._id, slotTime)) ? { scale: 0.98 } : {}}
-                                  whileTap={!isBooked && (selectedSlots.length === 0 || isSlotConsecutive(court._id, slotTime)) ? { scale: 0.95 } : {}}
-                                  onClick={() =>
-                                    toggleSlot(court._id, slotTime)
-                                  }
-                                  disabled={isBooked}
-                                  title={
-                                    selectedSlots.length > 0 && 
-                                    selectedSlots[0].courtId === court._id && 
-                                    !isSlotConsecutive(court._id, slotTime) && 
-                                    !isSelected
-                                      ? "Select consecutive slots only"
-                                      : ""
-                                  }
-                                  className={`
+                                  <motion.button
+                                    whileHover={
+                                      !isBooked &&
+                                      (selectedSlots.length === 0 ||
+                                        isSlotConsecutive(court._id, slotTime))
+                                        ? { scale: 0.98 }
+                                        : {}
+                                    }
+                                    whileTap={
+                                      !isBooked &&
+                                      (selectedSlots.length === 0 ||
+                                        isSlotConsecutive(court._id, slotTime))
+                                        ? { scale: 0.95 }
+                                        : {}
+                                    }
+                                    onClick={() =>
+                                      toggleSlot(court._id, slotTime)
+                                    }
+                                    disabled={isBooked}
+                                    title={
+                                      selectedSlots.length > 0 &&
+                                      selectedSlots[0].courtId === court._id &&
+                                      !isSlotConsecutive(court._id, slotTime) &&
+                                      !isSelected
+                                        ? "Select consecutive slots only"
+                                        : ""
+                                    }
+                                    className={`
                                     w-full h-full rounded transition-all duration-300 relative overflow-hidden
                                     ${
                                       isBooked
                                         ? "bg-red-500/80 border border-red-400 cursor-not-allowed opacity-75"
                                         : isSelected
                                           ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
-                                          : selectedSlots.length > 0 && 
-                                            selectedSlots[0].courtId === court._id && 
-                                            !isSlotConsecutive(court._id, slotTime)
+                                          : selectedSlots.length > 0 &&
+                                              selectedSlots[0].courtId ===
+                                                court._id &&
+                                              !isSlotConsecutive(
+                                                court._id,
+                                                slotTime,
+                                              )
                                             ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
                                             : "bg-green-500/20 border border-green-400/60 hover:bg-green-500/30 hover:border-green-400"
                                     }
                                   `}
-                                >
+                                  >
                                     {isSelected && (
                                       <motion.div
                                         layoutId={`check-${court._id}-${slotTime}`}
@@ -534,20 +569,28 @@ export default function BookingPage() {
                         const endHour = Math.floor(endTime);
                         const endMin = endTime % 1 === 0 ? "00" : "30";
 
-                        const isConsecutive = isSlotConsecutive(court._id, slotTime);
-                        const canSelect = selectedSlots.length === 0 || isConsecutive;
-                        
+                        const isConsecutive = isSlotConsecutive(
+                          court._id,
+                          slotTime,
+                        );
+                        const canSelect =
+                          selectedSlots.length === 0 || isConsecutive;
+
                         return (
                           <motion.button
                             key={slotTime}
-                            whileHover={!isBooked && canSelect ? { scale: 0.95 } : {}}
-                            whileTap={!isBooked && canSelect ? { scale: 0.9 } : {}}
+                            whileHover={
+                              !isBooked && canSelect ? { scale: 0.95 } : {}
+                            }
+                            whileTap={
+                              !isBooked && canSelect ? { scale: 0.9 } : {}
+                            }
                             onClick={() => toggleSlot(court._id, slotTime)}
                             disabled={isBooked}
                             title={
-                              selectedSlots.length > 0 && 
-                              selectedSlots[0].courtId === court._id && 
-                              !isConsecutive && 
+                              selectedSlots.length > 0 &&
+                              selectedSlots[0].courtId === court._id &&
+                              !isConsecutive &&
                               !isSelected
                                 ? "Select consecutive slots only"
                                 : ""
@@ -559,9 +602,10 @@ export default function BookingPage() {
                                   ? "bg-red-500/80 border border-red-400 cursor-not-allowed opacity-75"
                                   : isSelected
                                     ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
-                                    : selectedSlots.length > 0 && 
-                                      selectedSlots[0].courtId === court._id && 
-                                      !isConsecutive
+                                    : selectedSlots.length > 0 &&
+                                        selectedSlots[0].courtId ===
+                                          court._id &&
+                                        !isConsecutive
                                       ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
                                       : "bg-green-500/20 border border-green-400/60 hover:bg-green-500/30 hover:border-green-400"
                               }
@@ -590,7 +634,7 @@ export default function BookingPage() {
         </div>
       </div>
 
-          {/* Booking Drawer / Modal */}
+      {/* Booking Drawer / Modal */}
       <AnimatePresence>
         {selectedSlots.length >= 2 && (
           <motion.div
@@ -662,7 +706,7 @@ export default function BookingPage() {
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="relative bg-[#09090b] border border-white/10 p-4 md:p-6 lg:p-8 rounded-2xl md:rounded-3xl w-full max-w-md lg:max-w-5xl shadow-2xl overflow-hidden"
+            className="relative bg-[#09090b] border border-white/10 p-4 md:p-6 lg:p-8 rounded-2xl md:rounded-3xl w-full max-w-md lg:max-w-5xl shadow-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden"
           >
             {/* Glossy Effect */}
             <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-[#2DD4BF]/10 rounded-full blur-[80px]" />
@@ -691,16 +735,23 @@ export default function BookingPage() {
                   {/* Left Column - Booking Details */}
                   <div className="flex-1 space-y-6">
                     <div className="bg-zinc-900/50 rounded-xl p-4 md:p-6 space-y-3 text-left">
-                      <h4 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-4">Booking Details</h4>
+                      <h4 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-4">
+                        Booking Details
+                      </h4>
                       <div className="space-y-3">
                         <div className="flex justify-between items-center">
-                          <span className="text-zinc-400 text-sm">Booking ID:</span>
-                          <span className="text-white font-mono text-sm font-semibold">#{createdBooking._id.slice(-8)}</span>
+                          <span className="text-zinc-400 text-sm">
+                            Booking ID:
+                          </span>
+                          <span className="text-white font-mono text-sm font-semibold">
+                            #{createdBooking._id.slice(-8)}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-zinc-400 text-sm">Court:</span>
                           <span className="text-white text-sm">
-                            {typeof createdBooking.courtId === "object" && createdBooking.courtId?.name
+                            {typeof createdBooking.courtId === "object" &&
+                            createdBooking.courtId?.name
                               ? createdBooking.courtId.name
                               : "Court"}
                           </span>
@@ -708,12 +759,15 @@ export default function BookingPage() {
                         <div className="flex justify-between items-center">
                           <span className="text-zinc-400 text-sm">Date:</span>
                           <span className="text-white text-sm">
-                            {new Date(createdBooking.date).toLocaleDateString("en-US", {
-                              weekday: "short",
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            })}
+                            {new Date(createdBooking.date).toLocaleDateString(
+                              "en-US",
+                              {
+                                weekday: "short",
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              },
+                            )}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
@@ -722,20 +776,39 @@ export default function BookingPage() {
                             {Math.floor(createdBooking.startTime)
                               .toString()
                               .padStart(2, "0")}
-                            :{createdBooking.startTime % 1 === 0 ? "00" : "30"} -{" "}
-                            {Math.floor(createdBooking.startTime + createdBooking.duration)
+                            :{createdBooking.startTime % 1 === 0 ? "00" : "30"}{" "}
+                            -{" "}
+                            {Math.floor(
+                              createdBooking.startTime +
+                                createdBooking.duration,
+                            )
                               .toString()
                               .padStart(2, "0")}
-                            :{(createdBooking.startTime + createdBooking.duration) % 1 === 0 ? "00" : "30"}
+                            :
+                            {(createdBooking.startTime +
+                              createdBooking.duration) %
+                              1 ===
+                            0
+                              ? "00"
+                              : "30"}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-zinc-400 text-sm">Duration:</span>
-                          <span className="text-white text-sm">{createdBooking.duration} hour{createdBooking.duration !== 1 ? "s" : ""}</span>
+                          <span className="text-zinc-400 text-sm">
+                            Duration:
+                          </span>
+                          <span className="text-white text-sm">
+                            {createdBooking.duration} hour
+                            {createdBooking.duration !== 1 ? "s" : ""}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center pt-2 border-t border-zinc-800">
-                          <span className="text-zinc-400 text-sm font-semibold">Total Price:</span>
-                          <span className="text-[#2DD4BF] font-bold text-lg">PKR {createdBooking.totalPrice.toFixed(2)}</span>
+                          <span className="text-zinc-400 text-sm font-semibold">
+                            Total Price:
+                          </span>
+                          <span className="text-[#2DD4BF] font-bold text-lg">
+                            PKR {createdBooking.totalPrice.toFixed(2)}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -745,7 +818,9 @@ export default function BookingPage() {
                   <div className="flex-1 space-y-4 lg:space-y-6">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
                       <div>
-                        <h4 className="text-sm font-semibold text-zinc-300 mb-3 text-center lg:text-left">Entry Verification QR Code</h4>
+                        <h4 className="text-sm font-semibold text-zinc-300 mb-3 text-center lg:text-left">
+                          Entry Verification QR Code
+                        </h4>
                         <div className="flex justify-center lg:justify-start">
                           <div className="bg-white p-3 md:p-4 rounded-xl inline-block">
                             <QRCode
@@ -755,9 +830,11 @@ export default function BookingPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div>
-                        <h4 className="text-sm font-semibold text-zinc-300 mb-3 text-center lg:text-left">Feedback QR Code</h4>
+                        <h4 className="text-sm font-semibold text-zinc-300 mb-3 text-center lg:text-left">
+                          Feedback QR Code
+                        </h4>
                         <div className="flex justify-center lg:justify-start">
                           <div className="bg-white p-3 md:p-4 rounded-xl inline-block">
                             <QRCode
@@ -768,7 +845,6 @@ export default function BookingPage() {
                         </div>
                       </div>
                     </div>
-                    
                   </div>
                 </div>
 
@@ -795,7 +871,9 @@ export default function BookingPage() {
                 className="space-y-4 md:space-y-6 relative z-10"
               >
                 <div>
-                  <h3 className="text-xl md:text-2xl font-bold text-white">Checkout</h3>
+                  <h3 className="text-xl md:text-2xl font-bold text-white">
+                    Checkout
+                  </h3>
                   <div className="flex flex-wrap items-center gap-2 mt-2 text-zinc-400 text-xs md:text-sm">
                     <span className="bg-zinc-800 px-2 py-1 rounded text-white">
                       {selectedDate.toLocaleDateString("en-US", {
