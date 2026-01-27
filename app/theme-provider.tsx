@@ -13,22 +13,23 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('dark');
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const stored = localStorage.getItem('theme') as Theme | null;
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const initialTheme = stored || (prefersDark ? 'dark' : 'light');
-    setTheme(initialTheme);
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
+    // Force dark theme on first load, ignore system preferences
+    setTheme('dark');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theme', 'dark');
+    }
+    document.documentElement.classList.add('dark');
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    // Always keep dark theme, even if some UI calls toggleTheme
+    setTheme('dark');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theme', 'dark');
+    }
+    document.documentElement.classList.add('dark');
   };
 
   // Always provide the context, even before mounting
