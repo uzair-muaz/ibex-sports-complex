@@ -12,6 +12,7 @@ import { getCourts } from "../actions/courts";
 import { getBookingsByDate, createBooking } from "../actions/bookings";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { formatLocalDate } from "@/lib/utils";
 
 export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -117,7 +118,7 @@ export default function BookingPage() {
   const loadBookings = async () => {
     setIsLoading(true);
     try {
-      const dateString = selectedDate.toISOString().split("T")[0];
+      const dateString = formatLocalDate(selectedDate);
       const result = await getBookingsByDate(dateString);
       if (result.success) {
         // Filter bookings for selected court type
@@ -311,7 +312,7 @@ export default function BookingPage() {
 
       const result = await createBooking({
         courtType: selectedCourtType,
-        date: selectedDate.toISOString().split("T")[0],
+        date: formatLocalDate(selectedDate),
         startTime,
         duration,
         userName: formData.name,

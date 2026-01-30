@@ -27,6 +27,7 @@ import {
 } from "../../../../actions/bookings";
 import { OPERATING_HOURS } from "@/types";
 import type { Court, Booking } from "@/types";
+import { formatLocalDate } from "@/lib/utils";
 
 export default function EditBookingPage() {
   const { data: session } = useSession();
@@ -172,7 +173,7 @@ export default function EditBookingPage() {
     setIsLoadingDateBookings(true);
     try {
       const dateString = formData.date instanceof Date
-        ? formData.date.toISOString().split("T")[0]
+        ? formatLocalDate(formData.date)
         : formData.date;
       const result = await getBookingsByDate(dateString);
       if (result.success) {
@@ -293,7 +294,7 @@ export default function EditBookingPage() {
       const startTime = sortedTimes[0];
       const duration = selectedSlots.length * 0.5;
       const dateString = formData.date instanceof Date
-        ? formData.date.toISOString().split("T")[0]
+        ? formatLocalDate(formData.date)
         : formData.date;
 
       const result = await updateBooking({

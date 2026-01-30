@@ -393,11 +393,11 @@ export default function BookingsPage() {
                               {Math.floor(booking.startTime)
                                 .toString()
                                 .padStart(2, "0")}
-                              :00 -
-                              {(booking.startTime + booking.duration)
+                              :{booking.startTime % 1 === 0 ? "00" : "30"} -{" "}
+                              {Math.floor(booking.startTime + booking.duration)
                                 .toString()
                                 .padStart(2, "0")}
-                              :00
+                              :{(booking.startTime + booking.duration) % 1 === 0 ? "00" : "30"}
                             </div>
                           </TableCell>
                           <TableCell>

@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { getAllBookings } from "../../actions/bookings";
 import { getAllCourts } from "../../actions/courts";
 import type { Booking, Court } from "@/types";
+import { formatLocalDate } from "@/lib/utils";
 
 export default function AnalyticsPage() {
   const { data: session } = useSession();
@@ -69,7 +70,7 @@ export default function AnalyticsPage() {
     );
     const confirmedBookings = bookings.filter((b) => b.status === "confirmed");
     const todayBookings = bookings.filter(
-      (b) => b.date === new Date().toISOString().split("T")[0]
+      (b) => b.date === formatLocalDate(new Date())
     );
 
     const userBookingCounts: {
