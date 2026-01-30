@@ -313,7 +313,7 @@ export default function NewBookingPage() {
             ) : (
               <div className="border border-zinc-800 rounded-lg overflow-hidden bg-zinc-900/50">
                 <div className="overflow-x-auto">
-                  <div className="min-w-[600px] grid grid-cols-[100px_1fr]">
+                  <div className="min-w-[600px] grid grid-cols-[130px_1fr]">
                     {/* Time Slots Column */}
                     <div className="border-r border-zinc-800 bg-zinc-950">
                       <div className="h-12 flex items-center justify-center border-b border-zinc-800 text-zinc-400 text-xs font-mono uppercase">
@@ -322,12 +322,15 @@ export default function NewBookingPage() {
                       {timeSlots.map((slotTime) => {
                         const startHour = Math.floor(slotTime);
                         const startMin = slotTime % 1 === 0 ? "00" : "30";
+                        const endTime = slotTime + 0.5;
+                        const endHour = Math.floor(endTime);
+                        const endMin = endTime % 1 === 0 ? "00" : "30";
                         return (
                           <div
                             key={slotTime}
                             className="h-6 flex items-center justify-center text-xs text-zinc-500 font-mono border-b border-zinc-800"
                           >
-                            {startHour}:{startMin}
+                            {startHour}:{startMin}-{endHour}:{endMin}
                           </div>
                         );
                       })}
