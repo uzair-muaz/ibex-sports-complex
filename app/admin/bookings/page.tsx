@@ -48,6 +48,7 @@ import {
   updateBooking,
 } from "../../actions/bookings";
 import type { Booking, Court } from "@/types";
+import { formatDisplayDate } from "@/lib/utils";
 
 export default function BookingsPage() {
   const { data: session } = useSession();
@@ -388,7 +389,7 @@ export default function BookingsPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-zinc-200 text-sm">
-                            <div>{booking.date}</div>
+                            <div>{formatDisplayDate(booking.date)}</div>
                             <div className="text-xs text-zinc-400">
                               {Math.floor(booking.startTime)
                                 .toString()
@@ -655,7 +656,7 @@ export default function BookingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Date:</span>
-                  <span className="text-white text-sm">{cancellingBooking.date}</span>
+                  <span className="text-white text-sm">{formatDisplayDate(cancellingBooking.date)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Time:</span>
@@ -663,11 +664,11 @@ export default function BookingsPage() {
                     {Math.floor(cancellingBooking.startTime)
                       .toString()
                       .padStart(2, "0")}
-                    :00 -{" "}
-                    {(cancellingBooking.startTime + cancellingBooking.duration)
+                    :{cancellingBooking.startTime % 1 === 0 ? "00" : "30"} -{" "}
+                    {Math.floor(cancellingBooking.startTime + cancellingBooking.duration)
                       .toString()
                       .padStart(2, "0")}
-                    :00
+                    :{(cancellingBooking.startTime + cancellingBooking.duration) % 1 === 0 ? "00" : "30"}
                   </span>
                 </div>
               </div>

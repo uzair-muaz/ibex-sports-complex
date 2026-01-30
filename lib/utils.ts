@@ -27,6 +27,17 @@ export function formatTime(decimalTime: number): string {
 }
 
 /**
+ * Format date from YYYY-MM-DD to DD-MM-YYYY for display
+ */
+export function formatDisplayDate(dateStr: string): string {
+  if (!dateStr || !dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return dateStr;
+  }
+  const [year, month, day] = dateStr.split('-');
+  return `${day}-${month}-${year}`;
+}
+
+/**
  * Get the base URL for the application
  * Works in both development and production (including Vercel)
  */
