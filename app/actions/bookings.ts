@@ -26,9 +26,12 @@ export async function createBooking(input: CreateBookingInput) {
       throw new Error('Phone number is required');
     }
 
-    // Validate minimum booking time (1 hour)
-    if (input.duration < 1) {
-      throw new Error('Minimum booking time is 1 hour');
+    // Validate minimum booking time (1 hour for most courts, 1.5 hours for Futsal)
+    const minDuration = input.courtType === 'FUTSAL' ? 1.5 : 1;
+    if (input.duration < minDuration) {
+      throw new Error(input.courtType === 'FUTSAL' 
+        ? 'Minimum booking time for Futsal is 90 minutes' 
+        : 'Minimum booking time is 1 hour');
     }
 
     // Validate duration increments (can be 1, 1.5, 2, 2.5, etc.)

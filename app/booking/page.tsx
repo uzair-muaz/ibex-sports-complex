@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,15 @@ import { getCourts } from "../actions/courts";
 import { getBookingsByDate, createBooking } from "../actions/bookings";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+
 export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedCourtType, setSelectedCourtType] =
-    useState<CourtType>("PADEL");
+  const [selectedCourtType, setSelectedCourtType] = useState<CourtType | null>(
+    null
+  );
+  const [availableCourtTypes, setAvailableCourtTypes] = useState<CourtType[]>(
+    []
+  );
   const [courts, setCourts] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<
@@ -23,6 +28,7 @@ export default function BookingPage() {
   >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCourts, setIsLoadingCourts] = useState(false);
+  const [isLoadingTypes, setIsLoadingTypes] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectionError, setSelectionError] = useState<string>("");
   const [createdBooking, setCreatedBooking] = useState<any>(null);
@@ -33,17 +39,67 @@ export default function BookingPage() {
     "idle" | "loading" | "success" | "error"
   >("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [isSticky, setIsSticky] = useState(false);
+  const stickyRef = useRef<HTMLDivElement>(null);
+
+  // Detect when sticky element becomes stuck
+  useEffect(() => {
+    const handleScroll = () => {
+      if (stickyRef.current) {
+        const rect = stickyRef.current.getBoundingClientRect();
+        // Check if the element is at its sticky position (top-20 = 80px or top-24 = 96px)
+        const stickyTop = window.innerWidth >= 768 ? 96 : 80;
+        setIsSticky(rect.top <= stickyTop + 2);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // Check initial state
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Load available court types on mount
+  useEffect(() => {
+    const loadAvailableTypes = async () => {
+      setIsLoadingTypes(true);
+      try {
+        const result = await getCourts(); // Get all active courts
+        if (result.success && result.courts.length > 0) {
+          // Extract unique court types
+          const types = [
+            ...new Set(result.courts.map((c: any) => c.type)),
+          ] as CourtType[];
+          setAvailableCourtTypes(types);
+          // Set default to first available type
+          if (types.length > 0 && !selectedCourtType) {
+            setSelectedCourtType(types[0]);
+          }
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoadingTypes(false);
+      }
+    };
+    loadAvailableTypes();
+  }, []);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-    loadCourts();
+    if (selectedCourtType) {
+      window.scrollTo(0, 0);
+      loadCourts();
+    }
   }, [selectedCourtType]);
 
   useEffect(() => {
-    loadBookings();
+    if (selectedCourtType) {
+      loadBookings();
+    }
   }, [selectedDate, selectedCourtType]);
 
   const loadCourts = async () => {
+    if (!selectedCourtType) return;
     setIsLoadingCourts(true);
     try {
       const result = await getCourts(selectedCourtType);
@@ -67,7 +123,7 @@ export default function BookingPage() {
         // Filter bookings for selected court type
         const filtered = result.bookings.filter(
           (b: any) =>
-            b.courtId?.type === selectedCourtType && b.status !== "cancelled",
+            b.courtId?.type === selectedCourtType && b.status !== "cancelled"
         );
         setBookings(filtered);
       }
@@ -94,7 +150,7 @@ export default function BookingPage() {
 
   const isSlotSelected = (courtId: string, slotTime: number) => {
     return selectedSlots.some(
-      (s) => s.courtId === courtId && s.slotTime === slotTime,
+      (s) => s.courtId === courtId && s.slotTime === slotTime
     );
   };
 
@@ -123,18 +179,25 @@ export default function BookingPage() {
     }
 
     const existingIndex = selectedSlots.findIndex(
-      (s) => s.courtId === courtId && s.slotTime === slotTime,
+      (s) => s.courtId === courtId && s.slotTime === slotTime
     );
+
+    // Minimum slots required: 3 for Futsal (90 mins), 2 for others (60 mins)
+    const minSlots = selectedCourtType === "FUTSAL" ? 3 : 2;
+    const minTimeMsg =
+      selectedCourtType === "FUTSAL"
+        ? "Minimum booking for Futsal is 90 minutes (3 consecutive slots)."
+        : "Minimum booking is 1 hour (2 consecutive slots).";
 
     if (existingIndex >= 0) {
       // Deselecting a slot
       const newSlots = [...selectedSlots];
       newSlots.splice(existingIndex, 1);
 
-      // If removing a slot leaves less than 2 slots, clear all
-      if (newSlots.length < 2) {
+      // If removing a slot leaves less than minimum slots, clear all
+      if (newSlots.length < minSlots) {
         setSelectedSlots([]);
-        setSelectionError("Minimum booking is 1 hour (2 consecutive slots).");
+        setSelectionError(minTimeMsg);
         setTimeout(() => setSelectionError(""), 3000);
       } else {
         setSelectedSlots(newSlots);
@@ -144,12 +207,16 @@ export default function BookingPage() {
       // Selecting a new slot
       setSelectionError("");
 
+      // Minimum slots message based on court type
+      const selectMoreMsg =
+        selectedCourtType === "FUTSAL"
+          ? "Select more consecutive slots to complete 90 minutes minimum booking."
+          : "Select another consecutive slot to complete 1 hour minimum booking.";
+
       // If no slots selected yet, start with this one
       if (selectedSlots.length === 0) {
         setSelectedSlots([{ courtId, slotTime }]);
-        setSelectionError(
-          "Select another consecutive slot to complete 1 hour minimum booking.",
-        );
+        setSelectionError(selectMoreMsg);
         setTimeout(() => setSelectionError(""), 3000);
         return;
       }
@@ -159,9 +226,7 @@ export default function BookingPage() {
       if (firstCourt !== courtId) {
         // Different court - replace selection
         setSelectedSlots([{ courtId, slotTime }]);
-        setSelectionError(
-          "Select another consecutive slot to complete 1 hour minimum booking.",
-        );
+        setSelectionError(selectMoreMsg);
         setTimeout(() => setSelectionError(""), 3000);
         return;
       }
@@ -191,9 +256,7 @@ export default function BookingPage() {
 
       // Consecutive slot - add it
       setSelectedSlots((prev) =>
-        [...prev, { courtId, slotTime }].sort(
-          (a, b) => a.slotTime - b.slotTime,
-        ),
+        [...prev, { courtId, slotTime }].sort((a, b) => a.slotTime - b.slotTime)
       );
       setSelectionError("");
     }
@@ -221,9 +284,14 @@ export default function BookingPage() {
       return;
     }
 
-    // Minimum booking is 1 hour (2 slots of 30 minutes each)
-    if (selectedSlots.length < 2) {
-      setErrorMessage("Minimum booking time is 1 hour (2 consecutive slots).");
+    // Minimum booking: 90 mins (3 slots) for Futsal, 1 hour (2 slots) for others
+    const minSlots = selectedCourtType === "FUTSAL" ? 3 : 2;
+    if (selectedSlots.length < minSlots) {
+      setErrorMessage(
+        selectedCourtType === "FUTSAL"
+          ? "Minimum booking time for Futsal is 90 minutes (3 consecutive slots)."
+          : "Minimum booking time is 1 hour (2 consecutive slots)."
+      );
       return;
     }
 
@@ -231,6 +299,12 @@ export default function BookingPage() {
     setErrorMessage("");
 
     try {
+      if (!selectedCourtType) {
+        setErrorMessage("Please select a court type");
+        setFormStatus("error");
+        return;
+      }
+
       const startTime = sortedTimes[0];
       // Duration in hours: number of slots * 0.5 hours per slot
       const duration = selectedSlots.length * 0.5;
@@ -273,13 +347,13 @@ export default function BookingPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-x-hidden">
+    <div className="min-h-screen bg-black text-white relative">
       <Navbar />
 
       <div className="fixed top-0 left-0 w-full h-[50vh] bg-gradient-to-b from-[#2DD4BF]/10 to-transparent pointer-events-none" />
 
-      <div className="pt-20  md:pt-24 lg:pt-32 pb-20 md:pb-24 px-4 md:px-6">
-        <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 lg:space-y-12 relative z-10">
+      <div className="pt-20 md:pt-24 lg:pt-32 pb-20 md:pb-24 px-4 md:px-6">
+        <div className="max-w-7xl mx-auto space-y-4 md:space-y-6 relative z-10">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 md:gap-8 pb-6 md:pb-8 border-b border-white/5">
             <div className="space-y-3 md:space-y-4">
@@ -294,47 +368,65 @@ export default function BookingPage() {
             </div>
 
             <div className="flex flex-col gap-4 w-full md:w-auto">
-              <div className="bg-zinc-900/50 p-1 rounded-2xl border border-white/10 flex flex-wrap md:flex-nowrap">
-                {(
-                  ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"] as CourtType[]
-                ).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => {
-                      setSelectedCourtType(type);
-                      setSelectedSlots([]);
-                    }}
-                    className={`flex-1 md:flex-none px-4 md:px-8 py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-semibold transition-all duration-300 ${
-                      selectedCourtType === type
-                        ? "bg-[#2DD4BF] text-[#0F172A] shadow-[0_0_20px_rgba(45,212,191,0.3)] scale-[1.02]"
-                        : "text-zinc-500 hover:text-zinc-300"
-                    }`}
-                  >
-                    {type === "PADEL"
-                      ? "Padel"
-                      : type === "CRICKET"
+              {isLoadingTypes ? (
+                <div className="bg-zinc-900/50 p-1 rounded-2xl border border-white/10 flex">
+                  <Skeleton className="h-10 w-32 rounded-xl" />
+                  <Skeleton className="h-10 w-32 rounded-xl ml-1" />
+                </div>
+              ) : availableCourtTypes.length > 0 ? (
+                <div className="bg-zinc-900/50 p-1 rounded-2xl border border-white/10 flex flex-wrap md:flex-nowrap">
+                  {availableCourtTypes.map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        setSelectedCourtType(type);
+                        setSelectedSlots([]);
+                      }}
+                      className={`flex-1 md:flex-none px-4 md:px-8 py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-semibold transition-all duration-300 ${
+                        selectedCourtType === type
+                          ? "bg-[#2DD4BF] text-[#0F172A] shadow-[0_0_20px_rgba(45,212,191,0.3)] scale-[1.02]"
+                          : "text-zinc-500 hover:text-zinc-300"
+                      }`}
+                    >
+                      {type === "PADEL"
+                        ? "Padel"
+                        : type === "CRICKET"
                         ? "Cricket"
                         : type === "PICKLEBALL"
-                          ? "Pickleball"
-                          : "Futsal"}
-                  </button>
-                ))}
-              </div>
+                        ? "Pickleball"
+                        : "Futsal"}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-zinc-500 text-sm">No courts available</div>
+              )}
             </div>
           </div>
 
-          {/* Date & Info */}
-          <div className="flex flex-col gap-4 md:gap-6">
-            <DatePicker
-              date={selectedDate}
-              onDateChange={(date) => {
-                if (date) {
-                  setSelectedDate(date);
-                }
-              }}
-            />
+          {/* Date Picker */}
+          <DatePicker
+            date={selectedDate}
+            onDateChange={(date) => {
+              if (date) {
+                setSelectedDate(date);
+              }
+            }}
+          />
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* Legend & Info + Booking Grid Container */}
+          <div>
+            {/* Legend & Info - Sticky */}
+            <div
+              ref={stickyRef}
+              // sticky - removing sticky for now
+              className={` top-20 md:top-24 z-30 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-200 ${
+                isSticky
+                  ? ""
+                  : // "bg-black/70 backdrop-blur-md -mx-4 px-4 md:-mx-6 md:px-6 rounded-xl shadow-lg border border-white/10"
+                    ""
+              }`}
+            >
               <div className="flex flex-wrap items-center gap-3 md:gap-6 text-xs md:text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-green-500/80 border border-green-400" />
@@ -350,293 +442,314 @@ export default function BookingPage() {
                 </div>
               </div>
 
-              {selectionError && (
-                <div className="bg-yellow-500/10 border border-yellow-500/50 rounded-lg px-4 py-2 text-xs md:text-sm text-yellow-400 max-w-md">
-                  {selectionError}
-                </div>
-              )}
+              {/* Minimum Booking Info */}
+              <div className="bg-yellow-500/10 border border-yellow-500/50 rounded-lg px-3 py-1.5 text-xs md:text-sm text-yellow-400">
+                {selectedCourtType === "FUTSAL"
+                  ? "Minimum booking for Futsal is 90 minutes (3 consecutive slots)."
+                  : "Minimum booking is 1 hour (2 consecutive slots)."}
+              </div>
             </div>
-          </div>
 
-          {/* Main Booking Grid */}
-          {isLoadingCourts ? (
-            <div className="space-y-4">
-              {/* Desktop Skeleton */}
-              <div className="hidden lg:block glass-panel rounded-3xl overflow-hidden p-1">
-                <div className="grid grid-cols-[130px_1fr]">
-                  <div className="border-r border-white/5 bg-black/20 p-4">
-                    <Skeleton className="h-24 w-full mb-2" />
-                    {[...Array(34)].map((_, i) => (
-                      <Skeleton key={i} className="h-7 w-full mb-0.5" />
-                    ))}
+            {selectionError && (
+              <div className="bg-orange-500/10 border border-orange-500/50 rounded-lg px-3 py-1.5 text-xs md:text-sm text-orange-400 max-w-md mt-2">
+                {selectionError}
+              </div>
+            )}
+
+            {/* Main Booking Grid */}
+            <div className="mt-4">
+              {isLoadingTypes || isLoadingCourts ? (
+                <div className="space-y-4 ">
+                  {/* Desktop Skeleton */}
+                  <div className="hidden lg:block glass-panel rounded-3xl overflow-hidden p-1">
+                    <div className="grid grid-cols-[130px_1fr]">
+                      <div className="border-r border-white/5 bg-black/20 p-4">
+                        <Skeleton className="h-24 w-full mb-2" />
+                        {[...Array(34)].map((_, i) => (
+                          <Skeleton key={i} className="h-7 w-full mb-0.5" />
+                        ))}
+                      </div>
+                      <div className="flex">
+                        {[...Array(3)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="flex-1 min-w-[200px] border-r border-white/5 last:border-0 p-4"
+                          >
+                            <Skeleton className="h-24 w-full mb-2" />
+                            {[...Array(34)].map((_, j) => (
+                              <Skeleton key={j} className="h-7 w-full mb-0.5" />
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex">
+                  {/* Mobile Skeleton */}
+                  <div className="lg:hidden space-y-4">
                     {[...Array(3)].map((_, i) => (
                       <div
                         key={i}
-                        className="flex-1 min-w-[200px] border-r border-white/5 last:border-0 p-4"
+                        className="glass-panel rounded-2xl overflow-hidden p-4"
                       >
-                        <Skeleton className="h-24 w-full mb-2" />
-                        {[...Array(34)].map((_, j) => (
-                          <Skeleton key={j} className="h-7 w-full mb-0.5" />
-                        ))}
+                        <Skeleton className="h-20 w-full mb-4" />
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                          {[...Array(24)].map((_, j) => (
+                            <Skeleton
+                              key={j}
+                              className="aspect-square rounded-lg"
+                            />
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
-              {/* Mobile Skeleton */}
-              <div className="lg:hidden space-y-4">
-                {[...Array(3)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="glass-panel rounded-2xl overflow-hidden p-4"
-                  >
-                    <Skeleton className="h-20 w-full mb-4" />
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                      {[...Array(24)].map((_, j) => (
-                        <Skeleton
-                          key={j}
-                          className="aspect-square rounded-lg"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : isLoading ? (
-            <div className="flex items-center justify-center py-24">
-              <Loader2 className="h-12 w-12 animate-spin text-[#2DD4BF]" />
-            </div>
-          ) : (
-            <>
-              {/* Desktop Grid View */}
-              <div className="hidden lg:block glass-panel rounded-3xl overflow-hidden p-1">
-                <div className="overflow-x-auto">
-                  <div className="grid grid-cols-[130px_1fr]">
-                    {/* Time Slots Column */}
-                    <div className="border-r border-white/5 bg-black/20">
-                      <div className="h-24 flex items-center justify-center border-b border-white/5 text-zinc-500 text-xs font-mono uppercase tracking-widest">
-                        Time
-                      </div>
-                      {timeSlots.map((slotTime) => {
-                        const startHour = Math.floor(slotTime);
-                        const startMin = slotTime % 1 === 0 ? "00" : "30";
-                        const endTime = slotTime + 0.5;
-                        const endHour = Math.floor(endTime);
-                        const endMin = endTime % 1 === 0 ? "00" : "30";
-                        return (
-                          <div
-                            key={slotTime}
-                            className="h-7 flex items-center justify-center text-xs text-zinc-600 font-mono border-b border-dashed border-white/5"
-                          >
-                            {startHour}:{startMin}-{endHour}:{endMin}
+              ) : isLoading ? (
+                <div className="flex items-center justify-center py-24">
+                  <Loader2 className="h-12 w-12 animate-spin text-[#2DD4BF]" />
+                </div>
+              ) : (
+                <>
+                  {/* Desktop Grid View */}
+                  <div className="hidden lg:block glass-panel rounded-3xl overflow-hidden p-1">
+                    <div className="overflow-x-auto overflow-y-hidden">
+                      <div className="grid grid-cols-[130px_1fr]">
+                        {/* Time Slots Column */}
+                        <div className="border-r border-white/5 bg-black/20">
+                          <div className="h-24 flex items-center justify-center border-b border-white/5 text-zinc-500 text-xs font-mono uppercase tracking-widest">
+                            Time
                           </div>
-                        );
-                      })}
-                    </div>
+                          {timeSlots.map((slotTime) => {
+                            const startHour = Math.floor(slotTime);
+                            const startMin = slotTime % 1 === 0 ? "00" : "30";
+                            const endTime = slotTime + 0.5;
+                            const endHour = Math.floor(endTime);
+                            const endMin = endTime % 1 === 0 ? "00" : "30";
+                            return (
+                              <div
+                                key={slotTime}
+                                className="h-7 flex items-center justify-center text-xs text-zinc-600 font-mono border-b border-dashed border-white/5"
+                              >
+                                {startHour}:{startMin}-{endHour}:{endMin}
+                              </div>
+                            );
+                          })}
+                        </div>
 
-                    {/* Courts Columns */}
-                    <div className="flex">
-                      {courts.map((court) => (
-                        <div
-                          key={court._id}
-                          className="flex-1 min-w-[200px] border-r border-white/5 last:border-0"
-                        >
-                          <div className="h-24 p-4 border-b border-white/5 flex flex-col justify-center bg-black/20 group">
-                            <h3 className="font-semibold text-white group-hover:text-[#2DD4BF] transition-colors">
-                              {court.name}
-                            </h3>
-                            <p className="text-xs text-zinc-500 truncate mt-1">
-                              {court.description}
-                            </p>
-                            <p className="text-xs text-[#2DD4BF] mt-1">
-                              PKR {court.pricePerHour}/hr{" "}
-                              {court.pricePerHour === 0 && "(Free)"}
-                            </p>
-                          </div>
+                        {/* Courts Columns */}
+                        <div className="flex">
+                          {courts.map((court) => (
+                            <div
+                              key={court._id}
+                              className="flex-1 min-w-[200px] border-r border-white/5 last:border-0"
+                            >
+                              <div className="h-24 p-4 border-b border-white/5 flex flex-col justify-center bg-black/20 group">
+                                <h3 className="font-semibold text-white group-hover:text-[#2DD4BF] transition-colors">
+                                  {court.name}
+                                </h3>
+                                <p className="text-xs text-zinc-500 truncate mt-1">
+                                  {court.description}
+                                </p>
+                                <p className="text-xs text-[#2DD4BF] mt-1">
+                                  PKR {court.pricePerHour}/hr{" "}
+                                  {court.pricePerHour === 0 && "(Free)"}
+                                </p>
+                              </div>
 
-                          <div className="">
-                            {timeSlots.map((slotTime) => {
-                              const isBooked = isSlotBooked(
-                                court._id,
-                                slotTime,
-                              );
-                              const isSelected = isSlotSelected(
-                                court._id,
-                                slotTime,
-                              );
+                              <div className="">
+                                {timeSlots.map((slotTime) => {
+                                  const isBooked = isSlotBooked(
+                                    court._id,
+                                    slotTime
+                                  );
+                                  const isSelected = isSlotSelected(
+                                    court._id,
+                                    slotTime
+                                  );
 
-                              return (
-                                <div
-                                  key={slotTime}
-                                  className="h-7 p-0.5 border-b border-white/5"
-                                >
-                                  <motion.button
-                                    whileHover={
-                                      !isBooked &&
-                                      (selectedSlots.length === 0 ||
-                                        isSlotConsecutive(court._id, slotTime))
-                                        ? { scale: 0.98 }
-                                        : {}
-                                    }
-                                    whileTap={
-                                      !isBooked &&
-                                      (selectedSlots.length === 0 ||
-                                        isSlotConsecutive(court._id, slotTime))
-                                        ? { scale: 0.95 }
-                                        : {}
-                                    }
-                                    onClick={() =>
-                                      toggleSlot(court._id, slotTime)
-                                    }
-                                    disabled={isBooked}
-                                    title={
-                                      selectedSlots.length > 0 &&
-                                      selectedSlots[0].courtId === court._id &&
-                                      !isSlotConsecutive(court._id, slotTime) &&
-                                      !isSelected
-                                        ? "Select consecutive slots only"
-                                        : ""
-                                    }
-                                    className={`
+                                  return (
+                                    <div
+                                      key={slotTime}
+                                      className="h-7 p-0.5 border-b border-white/5"
+                                    >
+                                      <motion.button
+                                        whileHover={
+                                          !isBooked &&
+                                          (selectedSlots.length === 0 ||
+                                            isSlotConsecutive(
+                                              court._id,
+                                              slotTime
+                                            ))
+                                            ? { scale: 0.98 }
+                                            : {}
+                                        }
+                                        whileTap={
+                                          !isBooked &&
+                                          (selectedSlots.length === 0 ||
+                                            isSlotConsecutive(
+                                              court._id,
+                                              slotTime
+                                            ))
+                                            ? { scale: 0.95 }
+                                            : {}
+                                        }
+                                        onClick={() =>
+                                          toggleSlot(court._id, slotTime)
+                                        }
+                                        disabled={isBooked}
+                                        title={
+                                          selectedSlots.length > 0 &&
+                                          selectedSlots[0].courtId ===
+                                            court._id &&
+                                          !isSlotConsecutive(
+                                            court._id,
+                                            slotTime
+                                          ) &&
+                                          !isSelected
+                                            ? "Select consecutive slots only"
+                                            : ""
+                                        }
+                                        className={`
                                     w-full h-full rounded transition-all duration-300 relative overflow-hidden
                                     ${
                                       isBooked
                                         ? "bg-red-500/80 border border-red-400 cursor-not-allowed opacity-75"
                                         : isSelected
-                                          ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
-                                          : selectedSlots.length > 0 &&
-                                              selectedSlots[0].courtId ===
-                                                court._id &&
-                                              !isSlotConsecutive(
-                                                court._id,
-                                                slotTime,
-                                              )
-                                            ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
-                                            : "bg-green-500/20 border border-green-400/60 hover:bg-green-500/30 hover:border-green-400"
+                                        ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
+                                        : selectedSlots.length > 0 &&
+                                          selectedSlots[0].courtId ===
+                                            court._id &&
+                                          !isSlotConsecutive(
+                                            court._id,
+                                            slotTime
+                                          )
+                                        ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
+                                        : "bg-green-500/20 border border-green-400/60 hover:bg-green-500/30 hover:border-green-400"
                                     }
                                   `}
-                                  >
-                                    {isSelected && (
-                                      <motion.div
-                                        layoutId={`check-${court._id}-${slotTime}`}
-                                        className="absolute inset-0 flex items-center justify-center text-[#0F172A]"
                                       >
-                                        <CheckCircle className="w-3 h-3" />
-                                      </motion.div>
-                                    )}
-                                  </motion.button>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                        {isSelected && (
+                                          <motion.div
+                                            layoutId={`check-${court._id}-${slotTime}`}
+                                            className="absolute inset-0 flex items-center justify-center text-[#0F172A]"
+                                          >
+                                            <CheckCircle className="w-3 h-3" />
+                                          </motion.div>
+                                        )}
+                                      </motion.button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Mobile Card View */}
-              <div className="lg:hidden space-y-4">
-                {courts.map((court) => (
-                  <div
-                    key={court._id}
-                    className="glass-panel rounded-2xl overflow-hidden p-4"
-                  >
-                    <div className="mb-4 pb-4 border-b border-white/10">
-                      <h3 className="text-lg font-semibold text-white mb-1">
-                        {court.name}
-                      </h3>
-                      <p className="text-xs text-zinc-400 mb-2">
-                        {court.description}
-                      </p>
-                      <p className="text-sm text-[#2DD4BF] font-medium">
-                        PKR {court.pricePerHour}/hr{" "}
-                        {court.pricePerHour === 0 && "(Free)"}
-                      </p>
-                    </div>
+                  {/* Mobile Card View */}
+                  <div className="lg:hidden space-y-4">
+                    {courts.map((court) => (
+                      <div
+                        key={court._id}
+                        className="glass-panel rounded-2xl overflow-hidden p-4"
+                      >
+                        <div className="mb-4 pb-4 border-b border-white/10">
+                          <h3 className="text-lg font-semibold text-white mb-1">
+                            {court.name}
+                          </h3>
+                          <p className="text-xs text-zinc-400 mb-2">
+                            {court.description}
+                          </p>
+                          <p className="text-sm text-[#2DD4BF] font-medium">
+                            PKR {court.pricePerHour}/hr{" "}
+                            {court.pricePerHour === 0 && "(Free)"}
+                          </p>
+                        </div>
 
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                      {timeSlots.map((slotTime) => {
-                        const isBooked = isSlotBooked(court._id, slotTime);
-                        const isSelected = isSlotSelected(court._id, slotTime);
-                        const startHour = Math.floor(slotTime);
-                        const startMin = slotTime % 1 === 0 ? "00" : "30";
-                        const endTime = slotTime + 0.5;
-                        const endHour = Math.floor(endTime);
-                        const endMin = endTime % 1 === 0 ? "00" : "30";
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                          {timeSlots.map((slotTime) => {
+                            const isBooked = isSlotBooked(court._id, slotTime);
+                            const isSelected = isSlotSelected(
+                              court._id,
+                              slotTime
+                            );
+                            const startHour = Math.floor(slotTime);
+                            const startMin = slotTime % 1 === 0 ? "00" : "30";
+                            const endTime = slotTime + 0.5;
+                            const endHour = Math.floor(endTime);
+                            const endMin = endTime % 1 === 0 ? "00" : "30";
 
-                        const isConsecutive = isSlotConsecutive(
-                          court._id,
-                          slotTime,
-                        );
-                        const canSelect =
-                          selectedSlots.length === 0 || isConsecutive;
+                            const isConsecutive = isSlotConsecutive(
+                              court._id,
+                              slotTime
+                            );
+                            const canSelect =
+                              selectedSlots.length === 0 || isConsecutive;
 
-                        return (
-                          <motion.button
-                            key={slotTime}
-                            whileHover={
-                              !isBooked && canSelect ? { scale: 0.95 } : {}
-                            }
-                            whileTap={
-                              !isBooked && canSelect ? { scale: 0.9 } : {}
-                            }
-                            onClick={() => toggleSlot(court._id, slotTime)}
-                            disabled={isBooked}
-                            title={
-                              selectedSlots.length > 0 &&
-                              selectedSlots[0].courtId === court._id &&
-                              !isConsecutive &&
-                              !isSelected
-                                ? "Select consecutive slots only"
-                                : ""
-                            }
-                            className={`
+                            return (
+                              <motion.button
+                                key={slotTime}
+                                whileHover={
+                                  !isBooked && canSelect ? { scale: 0.95 } : {}
+                                }
+                                whileTap={
+                                  !isBooked && canSelect ? { scale: 0.9 } : {}
+                                }
+                                onClick={() => toggleSlot(court._id, slotTime)}
+                                disabled={isBooked}
+                                title={
+                                  selectedSlots.length > 0 &&
+                                  selectedSlots[0].courtId === court._id &&
+                                  !isConsecutive &&
+                                  !isSelected
+                                    ? "Select consecutive slots only"
+                                    : ""
+                                }
+                                className={`
                               aspect-square rounded-lg transition-all duration-300 relative overflow-hidden flex flex-col items-center justify-center p-1
                               ${
                                 isBooked
                                   ? "bg-red-500/80 border border-red-400 cursor-not-allowed opacity-75"
                                   : isSelected
-                                    ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
-                                    : selectedSlots.length > 0 &&
-                                        selectedSlots[0].courtId ===
-                                          court._id &&
-                                        !isConsecutive
-                                      ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
-                                      : "bg-green-500/20 border border-green-400/60 hover:bg-green-500/30 hover:border-green-400"
+                                  ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
+                                  : selectedSlots.length > 0 &&
+                                    selectedSlots[0].courtId === court._id &&
+                                    !isConsecutive
+                                  ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
+                                  : "bg-green-500/20 border border-green-400/60 hover:bg-green-500/30 hover:border-green-400"
                               }
                             `}
-                          >
-                            <span className="text-[10px] font-mono text-white/90 leading-tight text-center">
-                              {startHour}:{startMin}
-                            </span>
-                            {isSelected && (
-                              <motion.div
-                                layoutId={`check-mobile-${court._id}-${slotTime}`}
-                                className="absolute inset-0 flex items-center justify-center"
                               >
-                                <CheckCircle className="w-4 h-4 text-[#0F172A]" />
-                              </motion.div>
-                            )}
-                          </motion.button>
-                        );
-                      })}
-                    </div>
+                                <span className="text-[10px] font-mono text-white/90 leading-tight text-center">
+                                  {startHour}:{startMin}
+                                </span>
+                                {isSelected && (
+                                  <motion.div
+                                    layoutId={`check-mobile-${court._id}-${slotTime}`}
+                                    className="absolute inset-0 flex items-center justify-center"
+                                  >
+                                    <CheckCircle className="w-4 h-4 text-[#0F172A]" />
+                                  </motion.div>
+                                )}
+                              </motion.button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </>
-          )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Booking Drawer / Modal */}
+      {/* Booking Drawer */}
       <AnimatePresence>
-        {selectedSlots.length >= 2 && (
+        {selectedSlots.length >= (selectedCourtType === "FUTSAL" ? 3 : 2) && (
           <motion.div
             initial={{ y: 100 }}
             animate={{ y: 0 }}
@@ -766,7 +879,7 @@ export default function BookingPage() {
                                 year: "numeric",
                                 month: "short",
                                 day: "numeric",
-                              },
+                              }
                             )}
                           </span>
                         </div>
@@ -779,8 +892,7 @@ export default function BookingPage() {
                             :{createdBooking.startTime % 1 === 0 ? "00" : "30"}{" "}
                             -{" "}
                             {Math.floor(
-                              createdBooking.startTime +
-                                createdBooking.duration,
+                              createdBooking.startTime + createdBooking.duration
                             )
                               .toString()
                               .padStart(2, "0")}
@@ -824,7 +936,11 @@ export default function BookingPage() {
                         <div className="flex justify-center lg:justify-start">
                           <div className="bg-white p-3 md:p-4 rounded-xl inline-block">
                             <QRCode
-                              value={`${typeof window !== "undefined" ? window.location.origin : ""}/booking/verify/${createdBooking._id}`}
+                              value={`${
+                                typeof window !== "undefined"
+                                  ? window.location.origin
+                                  : ""
+                              }/booking/verify/${createdBooking._id}`}
                               size={160}
                             />
                           </div>
@@ -838,7 +954,11 @@ export default function BookingPage() {
                         <div className="flex justify-center lg:justify-start">
                           <div className="bg-white p-3 md:p-4 rounded-xl inline-block">
                             <QRCode
-                              value={`${typeof window !== "undefined" ? window.location.origin : ""}/feedback/${createdBooking._id}`}
+                              value={`${
+                                typeof window !== "undefined"
+                                  ? window.location.origin
+                                  : ""
+                              }/feedback/${createdBooking._id}`}
                               size={160}
                             />
                           </div>

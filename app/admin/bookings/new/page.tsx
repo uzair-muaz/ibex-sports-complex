@@ -178,8 +178,14 @@ export default function NewBookingPage() {
       return;
     }
 
-    if (selectedSlots.length < 2) {
-      alert("Minimum booking time is 1 hour (2 consecutive slots)");
+    // Minimum booking: 90 mins (3 slots) for Futsal, 1 hour (2 slots) for others
+    const minSlots = formData.courtType === "FUTSAL" ? 3 : 2;
+    if (selectedSlots.length < minSlots) {
+      alert(
+        formData.courtType === "FUTSAL"
+          ? "Minimum booking time for Futsal is 90 minutes (3 consecutive slots)"
+          : "Minimum booking time is 1 hour (2 consecutive slots)"
+      );
       return;
     }
 
@@ -465,7 +471,7 @@ export default function NewBookingPage() {
             <Button
               type="submit"
               className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-              disabled={isSubmitting || selectedSlots.length < 2}
+              disabled={isSubmitting || selectedSlots.length < (formData.courtType === "FUTSAL" ? 3 : 2)}
             >
               {isSubmitting ? (
                 <>
