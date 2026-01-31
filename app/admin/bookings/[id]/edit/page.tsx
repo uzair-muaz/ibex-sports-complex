@@ -25,7 +25,7 @@ import {
   updateBooking,
   getAllBookings,
 } from "../../../../actions/bookings";
-import { OPERATING_HOURS } from "@/types";
+import { OPERATING_HOURS, COMPLEX_OPENING_DATE } from "@/types";
 import type { Court, Booking } from "@/types";
 import { formatLocalDate } from "@/lib/utils";
 
@@ -367,6 +367,7 @@ export default function EditBookingPage() {
                   }
                 }}
                 variant="admin"
+                minDate={COMPLEX_OPENING_DATE}
               />
             </div>
 

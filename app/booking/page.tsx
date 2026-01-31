@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { QRCode } from "@/components/ui/qr-code";
 import { Skeleton } from "@/components/ui/skeleton";
-import { OPERATING_HOURS, CourtType } from "@/types";
+import { OPERATING_HOURS, CourtType, COMPLEX_OPENING_DATE } from "@/types";
 import { getCourts } from "../actions/courts";
 import { getBookingsByDate, createBooking } from "../actions/bookings";
 import { Navbar } from "@/components/Navbar";
@@ -15,7 +15,12 @@ import { Footer } from "@/components/Footer";
 import { formatLocalDate } from "@/lib/utils";
 
 export default function BookingPage() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  // Default to opening date if today is before it
+  const getInitialDate = () => {
+    const today = new Date();
+    return today < COMPLEX_OPENING_DATE ? COMPLEX_OPENING_DATE : today;
+  };
+  const [selectedDate, setSelectedDate] = useState<Date>(getInitialDate());
   const [selectedCourtType, setSelectedCourtType] = useState<CourtType | null>(
     null
   );
@@ -413,6 +418,7 @@ export default function BookingPage() {
                 setSelectedDate(date);
               }
             }}
+            minDate={COMPLEX_OPENING_DATE}
           />
 
           {/* Legend & Info + Booking Grid Container */}

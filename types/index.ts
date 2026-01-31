@@ -37,6 +37,9 @@ export const OPERATING_HOURS = {
   end: 23, // 11 PM
 };
 
+// Complex opening date - no bookings allowed before this date
+export const COMPLEX_OPENING_DATE = new Date(2026, 1, 1); // February 1st, 2026 (month is 0-indexed)
+
 export const GALLERY_IMAGES = [
   {
     url: "/images/paddle.jpg",

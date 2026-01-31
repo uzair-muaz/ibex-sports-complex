@@ -24,7 +24,7 @@ import {
   getBookingsByDate,
   createBooking,
 } from "../../../actions/bookings";
-import { OPERATING_HOURS } from "@/types";
+import { OPERATING_HOURS, COMPLEX_OPENING_DATE } from "@/types";
 import type { Court } from "@/types";
 import { formatLocalDate } from "@/lib/utils";
 
@@ -40,8 +40,14 @@ export default function NewBookingPage() {
   const [isLoadingCourts, setIsLoadingCourts] = useState(false);
   const [isLoadingDateBookings, setIsLoadingDateBookings] = useState(false);
   
+  // Default to opening date if today is before it
+  const getInitialDate = () => {
+    const today = new Date();
+    return today < COMPLEX_OPENING_DATE ? COMPLEX_OPENING_DATE : today;
+  };
+  
   const [formData, setFormData] = useState({
-    date: new Date(),
+    date: getInitialDate(),
     courtType: "PADEL" as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
     userName: "",
     userEmail: "",
@@ -289,6 +295,7 @@ export default function NewBookingPage() {
                   }
                 }}
                 variant="admin"
+                minDate={COMPLEX_OPENING_DATE}
               />
             </div>
           </div>
