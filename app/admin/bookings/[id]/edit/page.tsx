@@ -17,9 +17,7 @@ import {
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { DatePicker } from "@/components/ui/date-picker";
 import { motion } from "framer-motion";
-import {
-  getCourts,
-} from "../../../../actions/courts";
+import { getCourts } from "../../../../actions/courts";
 import {
   getBookingsByDate,
   updateBooking,
@@ -34,24 +32,30 @@ export default function EditBookingPage() {
   const router = useRouter();
   const params = useParams();
   const bookingId = params.id as string;
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingBooking, setIsLoadingBooking] = useState(true);
-  
+
   // Slot selection state
   const [courts, setCourts] = useState<Court[]>([]);
   const [dateBookings, setDateBookings] = useState<any[]>([]);
-  const [selectedSlots, setSelectedSlots] = useState<{ courtId: string; slotTime: number }[]>([]);
+  const [selectedSlots, setSelectedSlots] = useState<
+    { courtId: string; slotTime: number }[]
+  >([]);
   const [isLoadingCourts, setIsLoadingCourts] = useState(false);
   const [isLoadingDateBookings, setIsLoadingDateBookings] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     date: new Date(),
     courtType: "PADEL" as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
     userName: "",
     userEmail: "",
     userPhone: "",
-    status: "pending_payment" as "pending_payment" | "confirmed" | "cancelled" | "completed",
+    status: "pending_payment" as
+      | "pending_payment"
+      | "confirmed"
+      | "cancelled"
+      | "completed",
     amountPaid: 0,
   });
 
@@ -94,17 +98,24 @@ export default function EditBookingPage() {
     try {
       const result = await getAllBookings();
       if (result.success) {
-        const booking = result.bookings.find((b: Booking) => b._id === bookingId);
+        const booking = result.bookings.find(
+          (b: Booking) => b._id === bookingId
+        );
         if (booking) {
-          const courtType = typeof booking.courtId === "object" &&
+          const courtType =
+            typeof booking.courtId === "object" &&
             booking.courtId &&
             "type" in booking.courtId
               ? (booking.courtId as Court).type
               : "PADEL";
-          
+
           setFormData({
             date: new Date(booking.date),
-            courtType: courtType as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
+            courtType: courtType as
+              | "PADEL"
+              | "CRICKET"
+              | "PICKLEBALL"
+              | "FUTSAL",
             userName: booking.userName,
             userEmail: booking.userEmail,
             userPhone: booking.userPhone || "",
@@ -129,7 +140,9 @@ export default function EditBookingPage() {
     try {
       const result = await getAllBookings();
       if (result.success) {
-        const booking = result.bookings.find((b: Booking) => b._id === bookingId);
+        const booking = result.bookings.find(
+          (b: Booking) => b._id === bookingId
+        );
         if (booking && courts.length > 0) {
           const court = courts.find((c) => {
             if (typeof booking.courtId === "string") {
@@ -137,7 +150,7 @@ export default function EditBookingPage() {
             }
             return (booking.courtId as any)?._id === c._id;
           });
-          
+
           if (court) {
             const slots: { courtId: string; slotTime: number }[] = [];
             for (let i = 0; i < booking.duration * 2; i++) {
@@ -172,14 +185,15 @@ export default function EditBookingPage() {
   const loadBookingsForDate = async () => {
     setIsLoadingDateBookings(true);
     try {
-      const dateString = formData.date instanceof Date
-        ? formatLocalDate(formData.date)
-        : formData.date;
+      const dateString =
+        formData.date instanceof Date
+          ? formatLocalDate(formData.date)
+          : formData.date;
       const result = await getBookingsByDate(dateString);
       if (result.success) {
         const filtered = result.bookings.filter(
           (b: any) =>
-            b.courtId?.type === formData.courtType && 
+            b.courtId?.type === formData.courtType &&
             b.status !== "cancelled" &&
             b._id !== bookingId // Exclude current booking
         );
@@ -222,7 +236,9 @@ export default function EditBookingPage() {
     if (selectedSlots.length === 0) return true;
     if (selectedSlots[0].courtId !== courtId) return false;
 
-    const sortedTimes = selectedSlots.map((s) => s.slotTime).sort((a, b) => a - b);
+    const sortedTimes = selectedSlots
+      .map((s) => s.slotTime)
+      .sort((a, b) => a - b);
     const minTime = sortedTimes[0];
     const maxTime = sortedTimes[sortedTimes.length - 1];
 
@@ -265,7 +281,7 @@ export default function EditBookingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (selectedSlots.length === 0) {
       alert("Please select at least one time slot");
       return;
@@ -290,12 +306,15 @@ export default function EditBookingPage() {
     setIsSubmitting(true);
 
     try {
-      const sortedTimes = selectedSlots.map((s) => s.slotTime).sort((a, b) => a - b);
+      const sortedTimes = selectedSlots
+        .map((s) => s.slotTime)
+        .sort((a, b) => a - b);
       const startTime = sortedTimes[0];
       const duration = selectedSlots.length * 0.5;
-      const dateString = formData.date instanceof Date
-        ? formatLocalDate(formData.date)
-        : formData.date;
+      const dateString =
+        formData.date instanceof Date
+          ? formatLocalDate(formData.date)
+          : formData.date;
 
       const result = await updateBooking({
         bookingId,
@@ -337,10 +356,7 @@ export default function EditBookingPage() {
   }
 
   return (
-    <AdminLayout
-      title="Edit Booking"
-      description="Update booking details"
-    >
+    <AdminLayout title="Edit Booking" description="Update booking details">
       <div className="max-w-6xl mx-auto space-y-6">
         <Button
           variant="ghost"
@@ -385,7 +401,9 @@ export default function EditBookingPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pending_payment">Pending Payment</SelectItem>
+                  <SelectItem value="pending_payment">
+                    Pending Payment
+                  </SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
@@ -400,17 +418,20 @@ export default function EditBookingPage() {
               Select Time Slots
               {selectedSlots.length > 0 && (
                 <span className="ml-2 text-[#2DD4BF]">
-                  ({selectedSlots.length * 0.5} hour{selectedSlots.length * 0.5 !== 1 ? "s" : ""})
+                  ({selectedSlots.length * 0.5} hour
+                  {selectedSlots.length * 0.5 !== 1 ? "s" : ""})
                 </span>
               )}
             </Label>
-            
+
             {isLoadingCourts || isLoadingDateBookings ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
               </div>
             ) : courts.length === 0 ? (
-              <p className="text-zinc-400 text-sm py-8 text-center">No courts available for this court type.</p>
+              <p className="text-zinc-400 text-sm py-8 text-center">
+                No courts available for this court type.
+              </p>
             ) : (
               <div className="border border-zinc-800 rounded-lg overflow-hidden bg-zinc-900/50">
                 <div className="overflow-x-auto">
@@ -455,10 +476,20 @@ export default function EditBookingPage() {
 
                           <div>
                             {timeSlots.map((slotTime) => {
-                              const isBooked = isSlotBooked(court._id, slotTime);
-                              const isSelected = isSlotSelected(court._id, slotTime);
-                              const isConsecutive = isSlotConsecutive(court._id, slotTime);
-                              const canSelect = selectedSlots.length === 0 || isConsecutive;
+                              const isBooked = isSlotBooked(
+                                court._id,
+                                slotTime
+                              );
+                              const isSelected = isSlotSelected(
+                                court._id,
+                                slotTime
+                              );
+                              const isConsecutive = isSlotConsecutive(
+                                court._id,
+                                slotTime
+                              );
+                              const canSelect =
+                                selectedSlots.length === 0 || isConsecutive;
 
                               return (
                                 <div
@@ -467,18 +498,22 @@ export default function EditBookingPage() {
                                 >
                                   <button
                                     type="button"
-                                    onClick={() => toggleSlot(court._id, slotTime)}
-                                    disabled={isBooked || (!canSelect && !isSelected)}
+                                    onClick={() =>
+                                      toggleSlot(court._id, slotTime)
+                                    }
+                                    disabled={
+                                      isBooked || (!canSelect && !isSelected)
+                                    }
                                     className={`
                                       w-full h-full rounded transition-all duration-200
                                       ${
                                         isBooked
                                           ? "bg-red-500/20 border border-red-500/50 cursor-not-allowed opacity-50"
                                           : isSelected
-                                            ? "bg-[#2DD4BF] border border-[#2DD4BF]"
-                                            : !canSelect
-                                              ? "bg-zinc-800/50 border border-zinc-700 cursor-not-allowed opacity-50"
-                                              : "bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 hover:border-green-500/50 cursor-pointer"
+                                          ? "bg-[#2DD4BF] border border-[#2DD4BF]"
+                                          : !canSelect
+                                          ? "bg-zinc-800/50 border border-zinc-700 cursor-not-allowed opacity-50"
+                                          : "bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 hover:border-green-500/50 cursor-pointer"
                                       }
                                     `}
                                   >
@@ -499,11 +534,13 @@ export default function EditBookingPage() {
                 </div>
               </div>
             )}
-            
+
             {selectedSlots.length > 0 && (
               <div className="text-xs text-zinc-400">
-                Selected: {selectedSlots.length} slot{selectedSlots.length !== 1 ? "s" : ""} 
-                ({selectedSlots.length * 0.5} hour{selectedSlots.length * 0.5 !== 1 ? "s" : ""})
+                Selected: {selectedSlots.length} slot
+                {selectedSlots.length !== 1 ? "s" : ""}(
+                {selectedSlots.length * 0.5} hour
+                {selectedSlots.length * 0.5 !== 1 ? "s" : ""})
               </div>
             )}
           </div>
@@ -511,7 +548,7 @@ export default function EditBookingPage() {
           {/* User Details */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">User Details</h3>
-            
+
             <div className="space-y-2">
               <Label htmlFor="user-name" className="text-zinc-200 text-sm">
                 User Name
@@ -566,8 +603,10 @@ export default function EditBookingPage() {
 
           {/* Payment Details */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">Payment Details</h3>
-            
+            <h3 className="text-lg font-semibold text-white">
+              Payment Details
+            </h3>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="total-price" className="text-zinc-200 text-sm">
@@ -576,14 +615,18 @@ export default function EditBookingPage() {
                 <Input
                   id="total-price"
                   type="text"
-                  value={`PKR ${(courts.find(c => c.type === formData.courtType)?.pricePerHour || 0) * (selectedSlots.length * 0.5 || 1)}`}
+                  value={`PKR ${
+                    (courts.find((c) => c.type === formData.courtType)
+                      ?.pricePerHour || 0) * (selectedSlots.length * 0.5 || 1)
+                  }`}
                   disabled
                   className="text-sm bg-zinc-800"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="amount-paid" className="text-zinc-200 text-sm">
-                  Amount Paid <span className="text-zinc-400 text-xs">(PKR)</span>
+                  Amount Paid{" "}
+                  <span className="text-zinc-400 text-xs">(PKR)</span>
                 </Label>
                 <Input
                   id="amount-paid"
@@ -595,10 +638,18 @@ export default function EditBookingPage() {
                     const value = parseFloat(e.target.value) || 0;
                     setFormData({ ...formData, amountPaid: value });
                     // Auto-update status to confirmed if amount paid > 0
-                    if (value > 0 && formData.status === 'pending_payment') {
-                      setFormData({ ...formData, amountPaid: value, status: 'confirmed' });
-                    } else if (value === 0 && formData.status === 'confirmed') {
-                      setFormData({ ...formData, amountPaid: value, status: 'pending_payment' });
+                    if (value > 0 && formData.status === "pending_payment") {
+                      setFormData({
+                        ...formData,
+                        amountPaid: value,
+                        status: "confirmed",
+                      });
+                    } else if (value === 0 && formData.status === "confirmed") {
+                      setFormData({
+                        ...formData,
+                        amountPaid: value,
+                        status: "pending_payment",
+                      });
                     } else {
                       setFormData({ ...formData, amountPaid: value });
                     }
@@ -607,11 +658,13 @@ export default function EditBookingPage() {
                   placeholder="0.00"
                 />
                 <p className="text-xs text-zinc-400">
-                  {formData.amountPaid > 0 && formData.status === 'pending_payment' 
+                  {formData.amountPaid > 0 &&
+                  formData.status === "pending_payment"
                     ? 'Status will change to "Confirmed" when saved'
-                    : formData.amountPaid === 0 && formData.status === 'confirmed'
+                    : formData.amountPaid === 0 &&
+                      formData.status === "confirmed"
                     ? 'Status will change to "Pending Payment" when saved'
-                    : ''}
+                    : ""}
                 </p>
               </div>
             </div>
@@ -629,7 +682,10 @@ export default function EditBookingPage() {
             <Button
               type="submit"
               className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-              disabled={isSubmitting || selectedSlots.length < (formData.courtType === "FUTSAL" ? 3 : 2)}
+              disabled={
+                isSubmitting ||
+                selectedSlots.length < (formData.courtType === "FUTSAL" ? 3 : 2)
+              }
             >
               {isSubmitting ? (
                 <>

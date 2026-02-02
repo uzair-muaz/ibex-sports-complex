@@ -10,6 +10,14 @@ export interface Court {
   isActive: boolean;
 }
 
+export interface AppliedDiscount {
+  discountId: string;
+  name: string;
+  type: "percentage" | "fixed";
+  value: number;
+  amountSaved: number;
+}
+
 export interface Booking {
   _id: string;
   courtId: string;
@@ -20,8 +28,27 @@ export interface Booking {
   userEmail: string;
   userPhone?: string;
   status: "pending_payment" | "confirmed" | "cancelled" | "completed";
+  originalPrice: number;
+  discounts: AppliedDiscount[];
+  discountAmount: number;
   totalPrice: number;
   amountPaid: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Discount {
+  _id: string;
+  name: string;
+  type: "percentage" | "fixed";
+  value: number;
+  courtTypes: CourtType[];
+  allDay: boolean;
+  startHour: number;
+  endHour: number;
+  validFrom: string;
+  validUntil: string;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }

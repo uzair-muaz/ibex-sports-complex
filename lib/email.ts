@@ -6,7 +6,7 @@
  */
 
 import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
-import { generateBookingConfirmationEmail, BookingEmailData } from './email-templates/booking-confirmation';
+import { generateBookingConfirmationEmail, BookingEmailData, AppliedDiscountEmail } from './email-templates/booking-confirmation';
 // Note: Install 'qrcode' package for server-side QR code generation: npm install qrcode @types/qrcode
 // Using dynamic import to handle cases where package might not be installed yet
 let QRCode: any;
@@ -66,6 +66,9 @@ export interface BookingConfirmationEmailData {
   date: string;
   startTime: number;
   duration: number;
+  originalPrice?: number;
+  discounts?: AppliedDiscountEmail[];
+  discountAmount?: number;
   totalPrice: number;
   bookingId: string;
   baseUrl: string;
@@ -122,6 +125,9 @@ export async function sendBookingConfirmationEmail(
       date: data.date,
       startTime: data.startTime,
       duration: data.duration,
+      originalPrice: data.originalPrice,
+      discounts: data.discounts,
+      discountAmount: data.discountAmount,
       totalPrice: data.totalPrice,
       bookingId: data.bookingId,
       entryVerificationUrl,

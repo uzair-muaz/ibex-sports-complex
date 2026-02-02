@@ -2,6 +2,14 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export type BookingStatus = 'pending_payment' | 'confirmed' | 'cancelled' | 'completed';
 
+export interface IAppliedDiscount {
+  discountId: mongoose.Types.ObjectId;
+  name: string;
+  type: 'percentage' | 'fixed';
+  value: number;
+  amountSaved: number; // Actual PKR amount saved by this discount
+}
+
 export interface IBooking extends Document {
   courtId: mongoose.Types.ObjectId;
   date: string; // YYYY-MM-DD
@@ -11,7 +19,10 @@ export interface IBooking extends Document {
   userEmail: string;
   userPhone: string;
   status: BookingStatus;
-  totalPrice: number;
+  originalPrice: number; // Price before discounts
+  discounts: IAppliedDiscount[]; // Applied discounts
+  discountAmount: number; // Total discount in PKR
+  totalPrice: number; // Final price after discounts
   amountPaid: number;
   createdAt: Date;
   updatedAt: Date;
@@ -61,6 +72,44 @@ const BookingSchema: Schema = new Schema(
       type: String,
       enum: ['pending_payment', 'confirmed', 'cancelled', 'completed'],
       default: 'pending_payment',
+    },
+    originalPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    discounts: {
+      type: [{
+        discountId: {
+          type: Schema.Types.ObjectId,
+          ref: 'Discount',
+          required: true,
+        },
+        name: {
+          type: String,
+          required: true,
+        },
+        type: {
+          type: String,
+          enum: ['percentage', 'fixed'],
+          required: true,
+        },
+        value: {
+          type: Number,
+          required: true,
+        },
+        amountSaved: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+      }],
+      default: [],
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     totalPrice: {
       type: Number,

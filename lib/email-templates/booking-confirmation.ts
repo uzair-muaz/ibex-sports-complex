@@ -5,6 +5,14 @@
  * It includes booking details and QR codes for entry verification and feedback.
  */
 
+export interface AppliedDiscountEmail {
+  discountId: string;
+  name: string;
+  type: 'percentage' | 'fixed';
+  value: number;
+  amountSaved: number;
+}
+
 export interface BookingEmailData {
   userName: string;
   userEmail: string;
@@ -12,6 +20,9 @@ export interface BookingEmailData {
   date: string;
   startTime: number;
   duration: number;
+  originalPrice?: number;
+  discounts?: AppliedDiscountEmail[];
+  discountAmount?: number;
   totalPrice: number;
   bookingId: string;
   entryVerificationUrl: string;
@@ -103,10 +114,40 @@ export function generateBookingConfirmationEmail(data: BookingEmailData): string
                         <td style="padding: 8px 0; color: #a1a1aa; font-size: 14px;">Duration:</td>
                         <td style="padding: 8px 0; color: #ffffff; font-size: 14px; font-weight: 600; text-align: right;">${data.duration} hour${data.duration !== 1 ? 's' : ''}</td>
                       </tr>
+                      ${data.discountAmount && data.discountAmount > 0 ? `
+                      <tr>
+                        <td colspan="2" style="padding: 8px 0; border-top: 1px solid #3f3f46;"></td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #a1a1aa; font-size: 14px;">Subtotal:</td>
+                        <td style="padding: 8px 0; color: #ffffff; font-size: 14px; font-weight: 600; text-align: right;">PKR ${(data.originalPrice || data.totalPrice + data.discountAmount).toLocaleString()}</td>
+                      </tr>
+                      ${(data.discounts || []).map(d => `
+                      <tr>
+                        <td style="padding: 4px 0; color: #4ade80; font-size: 13px;">${d.name} (${d.type === 'percentage' ? d.value + '%' : 'PKR ' + d.value})</td>
+                        <td style="padding: 4px 0; color: #4ade80; font-size: 13px; text-align: right;">-PKR ${d.amountSaved.toLocaleString()}</td>
+                      </tr>
+                      `).join('')}
+                      <tr>
+                        <td colspan="2" style="padding: 8px 0; border-top: 1px solid #3f3f46;"></td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #a1a1aa; font-size: 14px;">Total:</td>
+                        <td style="padding: 8px 0; color: #2DD4BF; font-size: 16px; font-weight: 700; text-align: right;">PKR ${data.totalPrice.toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td colspan="2">
+                          <div style="background-color: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3); border-radius: 4px; padding: 8px; margin-top: 8px; text-align: center;">
+                            <span style="color: #4ade80; font-size: 13px; font-weight: 600;">🎉 You saved PKR ${data.discountAmount.toLocaleString()}!</span>
+                          </div>
+                        </td>
+                      </tr>
+                      ` : `
                       <tr>
                         <td style="padding: 8px 0; color: #a1a1aa; font-size: 14px;">Total Price:</td>
-                        <td style="padding: 8px 0; color: #2DD4BF; font-size: 16px; font-weight: 700; text-align: right;">PKR ${data.totalPrice.toFixed(2)}</td>
+                        <td style="padding: 8px 0; color: #2DD4BF; font-size: 16px; font-weight: 700; text-align: right;">PKR ${data.totalPrice.toLocaleString()}</td>
                       </tr>
+                      `}
                     </table>
                   </td>
                 </tr>

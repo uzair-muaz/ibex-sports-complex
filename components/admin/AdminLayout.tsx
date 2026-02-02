@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   RefreshCw,
+  Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -58,6 +59,12 @@ export function AdminLayout({
       label: "Bookings",
       icon: Calendar,
       path: "/admin/bookings",
+    },
+    {
+      id: "discounts",
+      label: "Discounts",
+      icon: Tag,
+      path: "/admin/discounts",
     },
     {
       id: "feedback",

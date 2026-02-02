@@ -6,7 +6,7 @@ import { Loader2, CheckCircle, X, User, Mail, Phone, Calendar, Clock, MapPin } f
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getAllBookings } from "@/app/actions/bookings";
-import type { Booking, Court } from "@/types";
+import type { Booking, Court, AppliedDiscount } from "@/types";
 
 export default function VerifyBookingPage() {
   const params = useParams();
@@ -193,25 +193,54 @@ export default function VerifyBookingPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
-                <div className="w-5 h-5 mt-0.5" />
-                <div>
-                  <p className="text-xs text-zinc-400 mb-1">Total Price</p>
-                  <p className="text-[#2DD4BF] font-semibold">PKR {booking.totalPrice.toFixed(2)}</p>
-                </div>
-              </div>
             </div>
+            
+            {/* Price Breakdown */}
+            <div className="pt-4 border-t border-zinc-800 space-y-2">
+              {booking.discountAmount && booking.discountAmount > 0 ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-zinc-400">Subtotal</p>
+                    <p className="text-zinc-300">PKR {(booking.originalPrice || booking.totalPrice + booking.discountAmount).toLocaleString()}</p>
+                  </div>
+                  {booking.discounts?.map((d: AppliedDiscount, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <p className="text-xs text-green-400">
+                        {d.name} ({d.type === 'percentage' ? `${d.value}%` : `PKR ${d.value}`})
+                      </p>
+                      <p className="text-green-400">-PKR {d.amountSaved.toLocaleString()}</p>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between pt-2 border-t border-zinc-700">
+                    <p className="text-sm text-white font-semibold">Total</p>
+                    <p className="text-[#2DD4BF] font-bold text-lg">PKR {booking.totalPrice.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-md px-3 py-2 text-center">
+                    <span className="text-green-400 text-sm font-medium">
+                      You saved PKR {booking.discountAmount.toLocaleString()}!
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-zinc-400">Total Price</p>
+                  <p className="text-[#2DD4BF] font-semibold">PKR {booking.totalPrice.toLocaleString()}</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Payment Status */}
             {(booking.amountPaid || 0) > 0 && (
               <div className="pt-4 border-t border-zinc-800">
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-zinc-400">Amount Paid</p>
-                  <p className="text-white font-semibold">PKR {(booking.amountPaid || 0).toFixed(2)}</p>
+                  <p className="text-white font-semibold">PKR {(booking.amountPaid || 0).toLocaleString()}</p>
                 </div>
                 {(booking.amountPaid || 0) < booking.totalPrice && (
                   <div className="flex items-center justify-between mt-2">
                     <p className="text-xs text-zinc-400">Remaining Balance</p>
                     <p className="text-yellow-400 font-semibold">
-                      PKR {(booking.totalPrice - (booking.amountPaid || 0)).toFixed(2)}
+                      PKR {(booking.totalPrice - (booking.amountPaid || 0)).toLocaleString()}
                     </p>
                   </div>
                 )}

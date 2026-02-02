@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { DiscountBanner } from "@/components/DiscountBanner";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { MarqueeSection } from "@/components/sections/MarqueeSection";
 import { FacilitiesSection } from "@/components/sections/FacilitiesSection";
@@ -59,6 +60,7 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white overflow-hidden transition-colors duration-200">
       <Navbar />
+      <DiscountBanner className="fixed top-16 md:top-20 left-0 right-0 z-40" />
 
       <HeroSection />
 

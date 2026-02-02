@@ -566,18 +566,44 @@ export default function BookingsPage() {
                   <Label className="text-zinc-400 text-xs">Duration</Label>
                   <p className="text-white">{viewingBooking.duration} hour{viewingBooking.duration !== 1 ? "s" : ""}</p>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">Total Price</Label>
-                  <p className="text-[#2DD4BF] font-semibold">PKR {viewingBooking.totalPrice.toFixed(2)}</p>
-                </div>
+                {/* Price Breakdown */}
+                {viewingBooking.discountAmount && viewingBooking.discountAmount > 0 ? (
+                  <div className="col-span-2 space-y-2 bg-zinc-900/50 rounded-lg p-4">
+                    <Label className="text-zinc-400 text-xs">Price Breakdown</Label>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-zinc-400 text-sm">Subtotal</span>
+                        <span className="text-zinc-300">PKR {(viewingBooking.originalPrice || viewingBooking.totalPrice + viewingBooking.discountAmount).toLocaleString()}</span>
+                      </div>
+                      {viewingBooking.discounts?.map((d: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center">
+                          <span className="text-green-400 text-sm">{d.name} ({d.type === 'percentage' ? `${d.value}%` : `PKR ${d.value}`})</span>
+                          <span className="text-green-400">-PKR {d.amountSaved.toLocaleString()}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-center pt-2 border-t border-zinc-700">
+                        <span className="text-white font-semibold">Total</span>
+                        <span className="text-[#2DD4BF] font-bold">PKR {viewingBooking.totalPrice.toLocaleString()}</span>
+                      </div>
+                      <div className="bg-green-500/10 border border-green-500/30 rounded px-2 py-1 text-center">
+                        <span className="text-green-400 text-xs">Saved PKR {viewingBooking.discountAmount.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <Label className="text-zinc-400 text-xs">Total Price</Label>
+                    <p className="text-[#2DD4BF] font-semibold">PKR {viewingBooking.totalPrice.toLocaleString()}</p>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <Label className="text-zinc-400 text-xs">Amount Paid</Label>
-                  <p className="text-white font-semibold">PKR {(viewingBooking.amountPaid || 0).toFixed(2)}</p>
+                  <p className="text-white font-semibold">PKR {(viewingBooking.amountPaid || 0).toLocaleString()}</p>
                 </div>
                 {(viewingBooking.amountPaid || 0) < viewingBooking.totalPrice && (
                   <div className="space-y-1">
                     <Label className="text-zinc-400 text-xs">Remaining Balance</Label>
-                    <p className="text-yellow-400 font-semibold">PKR {(viewingBooking.totalPrice - (viewingBooking.amountPaid || 0)).toFixed(2)}</p>
+                    <p className="text-yellow-400 font-semibold">PKR {(viewingBooking.totalPrice - (viewingBooking.amountPaid || 0)).toLocaleString()}</p>
                   </div>
                 )}
               </div>

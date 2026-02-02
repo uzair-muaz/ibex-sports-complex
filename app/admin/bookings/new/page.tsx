@@ -17,13 +17,8 @@ import {
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { DatePicker } from "@/components/ui/date-picker";
 import { motion } from "framer-motion";
-import {
-  getCourts,
-} from "../../../actions/courts";
-import {
-  getBookingsByDate,
-  createBooking,
-} from "../../../actions/bookings";
+import { getCourts } from "../../../actions/courts";
+import { getBookingsByDate, createBooking } from "../../../actions/bookings";
 import { OPERATING_HOURS, COMPLEX_OPENING_DATE } from "@/types";
 import type { Court } from "@/types";
 import { formatLocalDate } from "@/lib/utils";
@@ -32,20 +27,22 @@ export default function NewBookingPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Slot selection state
   const [courts, setCourts] = useState<Court[]>([]);
   const [dateBookings, setDateBookings] = useState<any[]>([]);
-  const [selectedSlots, setSelectedSlots] = useState<{ courtId: string; slotTime: number }[]>([]);
+  const [selectedSlots, setSelectedSlots] = useState<
+    { courtId: string; slotTime: number }[]
+  >([]);
   const [isLoadingCourts, setIsLoadingCourts] = useState(false);
   const [isLoadingDateBookings, setIsLoadingDateBookings] = useState(false);
-  
+
   // Default to opening date if today is before it
   const getInitialDate = () => {
     const today = new Date();
     return today < COMPLEX_OPENING_DATE ? COMPLEX_OPENING_DATE : today;
   };
-  
+
   const [formData, setFormData] = useState({
     date: getInitialDate(),
     courtType: "PADEL" as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
@@ -87,15 +84,15 @@ export default function NewBookingPage() {
   const loadBookingsForDate = async () => {
     setIsLoadingDateBookings(true);
     try {
-      const dateString = formData.date instanceof Date
-        ? formatLocalDate(formData.date)
-        : formData.date;
+      const dateString =
+        formData.date instanceof Date
+          ? formatLocalDate(formData.date)
+          : formData.date;
       const result = await getBookingsByDate(dateString);
       if (result.success) {
         const filtered = result.bookings.filter(
           (b: any) =>
-            b.courtId?.type === formData.courtType && 
-            b.status !== "cancelled"
+            b.courtId?.type === formData.courtType && b.status !== "cancelled"
         );
         setDateBookings(filtered);
       }
@@ -136,7 +133,9 @@ export default function NewBookingPage() {
     if (selectedSlots.length === 0) return true;
     if (selectedSlots[0].courtId !== courtId) return false;
 
-    const sortedTimes = selectedSlots.map((s) => s.slotTime).sort((a, b) => a - b);
+    const sortedTimes = selectedSlots
+      .map((s) => s.slotTime)
+      .sort((a, b) => a - b);
     const minTime = sortedTimes[0];
     const maxTime = sortedTimes[sortedTimes.length - 1];
 
@@ -179,7 +178,7 @@ export default function NewBookingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (selectedSlots.length === 0) {
       alert("Please select at least one time slot");
       return;
@@ -204,12 +203,15 @@ export default function NewBookingPage() {
     setIsSubmitting(true);
 
     try {
-      const sortedTimes = selectedSlots.map((s) => s.slotTime).sort((a, b) => a - b);
+      const sortedTimes = selectedSlots
+        .map((s) => s.slotTime)
+        .sort((a, b) => a - b);
       const startTime = sortedTimes[0];
       const duration = selectedSlots.length * 0.5;
-      const dateString = formData.date instanceof Date
-        ? formatLocalDate(formData.date)
-        : formData.date;
+      const dateString =
+        formData.date instanceof Date
+          ? formatLocalDate(formData.date)
+          : formData.date;
 
       const result = await createBooking({
         courtType: formData.courtType,
@@ -239,10 +241,7 @@ export default function NewBookingPage() {
   }
 
   return (
-    <AdminLayout
-      title="Create Booking"
-      description="Add a new booking"
-    >
+    <AdminLayout title="Create Booking" description="Add a new booking">
       <div className="max-w-6xl mx-auto space-y-6">
         <Button
           variant="ghost"
@@ -306,17 +305,20 @@ export default function NewBookingPage() {
               Select Time Slots
               {selectedSlots.length > 0 && (
                 <span className="ml-2 text-[#2DD4BF]">
-                  ({selectedSlots.length * 0.5} hour{selectedSlots.length * 0.5 !== 1 ? "s" : ""})
+                  ({selectedSlots.length * 0.5} hour
+                  {selectedSlots.length * 0.5 !== 1 ? "s" : ""})
                 </span>
               )}
             </Label>
-            
+
             {isLoadingCourts || isLoadingDateBookings ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
               </div>
             ) : courts.length === 0 ? (
-              <p className="text-zinc-400 text-sm py-8 text-center">No courts available for this court type.</p>
+              <p className="text-zinc-400 text-sm py-8 text-center">
+                No courts available for this court type.
+              </p>
             ) : (
               <div className="border border-zinc-800 rounded-lg overflow-hidden bg-zinc-900/50">
                 <div className="overflow-x-auto">
@@ -361,10 +363,20 @@ export default function NewBookingPage() {
 
                           <div>
                             {timeSlots.map((slotTime) => {
-                              const isBooked = isSlotBooked(court._id, slotTime);
-                              const isSelected = isSlotSelected(court._id, slotTime);
-                              const isConsecutive = isSlotConsecutive(court._id, slotTime);
-                              const canSelect = selectedSlots.length === 0 || isConsecutive;
+                              const isBooked = isSlotBooked(
+                                court._id,
+                                slotTime
+                              );
+                              const isSelected = isSlotSelected(
+                                court._id,
+                                slotTime
+                              );
+                              const isConsecutive = isSlotConsecutive(
+                                court._id,
+                                slotTime
+                              );
+                              const canSelect =
+                                selectedSlots.length === 0 || isConsecutive;
 
                               return (
                                 <div
@@ -373,18 +385,22 @@ export default function NewBookingPage() {
                                 >
                                   <button
                                     type="button"
-                                    onClick={() => toggleSlot(court._id, slotTime)}
-                                    disabled={isBooked || (!canSelect && !isSelected)}
+                                    onClick={() =>
+                                      toggleSlot(court._id, slotTime)
+                                    }
+                                    disabled={
+                                      isBooked || (!canSelect && !isSelected)
+                                    }
                                     className={`
                                       w-full h-full rounded transition-all duration-200
                                       ${
                                         isBooked
                                           ? "bg-red-500/20 border border-red-500/50 cursor-not-allowed opacity-50"
                                           : isSelected
-                                            ? "bg-[#2DD4BF] border border-[#2DD4BF]"
-                                            : !canSelect
-                                              ? "bg-zinc-800/50 border border-zinc-700 cursor-not-allowed opacity-50"
-                                              : "bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 hover:border-green-500/50 cursor-pointer"
+                                          ? "bg-[#2DD4BF] border border-[#2DD4BF]"
+                                          : !canSelect
+                                          ? "bg-zinc-800/50 border border-zinc-700 cursor-not-allowed opacity-50"
+                                          : "bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 hover:border-green-500/50 cursor-pointer"
                                       }
                                     `}
                                   >
@@ -405,11 +421,13 @@ export default function NewBookingPage() {
                 </div>
               </div>
             )}
-            
+
             {selectedSlots.length > 0 && (
               <div className="text-xs text-zinc-400">
-                Selected: {selectedSlots.length} slot{selectedSlots.length !== 1 ? "s" : ""} 
-                ({selectedSlots.length * 0.5} hour{selectedSlots.length * 0.5 !== 1 ? "s" : ""})
+                Selected: {selectedSlots.length} slot
+                {selectedSlots.length !== 1 ? "s" : ""}(
+                {selectedSlots.length * 0.5} hour
+                {selectedSlots.length * 0.5 !== 1 ? "s" : ""})
               </div>
             )}
           </div>
@@ -417,7 +435,7 @@ export default function NewBookingPage() {
           {/* User Details */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">User Details</h3>
-            
+
             <div className="space-y-2">
               <Label htmlFor="user-name" className="text-zinc-200 text-sm">
                 User Name
@@ -482,7 +500,10 @@ export default function NewBookingPage() {
             <Button
               type="submit"
               className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-              disabled={isSubmitting || selectedSlots.length < (formData.courtType === "FUTSAL" ? 3 : 2)}
+              disabled={
+                isSubmitting ||
+                selectedSlots.length < (formData.courtType === "FUTSAL" ? 3 : 2)
+              }
             >
               {isSubmitting ? (
                 <>

@@ -7,12 +7,16 @@ import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { QRCode } from "@/components/ui/qr-code";
 import { Skeleton } from "@/components/ui/skeleton";
-import { OPERATING_HOURS, CourtType, COMPLEX_OPENING_DATE } from "@/types";
+import { OPERATING_HOURS, CourtType, COMPLEX_OPENING_DATE, AppliedDiscount, Discount } from "@/types";
 import { getCourts } from "../actions/courts";
 import { getBookingsByDate, createBooking } from "../actions/bookings";
+import { getActiveDiscounts } from "../actions/discounts";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { formatLocalDate } from "@/lib/utils";
+import { getApplicableDiscounts, calculateDiscountedPrice, DiscountInput } from "@/lib/discount-utils";
+import { PriceBreakdown } from "@/components/PriceBreakdown";
+import { DiscountBanner } from "@/components/DiscountBanner";
 
 export default function BookingPage() {
   // Default to opening date if today is before it
@@ -38,6 +42,7 @@ export default function BookingPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectionError, setSelectionError] = useState<string>("");
   const [createdBooking, setCreatedBooking] = useState<any>(null);
+  const [activeDiscounts, setActiveDiscounts] = useState<Discount[]>([]);
 
   // Form State
   const [formData, setFormData] = useState({ name: "", email: "", phone: "" });
@@ -65,7 +70,7 @@ export default function BookingPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Load available court types on mount
+  // Load available court types and active discounts on mount
   useEffect(() => {
     const loadAvailableTypes = async () => {
       setIsLoadingTypes(true);
@@ -88,7 +93,20 @@ export default function BookingPage() {
         setIsLoadingTypes(false);
       }
     };
+
+    const loadDiscounts = async () => {
+      try {
+        const result = await getActiveDiscounts();
+        if (result.success) {
+          setActiveDiscounts(result.discounts);
+        }
+      } catch (error) {
+        console.error('Failed to load discounts:', error);
+      }
+    };
+
     loadAvailableTypes();
+    loadDiscounts();
   }, []);
 
   useEffect(() => {
@@ -154,6 +172,26 @@ export default function BookingPage() {
     });
   };
 
+  // Check if a time slot has already passed (for today's date)
+  const isSlotPassed = (slotTime: number) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const selectedDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+    
+    // Only check for today's date
+    if (selectedDay.getTime() !== today.getTime()) {
+      return false;
+    }
+    
+    // Get current hour and minutes
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTime = currentHour + (currentMinutes / 60);
+    
+    // Slot has passed if its start time is less than or equal to current time
+    return slotTime <= currentTime;
+  };
+
   const isSlotSelected = (courtId: string, slotTime: number) => {
     return selectedSlots.some(
       (s) => s.courtId === courtId && s.slotTime === slotTime
@@ -178,6 +216,12 @@ export default function BookingPage() {
   };
 
   const toggleSlot = (courtId: string, slotTime: number) => {
+    if (isSlotPassed(slotTime)) {
+      setSelectionError("This time slot has already passed.");
+      setTimeout(() => setSelectionError(""), 3000);
+      return;
+    }
+    
     if (isSlotBooked(courtId, slotTime)) {
       setSelectionError("This slot is already booked.");
       setTimeout(() => setSelectionError(""), 3000);
@@ -348,13 +392,44 @@ export default function BookingPage() {
 
   const selectedDuration = selectedSlots.length * 0.5; // Duration in hours
   const selectedCourt = courts.find((c) => c._id === selectedSlots[0]?.courtId);
-  const totalPrice = selectedCourt
+  const originalPrice = selectedCourt
     ? selectedCourt.pricePerHour * selectedDuration
     : 0;
+
+  // Calculate discounts for the current selection
+  const discountCalcResult = React.useMemo(() => {
+    if (!selectedCourtType || selectedSlots.length === 0 || !selectedCourt) {
+      return { finalPrice: originalPrice, discountAmount: 0, appliedDiscounts: [] };
+    }
+
+    const sortedTimes = selectedSlots.map((s) => s.slotTime).sort((a, b) => a - b);
+    const startTime = sortedTimes[0];
+    const dateString = formatLocalDate(selectedDate);
+
+    const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
+      _id: d._id,
+      name: d.name,
+      type: d.type,
+      value: d.value,
+      courtTypes: d.courtTypes,
+      allDay: d.allDay,
+      startHour: d.startHour,
+      endHour: d.endHour,
+      validFrom: d.validFrom,
+      validUntil: d.validUntil,
+      isActive: d.isActive,
+    }));
+
+    const applicable = getApplicableDiscounts(discountsData, selectedCourtType, startTime, dateString);
+    return calculateDiscountedPrice(originalPrice, applicable);
+  }, [selectedCourtType, selectedSlots, selectedCourt, originalPrice, activeDiscounts, selectedDate]);
+
+  const { finalPrice: totalPrice, discountAmount, appliedDiscounts } = discountCalcResult;
 
   return (
     <div className="min-h-screen bg-black text-white relative">
       <Navbar />
+      <DiscountBanner className="fixed top-16 md:top-20 left-0 right-0 z-40" />
 
       <div className="fixed top-0 left-0 w-full h-[50vh] bg-gradient-to-b from-[#2DD4BF]/10 to-transparent pointer-events-none" />
 
@@ -446,6 +521,10 @@ export default function BookingPage() {
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-red-500/80 border border-red-400" />
                   <span className="text-zinc-500">Booked</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-zinc-600/80 border border-zinc-500" />
+                  <span className="text-zinc-500">Passed</span>
                 </div>
               </div>
 
@@ -569,6 +648,8 @@ export default function BookingPage() {
                                     court._id,
                                     slotTime
                                   );
+                                  const isPassed = isSlotPassed(slotTime);
+                                  const isUnavailable = isBooked || isPassed;
                                   const isSelected = isSlotSelected(
                                     court._id,
                                     slotTime
@@ -581,7 +662,7 @@ export default function BookingPage() {
                                     >
                                       <motion.button
                                         whileHover={
-                                          !isBooked &&
+                                          !isUnavailable &&
                                           (selectedSlots.length === 0 ||
                                             isSlotConsecutive(
                                               court._id,
@@ -591,7 +672,7 @@ export default function BookingPage() {
                                             : {}
                                         }
                                         whileTap={
-                                          !isBooked &&
+                                          !isUnavailable &&
                                           (selectedSlots.length === 0 ||
                                             isSlotConsecutive(
                                               court._id,
@@ -603,24 +684,28 @@ export default function BookingPage() {
                                         onClick={() =>
                                           toggleSlot(court._id, slotTime)
                                         }
-                                        disabled={isBooked}
+                                        disabled={isUnavailable}
                                         title={
-                                          selectedSlots.length > 0 &&
-                                          selectedSlots[0].courtId ===
-                                            court._id &&
-                                          !isSlotConsecutive(
-                                            court._id,
-                                            slotTime
-                                          ) &&
-                                          !isSelected
-                                            ? "Select consecutive slots only"
-                                            : ""
+                                          isPassed
+                                            ? "This time has passed"
+                                            : selectedSlots.length > 0 &&
+                                              selectedSlots[0].courtId ===
+                                                court._id &&
+                                              !isSlotConsecutive(
+                                                court._id,
+                                                slotTime
+                                              ) &&
+                                              !isSelected
+                                              ? "Select consecutive slots only"
+                                              : ""
                                         }
                                         className={`
                                     w-full h-full rounded transition-all duration-300 relative overflow-hidden
                                     ${
                                       isBooked
                                         ? "bg-red-500/80 border border-red-400 cursor-not-allowed opacity-75"
+                                        : isPassed
+                                        ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
                                         : isSelected
                                         ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
                                         : selectedSlots.length > 0 &&
@@ -678,6 +763,8 @@ export default function BookingPage() {
                         <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                           {timeSlots.map((slotTime) => {
                             const isBooked = isSlotBooked(court._id, slotTime);
+                            const isPassed = isSlotPassed(slotTime);
+                            const isUnavailable = isBooked || isPassed;
                             const isSelected = isSlotSelected(
                               court._id,
                               slotTime
@@ -699,26 +786,30 @@ export default function BookingPage() {
                               <motion.button
                                 key={slotTime}
                                 whileHover={
-                                  !isBooked && canSelect ? { scale: 0.95 } : {}
+                                  !isUnavailable && canSelect ? { scale: 0.95 } : {}
                                 }
                                 whileTap={
-                                  !isBooked && canSelect ? { scale: 0.9 } : {}
+                                  !isUnavailable && canSelect ? { scale: 0.9 } : {}
                                 }
                                 onClick={() => toggleSlot(court._id, slotTime)}
-                                disabled={isBooked}
+                                disabled={isUnavailable}
                                 title={
-                                  selectedSlots.length > 0 &&
-                                  selectedSlots[0].courtId === court._id &&
-                                  !isConsecutive &&
-                                  !isSelected
-                                    ? "Select consecutive slots only"
-                                    : ""
+                                  isPassed
+                                    ? "This time has passed"
+                                    : selectedSlots.length > 0 &&
+                                      selectedSlots[0].courtId === court._id &&
+                                      !isConsecutive &&
+                                      !isSelected
+                                      ? "Select consecutive slots only"
+                                      : ""
                                 }
                                 className={`
                               aspect-square rounded-lg transition-all duration-300 relative overflow-hidden flex flex-col items-center justify-center p-1
                               ${
                                 isBooked
                                   ? "bg-red-500/80 border border-red-400 cursor-not-allowed opacity-75"
+                                  : isPassed
+                                  ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
                                   : isSelected
                                   ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
                                   : selectedSlots.length > 0 &&
@@ -787,10 +878,18 @@ export default function BookingPage() {
                           sortedTimes[sortedTimes.length - 1] + 0.5;
                         const endHour = Math.floor(endTime);
                         const endMin = endTime % 1 === 0 ? "00" : "30";
-                        return `${startHour}:${startMin} - ${endHour}:${endMin} • `;
+                        return `${startHour}:${startMin} - ${endHour}:${endMin}`;
                       })()}
-                    Total: PKR {totalPrice.toFixed(2)}
                   </p>
+                  {discountAmount > 0 ? (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-zinc-500 line-through text-xs">PKR {originalPrice.toLocaleString()}</span>
+                      <span className="text-[#2DD4BF] font-semibold text-sm">PKR {totalPrice.toLocaleString()}</span>
+                      <span className="text-green-400 text-xs">Save PKR {discountAmount.toLocaleString()}</span>
+                    </div>
+                  ) : (
+                    <p className="text-[#2DD4BF] font-semibold text-sm mt-1">PKR {totalPrice.toLocaleString()}</p>
+                  )}
                 </div>
               </div>
               <div className="flex gap-2 md:gap-3 w-full">
@@ -921,13 +1020,36 @@ export default function BookingPage() {
                             {createdBooking.duration !== 1 ? "s" : ""}
                           </span>
                         </div>
-                        <div className="flex justify-between items-center pt-2 border-t border-zinc-800">
-                          <span className="text-zinc-400 text-sm font-semibold">
-                            Total Price:
-                          </span>
-                          <span className="text-[#2DD4BF] font-bold text-lg">
-                            PKR {createdBooking.totalPrice.toFixed(2)}
-                          </span>
+                        {/* Price Breakdown */}
+                        <div className="pt-2 border-t border-zinc-800">
+                          {createdBooking.discountAmount > 0 ? (
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <span className="text-zinc-400 text-sm">Subtotal:</span>
+                                <span className="text-zinc-300 text-sm">PKR {createdBooking.originalPrice?.toLocaleString()}</span>
+                              </div>
+                              {createdBooking.discounts?.map((d: AppliedDiscount, idx: number) => (
+                                <div key={idx} className="flex justify-between items-center">
+                                  <span className="text-green-400 text-sm">
+                                    {d.name} ({d.type === 'percentage' ? `${d.value}%` : `PKR ${d.value}`})
+                                  </span>
+                                  <span className="text-green-400 text-sm">-PKR {d.amountSaved?.toLocaleString()}</span>
+                                </div>
+                              ))}
+                              <div className="flex justify-between items-center pt-2 border-t border-zinc-700">
+                                <span className="text-zinc-300 text-sm font-semibold">Total:</span>
+                                <span className="text-[#2DD4BF] font-bold text-lg">PKR {createdBooking.totalPrice.toLocaleString()}</span>
+                              </div>
+                              <div className="bg-green-500/10 border border-green-500/30 rounded-md px-2 py-1 text-center">
+                                <span className="text-green-400 text-xs">You saved PKR {createdBooking.discountAmount?.toLocaleString()}!</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex justify-between items-center">
+                              <span className="text-zinc-400 text-sm font-semibold">Total Price:</span>
+                              <span className="text-[#2DD4BF] font-bold text-lg">PKR {createdBooking.totalPrice.toLocaleString()}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1035,9 +1157,18 @@ export default function BookingPage() {
                       {selectedDuration}{" "}
                       {selectedDuration === 1 ? "Hour" : "Hours"}
                     </span>
-                    {selectedCourt && <span>•</span>}
-                    {selectedCourt && <span>PKR {totalPrice.toFixed(2)}</span>}
                   </div>
+                  {/* Price Breakdown */}
+                  {selectedCourt && (
+                    <div className="mt-4 bg-zinc-900/50 rounded-xl p-4">
+                      <PriceBreakdown
+                        originalPrice={originalPrice}
+                        discounts={appliedDiscounts}
+                        discountAmount={discountAmount}
+                        totalPrice={totalPrice}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {errorMessage && (
