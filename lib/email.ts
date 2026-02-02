@@ -1,23 +1,30 @@
 /**
- * AWS SES Email Service
+ * Email Service
  * 
- * This module handles sending emails using Amazon SES (Simple Email Service).
- * It provides functions to send booking confirmation emails with QR codes.
+ * This module handles sending emails using either Resend or AWS SES.
+ * Set EMAIL_PROVIDER env variable to 'ses' to use AWS SES, otherwise defaults to Resend.
  */
 
+import { Resend } from 'resend';
 import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
 import { generateBookingConfirmationEmail, BookingEmailData, AppliedDiscountEmail } from './email-templates/booking-confirmation';
-// Note: Install 'qrcode' package for server-side QR code generation: npm install qrcode @types/qrcode
-// Using dynamic import to handle cases where package might not be installed yet
+
+// QR Code generation
 let QRCode: any;
 try {
   QRCode = require('qrcode');
 } catch (e) {
-  // QRCode package not installed - will use fallback
   console.warn('qrcode package not installed. QR codes in emails will not be generated.');
 }
 
-// Initialize SES client with credentials from environment variables
+// Email provider configuration
+const EMAIL_PROVIDER = process.env.EMAIL_PROVIDER || 'resend'; // 'resend' or 'ses'
+
+// Resend configuration
+const resend = new Resend(process.env.RESEND_API_KEY);
+const resendFromEmail = process.env.RESEND_FROM_EMAIL || 'IBEX Sports <onboarding@resend.dev>';
+
+// SES configuration (kept for future use)
 const sesClient = new SESClient({
   region: process.env.AWS_REGION || 'us-east-1',
   credentials: {
@@ -25,19 +32,41 @@ const sesClient = new SESClient({
     secretAccessKey: process.env.AWS_SECRET_KEY || '',
   },
 });
-
-const fromEmail = process.env.SES_FROM_EMAIL || 'noreply@ibexarena.com';
+const sesFromEmail = process.env.SES_FROM_EMAIL || 'noreply@ibexarena.com';
 
 /**
- * Generates QR code as buffer (for email inline attachments)
- * Requires 'qrcode' package to be installed
+ * Generates QR code as base64 data URL
+ */
+async function generateQRCodeDataUrl(value: string): Promise<string> {
+  try {
+    if (!QRCode) {
+      throw new Error('QRCode package not available');
+    }
+    const dataUrl = await QRCode.toDataURL(value, {
+      width: 300,
+      margin: 3,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF',
+      },
+    });
+    return dataUrl;
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    // Return a placeholder
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  }
+}
+
+/**
+ * Generates QR code as buffer (for SES inline attachments)
  */
 async function generateQRCodeBuffer(value: string): Promise<Buffer> {
   try {
     if (!QRCode) {
       throw new Error('QRCode package not available');
     }
-    // Generate QR code as buffer for email inline attachments
     const buffer = await QRCode.toBuffer(value, {
       width: 300,
       margin: 3,
@@ -48,7 +77,6 @@ async function generateQRCodeBuffer(value: string): Promise<Buffer> {
       },
       type: 'image/png',
     });
-    
     return buffer;
   } catch (error) {
     console.error('Error generating QR code:', error);
@@ -75,12 +103,89 @@ export interface BookingConfirmationEmailData {
 }
 
 /**
- * Sends booking confirmation email with QR codes
- * 
- * @param data - Booking information and user details
- * @returns Promise with success status and email ID or error message
+ * Send email via Resend
  */
-export async function sendBookingConfirmationEmail(
+async function sendViaResend(
+  data: BookingConfirmationEmailData
+): Promise<{ success: boolean; message?: string; emailId?: string }> {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.error('RESEND_API_KEY is not configured');
+      return { success: false, message: 'Email service is not configured' };
+    }
+
+    const validEmail = data.userEmail.trim().toLowerCase();
+
+    // Generate QR code URLs
+    const entryVerificationUrl = `${data.baseUrl}/booking/verify/${data.bookingId}`;
+    const feedbackUrl = `${data.baseUrl}/feedback/${data.bookingId}`;
+
+    // Generate QR codes as data URLs for embedding in HTML
+    const entryQRCode = await generateQRCodeDataUrl(entryVerificationUrl);
+    const feedbackQRCode = await generateQRCodeDataUrl(feedbackUrl);
+
+    // Prepare email data
+    const emailData: BookingEmailData = {
+      userName: data.userName,
+      userEmail: validEmail,
+      courtName: data.courtName,
+      date: data.date,
+      startTime: data.startTime,
+      duration: data.duration,
+      originalPrice: data.originalPrice,
+      discounts: data.discounts,
+      discountAmount: data.discountAmount,
+      totalPrice: data.totalPrice,
+      bookingId: data.bookingId,
+      entryVerificationUrl,
+      feedbackUrl,
+      entryQRCode, // Data URL for inline display
+      feedbackQRCode, // Data URL for inline display
+    };
+
+    // Generate HTML email content
+    const htmlContent = generateBookingConfirmationEmail(emailData);
+
+    // Format for subject
+    const startTimeFormatted = `${Math.floor(data.startTime).toString().padStart(2, '0')}:${data.startTime % 1 === 0 ? '00' : '30'}`;
+    const formattedDate = new Date(data.date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    const subject = `Booking Confirmed - IBEX Sports Complex - ${formattedDate} at ${startTimeFormatted}`;
+
+    // Send via Resend
+    const response = await resend.emails.send({
+      from: resendFromEmail,
+      to: validEmail,
+      subject,
+      html: htmlContent,
+    });
+
+    if (response.error) {
+      console.error('Resend error:', response.error);
+      return { success: false, message: response.error.message };
+    }
+
+    return {
+      success: true,
+      emailId: response.data?.id,
+    };
+  } catch (error: any) {
+    console.error('Error sending email via Resend:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to send email',
+    };
+  }
+}
+
+/**
+ * Send email via AWS SES (kept for future use)
+ */
+async function sendViaSES(
   data: BookingConfirmationEmailData
 ): Promise<{ success: boolean; message?: string; emailId?: string }> {
   try {
@@ -88,12 +193,6 @@ export async function sendBookingConfirmationEmail(
     if (!process.env.AWS_REGION || !process.env.AWS_ACCESS_KEY || !process.env.AWS_SECRET_KEY || !process.env.SES_FROM_EMAIL) {
       console.error('AWS SES configuration is missing. Please check your environment variables.');
       return { success: false, message: 'Email service is not configured' };
-    }
-
-    // Validate email address
-    if (!data.userEmail || !data.userEmail.trim() || !data.userEmail.includes('@')) {
-      console.error('Invalid email address:', data.userEmail);
-      return { success: false, message: 'Invalid email address' };
     }
 
     const validEmail = data.userEmail.trim().toLowerCase();
@@ -111,7 +210,6 @@ export async function sendBookingConfirmationEmail(
       feedbackQRCodeBuffer = await generateQRCodeBuffer(feedbackUrl);
     } catch (error) {
       console.error('Failed to generate QR codes:', error);
-      // Create a simple 1x1 transparent PNG as placeholder
       const placeholder = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
       entryQRCodeBuffer = placeholder;
       feedbackQRCodeBuffer = placeholder;
@@ -132,8 +230,8 @@ export async function sendBookingConfirmationEmail(
       bookingId: data.bookingId,
       entryVerificationUrl,
       feedbackUrl,
-      entryQRCode: 'cid:entry-qr-code', // CID reference for inline attachment
-      feedbackQRCode: 'cid:feedback-qr-code', // CID reference for inline attachment
+      entryQRCode: 'cid:entry-qr-code',
+      feedbackQRCode: 'cid:feedback-qr-code',
     };
 
     // Generate HTML email content
@@ -147,22 +245,18 @@ export async function sendBookingConfirmationEmail(
       year: 'numeric',
     });
     
-    // Create preview text to help prevent Gmail from collapsing
     const previewText = `Your booking for ${data.courtName} on ${formattedDate} at ${startTimeFormatted} has been confirmed.`;
 
-    // Create MIME multipart message with inline attachments (required for Gmail)
+    // Create MIME multipart message with inline attachments
     const mainBoundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const relatedBoundary = `----=_Related_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const subject = `Booking Confirmed - IBEX Sports Complex - ${formattedDate} at ${startTimeFormatted}`;
     
-    // Convert buffers to base64 for MIME encoding
     const entryQRCodeBase64 = entryQRCodeBuffer.toString('base64');
     const feedbackQRCodeBase64 = feedbackQRCodeBuffer.toString('base64');
 
-    // Build raw email message with proper MIME formatting
-    // Using multipart/alternative with text/plain and multipart/related for HTML+images
     const rawMessage = [
-      `From: ${fromEmail}`,
+      `From: ${sesFromEmail}`,
       `To: ${validEmail}`,
       `Subject: ${subject}`,
       `MIME-Version: 1.0`,
@@ -204,7 +298,6 @@ export async function sendBookingConfirmationEmail(
       `--${mainBoundary}--`,
     ].join('\r\n');
 
-    // Send email using SES Raw Email (required for inline attachments)
     const command = new SendRawEmailCommand({
       RawMessage: {
         Data: Buffer.from(rawMessage),
@@ -220,7 +313,6 @@ export async function sendBookingConfirmationEmail(
   } catch (error: any) {
     console.error('Error sending email via SES:', error);
     
-    // Provide user-friendly error messages
     let errorMessage = 'Failed to send email';
     
     if (error.name === 'MessageRejected') {
@@ -240,4 +332,29 @@ export async function sendBookingConfirmationEmail(
       message: errorMessage,
     };
   }
+}
+
+/**
+ * Sends booking confirmation email with QR codes
+ * Uses Resend by default, or AWS SES if EMAIL_PROVIDER is set to 'ses'
+ * 
+ * @param data - Booking information and user details
+ * @returns Promise with success status and email ID or error message
+ */
+export async function sendBookingConfirmationEmail(
+  data: BookingConfirmationEmailData
+): Promise<{ success: boolean; message?: string; emailId?: string }> {
+  // Validate email address
+  if (!data.userEmail || !data.userEmail.trim() || !data.userEmail.includes('@')) {
+    console.error('Invalid email address:', data.userEmail);
+    return { success: false, message: 'Invalid email address' };
+  }
+
+  // Use the configured email provider
+  if (EMAIL_PROVIDER === 'ses') {
+    return sendViaSES(data);
+  }
+  
+  // Default to Resend
+  return sendViaResend(data);
 }
