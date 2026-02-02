@@ -1,6 +1,5 @@
-import { IDiscount } from '@/models/Discount';
 import { CourtType } from '@/models/Court';
-import { IAppliedDiscount } from '@/models/Booking';
+import { AppliedDiscount } from '@/types';
 
 export interface DiscountInput {
   _id: string;
@@ -72,7 +71,7 @@ export function calculateDiscountedPrice(
 ): {
   finalPrice: number;
   discountAmount: number;
-  appliedDiscounts: IAppliedDiscount[];
+  appliedDiscounts: AppliedDiscount[];
 } {
   if (applicableDiscounts.length === 0) {
     return {
@@ -90,7 +89,7 @@ export function calculateDiscountedPrice(
   });
 
   let runningPrice = originalPrice;
-  const appliedDiscounts: IAppliedDiscount[] = [];
+  const appliedDiscounts: AppliedDiscount[] = [];
 
   for (const discount of sortedDiscounts) {
     let amountSaved: number;
@@ -105,7 +104,7 @@ export function calculateDiscountedPrice(
     runningPrice = Math.max(0, runningPrice - amountSaved);
 
     appliedDiscounts.push({
-      discountId: discount._id as any,
+      discountId: discount._id,
       name: discount.name,
       type: discount.type,
       value: discount.value,

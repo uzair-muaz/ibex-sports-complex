@@ -61,6 +61,9 @@ export default function BookingsPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [sortColumn, setSortColumn] = useState<keyof Booking | "courtName" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -122,18 +125,28 @@ export default function BookingsPage() {
     }
   };
 
-  const handleDeleteBooking = async (id: string) => {
-    if (
-      window.confirm(
-        "Are you sure you want to permanently delete this booking? This action cannot be undone."
-      )
-    ) {
-      const result = await deleteBooking(id);
+  const handleDeleteBooking = (booking: Booking) => {
+    setDeletingBooking(booking);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteBooking = async () => {
+    if (!deletingBooking) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await deleteBooking(deletingBooking._id);
       if (result.success) {
+        setShowDeleteModal(false);
+        setDeletingBooking(null);
         loadData();
       } else {
         alert(result.error || "Failed to delete booking");
       }
+    } catch (error: any) {
+      alert(error.message || "An error occurred");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -460,7 +473,7 @@ export default function BookingsPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleDeleteBooking(booking._id)}
+                                onClick={() => handleDeleteBooking(booking)}
                                 className="text-zinc-400 hover:text-red-400 h-8 w-8"
                                 title="Delete"
                               >
@@ -726,6 +739,113 @@ export default function BookingsPage() {
                 </>
               ) : (
                 "Yes, Cancel Booking"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Booking Confirmation Modal */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="bg-zinc-950 border-zinc-800 max-w-md text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">Delete Booking</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Are you sure you want to permanently delete this booking? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deletingBooking && (
+            <div className="space-y-4 py-4">
+              <div className="bg-zinc-900/50 rounded-lg p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400 text-sm">Booking ID:</span>
+                  <span className="text-white font-mono text-sm">
+                    #{deletingBooking._id.slice(-8)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400 text-sm">User:</span>
+                  <span className="text-white text-sm">{deletingBooking.userName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400 text-sm">Email:</span>
+                  <span className="text-white text-sm">{deletingBooking.userEmail}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400 text-sm">Date:</span>
+                  <span className="text-white text-sm">{formatDisplayDate(deletingBooking.date)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400 text-sm">Time:</span>
+                  <span className="text-white text-sm">
+                    {Math.floor(deletingBooking.startTime)
+                      .toString()
+                      .padStart(2, "0")}
+                    :{deletingBooking.startTime % 1 === 0 ? "00" : "30"} -{" "}
+                    {Math.floor(deletingBooking.startTime + deletingBooking.duration)
+                      .toString()
+                      .padStart(2, "0")}
+                    :{(deletingBooking.startTime + deletingBooking.duration) % 1 === 0 ? "00" : "30"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400 text-sm">Status:</span>
+                  <Badge
+                    variant="outline"
+                    className={
+                      deletingBooking.status === "confirmed"
+                        ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF] text-xs"
+                        : deletingBooking.status === "pending_payment"
+                          ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-400 text-xs"
+                          : deletingBooking.status === "cancelled"
+                            ? "bg-red-500/20 border-red-500/50 text-red-400 text-xs"
+                            : deletingBooking.status === "completed"
+                              ? "bg-green-500/20 border-green-500/50 text-green-400 text-xs"
+                              : "bg-zinc-800 border-zinc-700 text-zinc-300 text-xs"
+                    }
+                  >
+                    {deletingBooking.status === "pending_payment"
+                      ? "Pending Payment"
+                      : deletingBooking.status.charAt(0).toUpperCase() + deletingBooking.status.slice(1).replace(/_/g, " ")}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400 text-sm">Total Price:</span>
+                  <span className="text-[#2DD4BF] font-semibold text-sm">
+                    PKR {deletingBooking.totalPrice.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                <p className="text-red-400 text-sm">
+                  This will permanently remove the booking from the system. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowDeleteModal(false);
+                setDeletingBooking(null);
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDeleteBooking}
+              className="bg-red-500 text-white hover:bg-red-600"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Yes, Delete Booking"
               )}
             </Button>
           </DialogFooter>

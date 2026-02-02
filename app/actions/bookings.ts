@@ -1,5 +1,6 @@
 'use server';
 
+import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 import Booking from '@/models/Booking';
 import Court from '@/models/Court';
@@ -127,6 +128,15 @@ export async function createBooking(input: CreateBookingInput) {
       applicableDiscounts
     );
 
+    // Convert discounts for Mongoose (string discountId to ObjectId)
+    const discountsForDB = appliedDiscounts.map((d) => ({
+      discountId: new mongoose.Types.ObjectId(d.discountId),
+      name: d.name,
+      type: d.type,
+      value: d.value,
+      amountSaved: d.amountSaved,
+    }));
+
     // Create booking with discount information
     const booking = await Booking.create({
       courtId: assignedCourt._id,
@@ -137,7 +147,7 @@ export async function createBooking(input: CreateBookingInput) {
       userEmail: input.userEmail.toLowerCase(),
       userPhone: input.userPhone,
       originalPrice,
-      discounts: appliedDiscounts,
+      discounts: discountsForDB,
       discountAmount,
       totalPrice: finalPrice,
       status: 'pending_payment',
@@ -156,7 +166,7 @@ export async function createBooking(input: CreateBookingInput) {
       startTime: input.startTime,
       duration: input.duration,
       originalPrice,
-      discounts: appliedDiscounts,
+      discounts: appliedDiscounts, // Already has string discountId
       discountAmount,
       totalPrice: finalPrice,
       bookingId: booking._id.toString(),

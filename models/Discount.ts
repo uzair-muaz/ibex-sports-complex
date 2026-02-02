@@ -84,7 +84,7 @@ const DiscountSchema: Schema = new Schema(
 );
 
 // Custom validation for date range
-DiscountSchema.pre("save", function (next) {
+DiscountSchema.pre("save", function (this: IDiscount, next) {
   if (this.validFrom >= this.validUntil) {
     next(new Error("Valid until date must be after valid from date"));
   } else if (!this.allDay && this.startHour >= this.endHour) {
