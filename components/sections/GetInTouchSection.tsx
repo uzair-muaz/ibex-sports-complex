@@ -25,7 +25,7 @@ export const GetInTouchSection = () => {
   const mapEmbedUrl = `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3323.7842767507145!2d73.1439709!3d33.5849499!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x38dfed0d4fd052a7%3A0x36114e312659cf3a!2sIbex%20Sports%20Complex!5e0!3m2!1sen!2s!4v1768089209428!5m2!1sen!2s`;
 
   return (
-    <section className="py-20 px-6 bg-white dark:bg-[#050505] border-t border-zinc-200 dark:border-white/5 transition-colors duration-200">
+    <section className="py-20 px-6 bg-[var(--landing-bg)] dark:bg-[#050505] border-t border-zinc-200/80 dark:border-white/5 transition-colors duration-500">
       <div className="max-w-7xl mx-auto">
         <div className="mb-16">
           <TextReveal className="text-[12vw] leading-[0.8] font-black tracking-tighter gradient-text uppercase">
@@ -73,7 +73,7 @@ export const GetInTouchSection = () => {
           </div>
 
           {/* Contact Info Card */}
-          <div className="bg-zinc-100 dark:bg-zinc-900 p-6 md:p-8 rounded-3xl flex flex-col justify-between hover:shadow-xl transition-shadow border border-zinc-200 dark:border-white/5 group">
+          <div className="bg-zinc-100/80 dark:bg-zinc-900/80 p-6 md:p-8 rounded-3xl flex flex-col justify-between hover:shadow-xl transition-all duration-300 border border-zinc-200/80 dark:border-white/10 group">
             <div>
               <div className="w-12 h-12 bg-[#2DD4BF] rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <AnimatedPhoneIcon className="w-6 h-6" color="#000" />

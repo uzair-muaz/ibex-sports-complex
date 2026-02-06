@@ -5,6 +5,7 @@ import Image from "next/image";
 import useSWR from "swr";
 import { ParallaxSection } from "@/components/ui/ParallaxSection";
 import { TextReveal } from "@/components/ui/TextReveal";
+import { LUXURY_EASE, CARD_ENTRANCE } from "@/lib/motion";
 
 // Static data - all court information is hardcoded
 // Only prices come from DB via ISR + SWR hybrid rendering
@@ -91,7 +92,7 @@ export const FacilitiesSection = ({
   const pickleballCourts = allCourts.filter((c) => c.type === "PICKLEBALL");
   const futsalCourts = allCourts.filter((c) => c.type === "FUTSAL");
   return (
-    <section className="py-32 px-6 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-200 relative z-20">
+    <section className="py-32 px-6 bg-[#F5F4F2] dark:bg-zinc-950 transition-colors duration-500 relative z-20">
       <div className="max-w-7xl mx-auto space-y-24">
         <ParallaxSection speed={0.3}>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-12">
@@ -112,18 +113,19 @@ export const FacilitiesSection = ({
           {padelCourts.length > 0 && (
             <ParallaxSection speed={0.2}>
               <motion.div
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-10%" }}
-                transition={{ duration: 0.8 }}
-                className="relative group overflow-hidden rounded-[2.5rem] h-[600px] shadow-2xl cursor-pointer"
+                initial={CARD_ENTRANCE.initial}
+                whileInView={CARD_ENTRANCE.whileInView}
+                viewport={CARD_ENTRANCE.viewport}
+                transition={{ ...CARD_ENTRANCE.transition, delay: 0 }}
+                whileHover={{ y: -4, transition: { duration: 0.4, ease: LUXURY_EASE } }}
+                className="relative group overflow-hidden rounded-[2.5rem] h-[600px] shadow-xl hover:shadow-2xl border border-zinc-200/80 dark:border-white/10 hover:border-[#2DD4BF]/20 cursor-pointer transition-shadow duration-300"
               >
                 <Image
                   src={premiumImages.padel}
                   alt={staticCourtData.padel.name}
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover transition-transform duration-1000 group-hover:scale-110"
+                  className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                   priority
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
@@ -146,18 +148,19 @@ export const FacilitiesSection = ({
           {futsalCourts.length > 0 && (
             <ParallaxSection speed={0.2}>
               <motion.div
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-10%" }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                className="relative group overflow-hidden rounded-[2.5rem] h-[600px] mt-0 md:mt-24 shadow-2xl cursor-pointer"
+                initial={CARD_ENTRANCE.initial}
+                whileInView={CARD_ENTRANCE.whileInView}
+                viewport={CARD_ENTRANCE.viewport}
+                transition={{ ...CARD_ENTRANCE.transition, delay: 0.1 }}
+                whileHover={{ y: -4, transition: { duration: 0.4, ease: LUXURY_EASE } }}
+                className="relative group overflow-hidden rounded-[2.5rem] h-[600px] mt-0 md:mt-24 shadow-xl hover:shadow-2xl border border-zinc-200/80 dark:border-white/10 hover:border-[#2DD4BF]/20 cursor-pointer transition-shadow duration-300"
               >
                 <Image
                   src={premiumImages.futsal}
                   alt={staticCourtData.futsal.name}
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover transition-transform duration-1000 group-hover:scale-110"
+                  className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                   priority
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
@@ -180,18 +183,19 @@ export const FacilitiesSection = ({
           {pickleballCourts.length > 0 && (
             <ParallaxSection speed={0.2}>
               <motion.div
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-10%" }}
-                transition={{ duration: 0.8, delay: 0.4 }}
-                className="relative group overflow-hidden rounded-[2.5rem] h-[600px] shadow-2xl cursor-pointer"
+                initial={CARD_ENTRANCE.initial}
+                whileInView={CARD_ENTRANCE.whileInView}
+                viewport={CARD_ENTRANCE.viewport}
+                transition={{ ...CARD_ENTRANCE.transition, delay: 0.2 }}
+                whileHover={{ y: -4, transition: { duration: 0.4, ease: LUXURY_EASE } }}
+                className="relative group overflow-hidden rounded-[2.5rem] h-[600px] shadow-xl hover:shadow-2xl border border-zinc-200/80 dark:border-white/10 hover:border-[#2DD4BF]/20 cursor-pointer transition-shadow duration-300"
               >
                 <Image
                   src={premiumImages.pickleball}
                   alt={staticCourtData.pickleball.name}
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover transition-transform duration-1000 group-hover:scale-110"
+                  className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                   priority
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">
@@ -214,18 +218,19 @@ export const FacilitiesSection = ({
           {cricketCourts.length > 0 && (
             <ParallaxSection speed={0.2}>
               <motion.div
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-10%" }}
-                transition={{ duration: 0.8, delay: 0.6 }}
-                className="relative group overflow-hidden rounded-[2.5rem] h-[600px] mt-0 md:mt-24 shadow-2xl cursor-pointer"
+                initial={CARD_ENTRANCE.initial}
+                whileInView={CARD_ENTRANCE.whileInView}
+                viewport={CARD_ENTRANCE.viewport}
+                transition={{ ...CARD_ENTRANCE.transition, delay: 0.3 }}
+                whileHover={{ y: -4, transition: { duration: 0.4, ease: LUXURY_EASE } }}
+                className="relative group overflow-hidden rounded-[2.5rem] h-[600px] mt-0 md:mt-24 shadow-xl hover:shadow-2xl border border-zinc-200/80 dark:border-white/10 hover:border-[#2DD4BF]/20 cursor-pointer transition-shadow duration-300"
               >
                 <Image
                   src={premiumImages.cricket}
                   alt={staticCourtData.cricket.name}
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover transition-transform duration-1000 group-hover:scale-110"
+                  className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                   priority
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-12 flex flex-col justify-end">

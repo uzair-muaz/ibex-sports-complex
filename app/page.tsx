@@ -59,7 +59,7 @@ export default async function Home() {
   const futsalCourts = courts.filter((c: any) => c.type === "FUTSAL");
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white overflow-hidden transition-colors duration-200">
+    <div className="min-h-screen bg-[var(--landing-bg)] dark:bg-[var(--landing-bg-dark)] text-black dark:text-white overflow-hidden transition-colors duration-500">
       <Navbar />
       <DiscountBanner className="fixed top-16 md:top-20 left-0 right-0 z-40" />
 
@@ -79,7 +79,7 @@ export default async function Home() {
       <MembershipSection />
 
       <ParallaxSection speed={0.1}>
-        <section className="py-24 bg-white dark:bg-black overflow-hidden transition-colors duration-200">
+        <section className="py-24 bg-[var(--landing-bg)] dark:bg-[var(--landing-bg-dark)] overflow-hidden transition-colors duration-500">
           <div className="px-6 mb-12 max-w-7xl mx-auto">
             <TextReveal className="text-5xl md:text-6xl font-bold tracking-tighter gradient-text">
               LIFESTYLE

@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
+import { LUXURY_EASE } from "@/lib/motion";
 
 export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -27,8 +28,8 @@ export const Navbar = () => {
     <motion.nav
       initial={{ y: -100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed top-0 left-0 right-0 z-50 bg-black/95 dark:bg-black/95 backdrop-blur-xl border-b border-white/10 transition-all duration-300"
+      transition={{ duration: 0.8, ease: LUXURY_EASE }}
+      className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b border-white/10 transition-all duration-300 ${isScrolled ? "bg-black/80 dark:bg-black/80" : "bg-black/95 dark:bg-black/95"}`}
     >
       <div className="max-w-7xl mx-auto px-6 md:px-8 h-16 md:h-20 flex items-center justify-between">
         {/* Logo */}
@@ -51,7 +52,7 @@ export const Navbar = () => {
             <motion.span
               className="text-xl md:text-2xl font-black tracking-tighter text-white dark:text-white"
               whileHover={{ color: "#2DD4BF" }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.3, ease: LUXURY_EASE }}
             >
               IBEX
             </motion.span>
@@ -67,7 +68,7 @@ export const Navbar = () => {
                 key={link.path}
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 + 0.3 }}
+                transition={{ delay: index * 0.1 + 0.3, ease: LUXURY_EASE }}
               >
                 <Link href={link.path} className="relative group">
                   <motion.span
@@ -102,19 +103,19 @@ export const Navbar = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+            transition={{ delay: 0.4, ease: LUXURY_EASE }}
           >
             <Link href="/admin">
               <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="relative px-4 py-2 rounded-lg text-zinc-300 dark:text-zinc-400 hover:text-[#2DD4BF] hover:bg-white/5 dark:hover:bg-white/5 transition-all duration-200 group cursor-pointer flex items-center gap-2"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
+                className="relative px-4 py-2 rounded-lg text-zinc-300 dark:text-zinc-400 hover:text-[#2DD4BF] hover:bg-white/5 dark:hover:bg-white/5 transition-all duration-300 group cursor-pointer flex items-center gap-2"
               >
                 <Lock className="w-4 h-4" />
                 <span className="text-sm font-medium">Admin</span>
                 <motion.div
                   className="absolute inset-0 bg-[#2DD4BF]/10 rounded-lg opacity-0 group-hover:opacity-100"
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.3, ease: LUXURY_EASE }}
                 />
               </motion.button>
             </Link>
@@ -124,20 +125,20 @@ export const Navbar = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            transition={{ delay: 0.5, ease: LUXURY_EASE }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.98 }}
           >
             <Link href="/booking">
               <Button
                 size="sm"
-                className="relative overflow-hidden bg-[#2DD4BF] text-[#0F172A] font-bold px-6 py-2.5 rounded-lg border-0 shadow-lg shadow-[#2DD4BF]/30 hover:shadow-[#2DD4BF]/50 transition-all duration-200 group cursor-pointer"
+                className="relative overflow-hidden bg-[#2DD4BF] text-[#0F172A] font-bold px-6 py-2.5 rounded-lg border-0 shadow-lg shadow-[#2DD4BF]/25 hover:shadow-[#2DD4BF]/40 transition-all duration-300 group cursor-pointer"
               >
                 <span className="relative z-10 flex items-center gap-2">
                   Book Now
                   <motion.span
                     animate={{ x: [0, 4, 0] }}
-                    transition={{ repeat: Infinity, duration: 1.5 }}
+                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
                   >
                     →
                   </motion.span>
@@ -145,13 +146,13 @@ export const Navbar = () => {
                 {/* Hover gradient overlay */}
                 <motion.div
                   className="absolute inset-0 bg-gradient-to-r from-[#14B8A6] to-[#2DD4BF] opacity-0 group-hover:opacity-100"
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.3, ease: LUXURY_EASE }}
                 />
-                {/* Shine effect */}
+                {/* Shine effect - slower for premium feel */}
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                   animate={{ x: ["-200%", "200%"] }}
-                  transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
+                  transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
                 />
               </Button>
             </Link>
