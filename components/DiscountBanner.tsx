@@ -68,11 +68,12 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.8 }}
           className={`bg-gradient-to-r from-[#2DD4BF]/20 via-[#2DD4BF]/10 to-[#2DD4BF]/20 border-y border-[#2DD4BF]/30 backdrop-blur-sm ${className}`}
         >
-          <div className="max-w-7xl mx-auto px-4 py-3 relative">
-            <div className="flex items-center justify-center gap-3">
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 relative">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 pr-8 sm:pr-0">
               <motion.div
                 animate={{ rotate: [0, 15, -15, 0] }}
                 transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                className="hidden sm:block"
               >
                 <Tag className="w-4 h-4 text-[#2DD4BF] shrink-0" />
               </motion.div>
@@ -86,34 +87,58 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
                   transition={{ duration: 0.4, ease: "easeInOut" }}
                   className="text-center"
                 >
-                  <span className="text-[#2DD4BF] font-semibold">
-                    {currentDiscount.name}
-                  </span>
-                  <span className="text-white mx-2">•</span>
-                  <motion.span 
-                    className="text-white font-bold"
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
-                  >
-                    {formatDiscountValue(currentDiscount.type, currentDiscount.value)} OFF
-                  </motion.span>
-                  <span className="text-zinc-400 mx-2">on</span>
-                  <span className="text-zinc-300">
-                    {formatCourtTypes(currentDiscount.courtTypes)}
-                  </span>
-                  {!currentDiscount.allDay && (
-                    <>
-                      <span className="text-zinc-400 mx-2">•</span>
-                      <span className="text-zinc-400 text-sm">
-                        {currentDiscount.startHour}:00 - {currentDiscount.endHour}:00
-                      </span>
-                    </>
-                  )}
+                  {/* Mobile: Compact single line */}
+                  <div className="sm:hidden flex items-center justify-center gap-1.5 flex-wrap">
+                    <motion.span 
+                      className="text-white font-bold text-xs"
+                      animate={{ scale: [1, 1.05, 1] }}
+                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                    >
+                      {formatDiscountValue(currentDiscount.type, currentDiscount.value)} OFF
+                    </motion.span>
+                    <span className="text-zinc-400 text-xs">on</span>
+                    <span className="text-zinc-300 text-xs">
+                      {formatCourtTypes(currentDiscount.courtTypes)}
+                    </span>
+                  </div>
+                  
+                  {/* Desktop: Full details */}
+                  <div className="hidden sm:flex items-center justify-center gap-2">
+                    <motion.div
+                      animate={{ rotate: [0, 15, -15, 0] }}
+                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                    >
+                      <Tag className="w-4 h-4 text-[#2DD4BF] shrink-0" />
+                    </motion.div>
+                    <span className="text-[#2DD4BF] font-semibold text-sm">
+                      {currentDiscount.name}
+                    </span>
+                    <span className="text-white mx-1">•</span>
+                    <motion.span 
+                      className="text-white font-bold text-sm"
+                      animate={{ scale: [1, 1.05, 1] }}
+                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                    >
+                      {formatDiscountValue(currentDiscount.type, currentDiscount.value)} OFF
+                    </motion.span>
+                    <span className="text-zinc-400 mx-1 text-sm">on</span>
+                    <span className="text-zinc-300 text-sm">
+                      {formatCourtTypes(currentDiscount.courtTypes)}
+                    </span>
+                    {!currentDiscount.allDay && (
+                      <>
+                        <span className="text-zinc-400 mx-1 text-sm">•</span>
+                        <span className="text-zinc-400 text-xs">
+                          {currentDiscount.startHour}:00 - {currentDiscount.endHour}:00
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </motion.div>
               </AnimatePresence>
               
               {discounts.length > 1 && (
-                <div className="flex items-center gap-1 ml-2">
+                <div className="flex items-center gap-1 sm:ml-2">
                   {discounts.map((_, idx) => (
                     <motion.div
                       key={idx}
@@ -130,12 +155,12 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
             
             <motion.button
               onClick={() => setIsVisible(false)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors p-1"
               aria-label="Dismiss banner"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4 sm:w-4 sm:h-4" />
             </motion.button>
           </div>
         </motion.div>

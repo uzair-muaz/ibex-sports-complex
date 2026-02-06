@@ -39,6 +39,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { QRCode } from "@/components/ui/qr-code";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,6 +71,7 @@ export default function BookingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [updatingStatusBookingId, setUpdatingStatusBookingId] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<keyof Booking | "courtName" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -147,6 +155,27 @@ export default function BookingsPage() {
       alert(error.message || "An error occurred");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleStatusChange = async (bookingId: string, newStatus: Booking["status"]) => {
+    setUpdatingStatusBookingId(bookingId);
+    try {
+      const result = await updateBooking({ bookingId, status: newStatus });
+      if (result.success) {
+        setBookings((prev) =>
+          prev.map((b) => (b._id === bookingId ? { ...b, status: newStatus } : b))
+        );
+        if (viewingBooking?._id === bookingId) {
+          setViewingBooking((prev) => (prev ? { ...prev, status: newStatus } : null));
+        }
+      } else {
+        alert(result.error || "Failed to update status");
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to update status");
+    } finally {
+      setUpdatingStatusBookingId(null);
     }
   };
 
@@ -420,24 +449,36 @@ export default function BookingsPage() {
                             </span>
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={
-                                booking.status === "confirmed"
-                                  ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF] text-xs"
-                                  : booking.status === "pending_payment"
-                                    ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-400 text-xs"
-                                    : booking.status === "cancelled"
-                                      ? "bg-red-500/20 border-red-500/50 text-red-400 text-xs"
-                                      : booking.status === "completed"
-                                        ? "bg-green-500/20 border-green-500/50 text-green-400 text-xs"
-                                        : "bg-zinc-800 border-zinc-700 text-zinc-300 text-xs"
-                              }
+                            <Select
+                              value={booking.status}
+                              onValueChange={(value) => handleStatusChange(booking._id, value as Booking["status"])}
+                              disabled={updatingStatusBookingId === booking._id}
                             >
-                              {booking.status === "pending_payment" 
-                                ? "Pending Payment"
-                                : booking.status.charAt(0).toUpperCase() + booking.status.slice(1).replace(/_/g, " ")}
-                            </Badge>
+                              <SelectTrigger
+                                className={`w-[165px] min-w-[165px] h-8 text-xs border ${
+                                  booking.status === "confirmed"
+                                    ? "border-[#2DD4BF]/50 text-[#2DD4BF] bg-[#2DD4BF]/10"
+                                    : booking.status === "pending_payment"
+                                      ? "border-yellow-500/50 text-yellow-400 bg-yellow-500/10"
+                                      : booking.status === "cancelled"
+                                        ? "border-red-500/50 text-red-400 bg-red-500/10"
+                                        : booking.status === "completed"
+                                          ? "border-green-500/50 text-green-400 bg-green-500/10"
+                                          : "border-zinc-600 text-zinc-300 bg-zinc-800/50"
+                                }`}
+                              >
+                                <SelectValue />
+                                {updatingStatusBookingId === booking._id && (
+                                  <Loader2 className="w-3 h-3 animate-spin ml-1 shrink-0" />
+                                )}
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending_payment">Pending Payment</SelectItem>
+                                <SelectItem value="confirmed">Confirmed</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -470,15 +511,17 @@ export default function BookingsPage() {
                                   <X className="w-4 h-4" />
                                 </Button>
                               )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteBooking(booking)}
-                                className="text-zinc-400 hover:text-red-400 h-8 w-8"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              {isSuperAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteBooking(booking)}
+                                  className="text-zinc-400 hover:text-red-400 h-8 w-8"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>

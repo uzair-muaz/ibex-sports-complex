@@ -447,110 +447,180 @@ export default function EditBookingPage() {
                 No courts available for this court type.
               </p>
             ) : (
-              <div className="border border-zinc-800 rounded-lg overflow-hidden bg-zinc-900/50">
-                <div className="overflow-x-auto">
-                  <div className="min-w-[600px] grid grid-cols-[130px_1fr]">
-                    {/* Time Slots Column */}
-                    <div className="border-r border-zinc-800 bg-zinc-950">
-                      <div className="h-12 flex items-center justify-center border-b border-zinc-800 text-zinc-400 text-xs font-mono uppercase">
-                        Time
-                      </div>
-                      {timeSlots.map((slotTime) => {
-                        const startHour = Math.floor(slotTime);
-                        const startMin = slotTime % 1 === 0 ? "00" : "30";
-                        const endTime = slotTime + 0.5;
-                        const endHour = Math.floor(endTime);
-                        const endMin = endTime % 1 === 0 ? "00" : "30";
-                        return (
-                          <div
-                            key={slotTime}
-                            className="h-6 flex items-center justify-center text-xs text-zinc-500 font-mono border-b border-zinc-800"
-                          >
-                            {startHour}:{startMin}-{endHour}:{endMin}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Courts Columns */}
-                    <div className="flex">
-                      {courts.map((court) => (
-                        <div
-                          key={court._id}
-                          className="flex-1 min-w-[150px] border-r border-zinc-800 last:border-0"
-                        >
-                          <div className="h-12 p-2 border-b border-zinc-800 flex flex-col justify-center bg-zinc-950">
-                            <h3 className="font-medium text-white text-xs truncate">
-                              {court.name}
-                            </h3>
-                            <p className="text-xs text-[#2DD4BF]">
-                              PKR {court.pricePerHour}/hr
-                            </p>
-                          </div>
-
-                          <div>
-                            {timeSlots.map((slotTime) => {
-                              const isBooked = isSlotBooked(
-                                court._id,
-                                slotTime,
-                              );
-                              const isSelected = isSlotSelected(
-                                court._id,
-                                slotTime,
-                              );
-                              const isConsecutive = isSlotConsecutive(
-                                court._id,
-                                slotTime,
-                              );
-                              const canSelect =
-                                selectedSlots.length === 0 || isConsecutive;
-
-                              return (
-                                <div
-                                  key={slotTime}
-                                  className="h-6 p-0.5 border-b border-zinc-800"
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      toggleSlot(court._id, slotTime)
-                                    }
-                                    disabled={
-                                      isBooked || (!canSelect && !isSelected)
-                                    }
-                                    className={`
-                                      w-full h-full rounded transition-all duration-200 relative flex items-center justify-center
-                                      ${
-                                        isBooked
-                                          ? "bg-red-500/20 border border-red-500/50 cursor-not-allowed opacity-50"
-                                          : isSelected
-                                            ? "bg-[#2DD4BF] border border-[#2DD4BF]"
-                                            : !canSelect
-                                              ? "bg-zinc-800/50 border border-zinc-700 cursor-not-allowed opacity-50"
-                                              : "bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 hover:border-green-500/50 cursor-pointer"
-                                      }
-                                    `}
-                                  >
-                                    <span className="text-[9px] md:text-[10px] font-mono text-white/90 leading-tight text-center">
-                                      {formatTime12(slotTime)} -{" "}
-                                      {formatTime12(slotTime + 0.5)}
-                                    </span>
-                                    {isSelected && (
-                                      <div className="absolute inset-0 flex items-center justify-center">
-                                        <CheckCircle className="w-3 h-3 text-[#0F172A]" />
-                                      </div>
-                                    )}
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
+              <>
+                {/* Desktop: horizontal grid with time column + court columns */}
+                <div className="hidden lg:block border border-zinc-800 rounded-lg overflow-hidden bg-zinc-900/50">
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[600px] grid grid-cols-[130px_1fr]">
+                      <div className="border-r border-zinc-800 bg-zinc-950">
+                        <div className="h-12 flex items-center justify-center border-b border-zinc-800 text-zinc-400 text-xs font-mono uppercase">
+                          Time
                         </div>
-                      ))}
+                        {timeSlots.map((slotTime) => {
+                          const startHour = Math.floor(slotTime);
+                          const startMin = slotTime % 1 === 0 ? "00" : "30";
+                          const endTime = slotTime + 0.5;
+                          const endHour = Math.floor(endTime);
+                          const endMin = endTime % 1 === 0 ? "00" : "30";
+                          return (
+                            <div
+                              key={slotTime}
+                              className="h-6 flex items-center justify-center text-xs text-zinc-500 font-mono border-b border-zinc-800"
+                            >
+                              {startHour}:{startMin}-{endHour}:{endMin}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex">
+                        {courts.map((court) => (
+                          <div
+                            key={court._id}
+                            className="flex-1 min-w-[150px] border-r border-zinc-800 last:border-0"
+                          >
+                            <div className="h-12 p-2 border-b border-zinc-800 flex flex-col justify-center bg-zinc-950">
+                              <h3 className="font-medium text-white text-xs truncate">
+                                {court.name}
+                              </h3>
+                              <p className="text-xs text-[#2DD4BF]">
+                                PKR {court.pricePerHour}/hr
+                              </p>
+                            </div>
+                            <div>
+                              {timeSlots.map((slotTime) => {
+                                const isBooked = isSlotBooked(
+                                  court._id,
+                                  slotTime,
+                                );
+                                const isSelected = isSlotSelected(
+                                  court._id,
+                                  slotTime,
+                                );
+                                const isConsecutive = isSlotConsecutive(
+                                  court._id,
+                                  slotTime,
+                                );
+                                const canSelect =
+                                  selectedSlots.length === 0 || isConsecutive;
+                                return (
+                                  <div
+                                    key={slotTime}
+                                    className="h-6 p-0.5 border-b border-zinc-800"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        toggleSlot(court._id, slotTime)
+                                      }
+                                      disabled={
+                                        isBooked ||
+                                        (!canSelect && !isSelected)
+                                      }
+                                      className={`
+                                        w-full h-full rounded transition-all duration-200 relative flex items-center justify-center
+                                        ${
+                                          isBooked
+                                            ? "bg-red-500/20 border border-red-500/50 cursor-not-allowed opacity-50"
+                                            : isSelected
+                                              ? "bg-[#2DD4BF] border border-[#2DD4BF]"
+                                              : !canSelect
+                                                ? "bg-zinc-800/50 border border-zinc-700 cursor-not-allowed opacity-50"
+                                                : "bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 hover:border-green-500/50 cursor-pointer"
+                                        }
+                                      `}
+                                    >
+                                      <span className="text-[9px] md:text-[10px] font-mono text-white/90 leading-tight text-center">
+                                        {formatTime12(slotTime)} -{" "}
+                                        {formatTime12(slotTime + 0.5)}
+                                      </span>
+                                      {isSelected && (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                          <CheckCircle className="w-3 h-3 text-[#0F172A]" />
+                                        </div>
+                                      )}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+
+                {/* Mobile: one card per court with slot grid */}
+                <div className="lg:hidden space-y-4">
+                  {courts.map((court) => (
+                    <div
+                      key={court._id}
+                      className="border border-zinc-800 rounded-lg overflow-hidden bg-zinc-900/50 p-4"
+                    >
+                      <div className="mb-3 pb-3 border-b border-zinc-800">
+                        <h3 className="font-medium text-white text-sm">
+                          {court.name}
+                        </h3>
+                        <p className="text-xs text-[#2DD4BF] mt-0.5">
+                          PKR {court.pricePerHour}/hr
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        {timeSlots.map((slotTime) => {
+                          const isBooked = isSlotBooked(
+                            court._id,
+                            slotTime,
+                          );
+                          const isSelected = isSlotSelected(
+                            court._id,
+                            slotTime,
+                          );
+                          const isConsecutive = isSlotConsecutive(
+                            court._id,
+                            slotTime,
+                          );
+                          const canSelect =
+                            selectedSlots.length === 0 || isConsecutive;
+                          return (
+                            <button
+                              key={slotTime}
+                              type="button"
+                              onClick={() =>
+                                toggleSlot(court._id, slotTime)
+                              }
+                              disabled={
+                                isBooked || (!canSelect && !isSelected)
+                              }
+                              className={`
+                                aspect-square rounded-lg transition-all duration-200 relative flex flex-col items-center justify-center p-1 text-[9px] font-mono text-white/90
+                                ${
+                                  isBooked
+                                    ? "bg-red-500/20 border border-red-500/50 cursor-not-allowed opacity-50"
+                                    : isSelected
+                                      ? "bg-[#2DD4BF] border border-[#2DD4BF] text-[#0F172A]"
+                                      : !canSelect
+                                        ? "bg-zinc-800/50 border border-zinc-700 cursor-not-allowed opacity-50"
+                                        : "bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 cursor-pointer"
+                                }
+                              `}
+                            >
+                              <span className="leading-tight text-center">
+                                {formatTime12(slotTime)} -{" "}
+                                {formatTime12(slotTime + 0.5)}
+                              </span>
+                              {isSelected && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <CheckCircle className="w-4 h-4 text-[#0F172A]" />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
 
             {selectedSlots.length > 0 && (

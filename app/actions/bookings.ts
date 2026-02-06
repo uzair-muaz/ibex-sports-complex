@@ -5,6 +5,7 @@ import connectDB from '@/lib/mongodb';
 import Booking from '@/models/Booking';
 import Court from '@/models/Court';
 import Discount from '@/models/Discount';
+import { auth } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
@@ -231,7 +232,7 @@ export async function getAllBookings() {
 
     const bookings = await Booking.find()
       .populate('courtId')
-      .sort({ createdAt: -1 });
+      .sort({ date: -1, startTime: -1 });
 
     return {
       success: true,
@@ -302,7 +303,8 @@ export async function updateBooking(input: UpdateBookingInput) {
     }
 
     // If amountPaid is provided and > 0, automatically change status to confirmed
-    if (updateData.amountPaid !== undefined && updateData.amountPaid > 0) {
+    // BUT only if status wasn't explicitly set (to allow manual status changes like 'completed')
+    if (updateData.amountPaid !== undefined && updateData.amountPaid > 0 && input.status === undefined) {
       updateData.status = 'confirmed';
     }
 
@@ -421,6 +423,15 @@ export async function updateBooking(input: UpdateBookingInput) {
 
 export async function deleteBooking(bookingId: string) {
   try {
+    const session = await auth();
+    const role = (session?.user as { role?: string })?.role;
+    if (role !== 'super_admin') {
+      return {
+        success: false,
+        error: 'Only super admin can delete bookings.',
+      };
+    }
+
     await connectDB();
 
     const booking = await Booking.findByIdAndDelete(bookingId);

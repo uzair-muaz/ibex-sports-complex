@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Lock, Loader2, Home } from "lucide-react";
+import { Lock, Loader2, Home, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
@@ -42,6 +42,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -158,12 +159,26 @@ export default function AdminPage() {
                   <FormItem>
                     <FormLabel className="text-zinc-200">Password</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Password"
-                        className="bg-zinc-900 border-zinc-800"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Password"
+                          className="bg-zinc-900 border-zinc-800 pr-10"
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 transition-colors p-1 rounded"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </FormControl>
                     <FormMessage className="text-red-400" />
                   </FormItem>
