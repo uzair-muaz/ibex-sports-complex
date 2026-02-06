@@ -92,7 +92,7 @@ export default function NewBookingPage() {
       if (result.success) {
         const filtered = result.bookings.filter(
           (b: any) =>
-            b.courtId?.type === formData.courtType && b.status !== "cancelled"
+            b.courtId?.type === formData.courtType && b.status !== "cancelled",
         );
         setDateBookings(filtered);
       }
@@ -103,12 +103,26 @@ export default function NewBookingPage() {
     }
   };
 
-  // Generate time slots
+  // Generate time slots for business hours: 12:00 PM - 2:00 AM
   const timeSlots: number[] = [];
-  for (let hour = OPERATING_HOURS.start; hour < OPERATING_HOURS.end; hour++) {
+  for (let hour = 12; hour < 24; hour++) {
     timeSlots.push(hour);
     timeSlots.push(hour + 0.5);
   }
+  for (let hour = 0; hour < 2; hour++) {
+    timeSlots.push(hour);
+    timeSlots.push(hour + 0.5);
+  }
+
+  const formatTime12 = (time: number) => {
+    const totalMinutes = Math.round(time * 60);
+    let h = Math.floor(totalMinutes / 60) % 24;
+    const m = totalMinutes % 60;
+    const suffix = h >= 12 ? "PM" : "AM";
+    const displayHour = h % 12 === 0 ? 12 : h % 12;
+    const minuteStr = m.toString().padStart(2, "0");
+    return `${displayHour}:${minuteStr} ${suffix}`;
+  };
 
   const isSlotBooked = (courtId: string, slotTime: number) => {
     return dateBookings.some((b) => {
@@ -125,7 +139,7 @@ export default function NewBookingPage() {
 
   const isSlotSelected = (courtId: string, slotTime: number) => {
     return selectedSlots.some(
-      (s) => s.courtId === courtId && s.slotTime === slotTime
+      (s) => s.courtId === courtId && s.slotTime === slotTime,
     );
   };
 
@@ -150,7 +164,7 @@ export default function NewBookingPage() {
     if (isSlotBooked(courtId, slotTime)) return;
 
     const existingIndex = selectedSlots.findIndex(
-      (s) => s.courtId === courtId && s.slotTime === slotTime
+      (s) => s.courtId === courtId && s.slotTime === slotTime,
     );
 
     if (existingIndex >= 0) {
@@ -190,7 +204,7 @@ export default function NewBookingPage() {
       alert(
         formData.courtType === "FUTSAL"
           ? "Minimum booking time for Futsal is 90 minutes (3 consecutive slots)"
-          : "Minimum booking time is 1 hour (2 consecutive slots)"
+          : "Minimum booking time is 1 hour (2 consecutive slots)",
       );
       return;
     }
@@ -365,15 +379,15 @@ export default function NewBookingPage() {
                             {timeSlots.map((slotTime) => {
                               const isBooked = isSlotBooked(
                                 court._id,
-                                slotTime
+                                slotTime,
                               );
                               const isSelected = isSlotSelected(
                                 court._id,
-                                slotTime
+                                slotTime,
                               );
                               const isConsecutive = isSlotConsecutive(
                                 court._id,
-                                slotTime
+                                slotTime,
                               );
                               const canSelect =
                                 selectedSlots.length === 0 || isConsecutive;
@@ -392,20 +406,24 @@ export default function NewBookingPage() {
                                       isBooked || (!canSelect && !isSelected)
                                     }
                                     className={`
-                                      w-full h-full rounded transition-all duration-200
+                                      w-full h-full rounded transition-all duration-200 relative flex items-center justify-center
                                       ${
                                         isBooked
                                           ? "bg-red-500/20 border border-red-500/50 cursor-not-allowed opacity-50"
                                           : isSelected
-                                          ? "bg-[#2DD4BF] border border-[#2DD4BF]"
-                                          : !canSelect
-                                          ? "bg-zinc-800/50 border border-zinc-700 cursor-not-allowed opacity-50"
-                                          : "bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 hover:border-green-500/50 cursor-pointer"
+                                            ? "bg-[#2DD4BF] border border-[#2DD4BF]"
+                                            : !canSelect
+                                              ? "bg-zinc-800/50 border border-zinc-700 cursor-not-allowed opacity-50"
+                                              : "bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 hover:border-green-500/50 cursor-pointer"
                                       }
                                     `}
                                   >
+                                    <span className="text-[9px] md:text-[10px] font-mono text-white/90 leading-tight text-center">
+                                      {formatTime12(slotTime)} -{" "}
+                                      {formatTime12(slotTime + 0.5)}
+                                    </span>
                                     {isSelected && (
-                                      <div className="flex items-center justify-center">
+                                      <div className="absolute inset-0 flex items-center justify-center">
                                         <CheckCircle className="w-3 h-3 text-[#0F172A]" />
                                       </div>
                                     )}

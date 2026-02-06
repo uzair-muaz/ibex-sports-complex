@@ -9,6 +9,16 @@ export interface ICourt extends Document {
   description: string;
   pricePerHour: number; // 0 for free courts
   isActive: boolean;
+  /** Enable time-based peak/off-peak pricing */
+  timeBasedPricingEnabled?: boolean;
+  /** Optional list of peak/off-peak pricing periods */
+  pricingPeriods?: {
+    label: "off_peak" | "peak";
+    startHour: number;
+    endHour: number;
+    pricePerHour: number;
+    allDay?: boolean;
+  }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,6 +54,40 @@ const CourtSchema: Schema = new Schema(
       type: Boolean,
       default: true,
     },
+    timeBasedPricingEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    pricingPeriods: [
+      {
+        label: {
+          type: String,
+          enum: ["off_peak", "peak"],
+          required: true,
+        },
+        startHour: {
+          type: Number,
+          min: 0,
+          max: 24,
+          required: false,
+        },
+        endHour: {
+          type: Number,
+          min: 0,
+          max: 24,
+          required: false,
+        },
+        pricePerHour: {
+          type: Number,
+          min: 0,
+          required: true,
+        },
+        allDay: {
+          type: Boolean,
+          default: false,
+        },
+      },
+    ],
   },
   {
     timestamps: true,

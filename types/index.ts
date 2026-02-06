@@ -1,5 +1,27 @@
 export type CourtType = "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
 
+export type PricingLabel = "off_peak" | "peak";
+
+export interface CourtPricingPeriod {
+  _id?: string;
+  label: PricingLabel;
+  /**
+   * Decimal hour in 0.5 increments (e.g. 12, 12.5, 13)
+   * Represents the start of the period in 24h format.
+   */
+  startHour: number;
+  /**
+   * Decimal hour in 0.5 increments (e.g. 16, 16.5, 2)
+   * Represents the end of the period in 24h format.
+   * If endHour <= startHour we treat it as wrapping past midnight.
+   */
+  endHour: number;
+  /** Price per hour during this period */
+  pricePerHour: number;
+  /** If true, applies all day regardless of hours */
+  allDay?: boolean;
+}
+
 export interface Court {
   _id: string;
   name: string;
@@ -8,6 +30,10 @@ export interface Court {
   description: string;
   pricePerHour: number;
   isActive: boolean;
+  /** Enable time-based peak/off-peak pricing */
+  timeBasedPricingEnabled?: boolean;
+  /** Optional list of peak/off-peak pricing periods */
+  pricingPeriods?: CourtPricingPeriod[];
 }
 
 export interface AppliedDiscount {

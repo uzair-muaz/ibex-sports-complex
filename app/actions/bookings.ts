@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
 import { getApplicableDiscounts, calculateDiscountedPrice, DiscountInput } from '@/lib/discount-utils';
+import { calculateOriginalPrice } from '@/lib/pricing-utils';
 
 export interface CreateBookingInput {
   courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
@@ -89,8 +90,12 @@ export async function createBooking(input: CreateBookingInput) {
       throw new Error('No available courts for the selected time slot');
     }
 
-    // Calculate original price (before discounts)
-    const originalPrice = assignedCourt.pricePerHour * input.duration;
+    // Calculate original price (before discounts) with peak/off-peak support
+    const { originalPrice } = calculateOriginalPrice(
+      assignedCourt,
+      input.startTime,
+      input.duration
+    );
 
     // Fetch active discounts
     const now = new Date();
@@ -340,8 +345,12 @@ export async function updateBooking(input: UpdateBookingInput) {
         }
       }
 
-      // Recalculate price with discounts
-      const originalPrice = court.pricePerHour * finalDuration;
+      // Recalculate price with discounts using peak/off-peak logic
+      const { originalPrice } = calculateOriginalPrice(
+        court,
+        finalStartTime,
+        finalDuration
+      );
 
       // Fetch active discounts
       const now = new Date();

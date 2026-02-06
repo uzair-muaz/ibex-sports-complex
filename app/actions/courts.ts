@@ -3,6 +3,53 @@
 import connectDB from '@/lib/mongodb';
 import Court from '@/models/Court';
 import { revalidatePath } from 'next/cache';
+import type { CourtPricingPeriod } from '@/types';
+
+const BUSINESS_START_HOUR = 12; // 12 PM
+const BUSINESS_END_HOUR = 26; // 2 AM next day (24 + 2)
+
+function normalizeHour(hour: number): number {
+  // Map 0-2 (AM) to 24-26 for continuous timeline
+  if (hour < BUSINESS_START_HOUR) {
+    return hour + 24;
+  }
+  return hour;
+}
+
+function validateTimeBasedPricing(periods: CourtPricingPeriod[]): string | null {
+  if (!periods.length) {
+    return 'Please add at least one peak/off-peak period when dynamic pricing is enabled.';
+  }
+
+  const covered = new Set<number>();
+
+  for (const period of periods) {
+    const ns = normalizeHour(period.startHour);
+    const ne = normalizeHour(period.endHour);
+
+    if (ns < BUSINESS_START_HOUR || ne > BUSINESS_END_HOUR) {
+      return 'Peak/off-peak hours must be within 12:00 PM to 2:00 AM.';
+    }
+
+    if (ne <= ns) {
+      return 'Each peak/off-peak period must have an end time after its start time.';
+    }
+
+    for (let t = ns; t < ne; t += 0.5) {
+      covered.add(Number(t.toFixed(2)));
+    }
+  }
+
+  // Ensure full coverage from 12 PM (12) to 2 AM next day (26) in 30-minute steps
+  for (let t = BUSINESS_START_HOUR; t < BUSINESS_END_HOUR; t += 0.5) {
+    const key = Number(t.toFixed(2));
+    if (!covered.has(key)) {
+      return 'Peak/off-peak periods must fully cover 12:00 PM to 2:00 AM without gaps.';
+    }
+  }
+
+  return null;
+}
 
 export async function getCourts(type?: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL') {
   try {
@@ -55,11 +102,23 @@ export interface CreateCourtInput {
   image?: string; // Images are hardcoded, optional
   description: string;
   pricePerHour: number;
+  timeBasedPricingEnabled?: boolean;
+  pricingPeriods?: CourtPricingPeriod[];
 }
 
 export async function createCourt(input: CreateCourtInput) {
   try {
     await connectDB();
+
+    if (input.timeBasedPricingEnabled) {
+      const error = validateTimeBasedPricing(input.pricingPeriods || []);
+      if (error) {
+        return {
+          success: false,
+          error,
+        };
+      }
+    }
 
     const court = await Court.create({
       name: input.name,
@@ -68,6 +127,8 @@ export async function createCourt(input: CreateCourtInput) {
       description: input.description,
       pricePerHour: input.pricePerHour,
       isActive: true,
+      timeBasedPricingEnabled: input.timeBasedPricingEnabled ?? false,
+      pricingPeriods: input.pricingPeriods ?? [],
     });
 
     revalidatePath('/admin');
@@ -94,6 +155,8 @@ export interface UpdateCourtInput {
   description?: string;
   pricePerHour?: number;
   isActive?: boolean;
+  timeBasedPricingEnabled?: boolean;
+  pricingPeriods?: CourtPricingPeriod[];
 }
 
 export async function updateCourt(input: UpdateCourtInput) {
@@ -101,6 +164,16 @@ export async function updateCourt(input: UpdateCourtInput) {
     await connectDB();
 
     const { courtId, ...updateData } = input;
+
+    if (updateData.timeBasedPricingEnabled) {
+      const error = validateTimeBasedPricing(updateData.pricingPeriods || []);
+      if (error) {
+        return {
+          success: false,
+          error,
+        };
+      }
+    }
 
     const court = await Court.findByIdAndUpdate(
       courtId,

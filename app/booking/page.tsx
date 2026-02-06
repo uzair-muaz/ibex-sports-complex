@@ -7,14 +7,26 @@ import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { QRCode } from "@/components/ui/qr-code";
 import { Skeleton } from "@/components/ui/skeleton";
-import { OPERATING_HOURS, CourtType, COMPLEX_OPENING_DATE, AppliedDiscount, Discount } from "@/types";
+import {
+  OPERATING_HOURS,
+  CourtType,
+  COMPLEX_OPENING_DATE,
+  AppliedDiscount,
+  Discount,
+  CourtPricingPeriod,
+} from "@/types";
 import { getCourts } from "../actions/courts";
 import { getBookingsByDate, createBooking } from "../actions/bookings";
 import { getActiveDiscounts } from "../actions/discounts";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { formatLocalDate } from "@/lib/utils";
-import { getApplicableDiscounts, calculateDiscountedPrice, DiscountInput } from "@/lib/discount-utils";
+import {
+  getApplicableDiscounts,
+  calculateDiscountedPrice,
+  DiscountInput,
+} from "@/lib/discount-utils";
+import { calculateOriginalPrice } from "@/lib/pricing-utils";
 import { PriceBreakdown } from "@/components/PriceBreakdown";
 import { DiscountBanner } from "@/components/DiscountBanner";
 
@@ -26,10 +38,10 @@ export default function BookingPage() {
   };
   const [selectedDate, setSelectedDate] = useState<Date>(getInitialDate());
   const [selectedCourtType, setSelectedCourtType] = useState<CourtType | null>(
-    null
+    null,
   );
   const [availableCourtTypes, setAvailableCourtTypes] = useState<CourtType[]>(
-    []
+    [],
   );
   const [courts, setCourts] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
@@ -70,6 +82,16 @@ export default function BookingPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const formatTime12 = (time: number) => {
+    const totalMinutes = Math.round(time * 60);
+    let h = Math.floor(totalMinutes / 60) % 24;
+    const m = totalMinutes % 60;
+    const suffix = h >= 12 ? "PM" : "AM";
+    const displayHour = h % 12 === 0 ? 12 : h % 12;
+    const minuteStr = m.toString().padStart(2, "0");
+    return `${displayHour}:${minuteStr} ${suffix}`;
+  };
+
   // Load available court types and active discounts on mount
   useEffect(() => {
     const loadAvailableTypes = async () => {
@@ -101,7 +123,7 @@ export default function BookingPage() {
           setActiveDiscounts(result.discounts);
         }
       } catch (error) {
-        console.error('Failed to load discounts:', error);
+        console.error("Failed to load discounts:", error);
       }
     };
 
@@ -147,7 +169,7 @@ export default function BookingPage() {
         // Filter bookings for selected court type
         const filtered = result.bookings.filter(
           (b: any) =>
-            b.courtId?.type === selectedCourtType && b.status !== "cancelled"
+            b.courtId?.type === selectedCourtType && b.status !== "cancelled",
         );
         setBookings(filtered);
       }
@@ -172,29 +194,37 @@ export default function BookingPage() {
     });
   };
 
-  // Check if a time slot has already passed (for today's date)
+  // Check if a time slot has already passed, handling 12 PM – 2 AM business day
   const isSlotPassed = (slotTime: number) => {
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const selectedDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
-    
-    // Only check for today's date
-    if (selectedDay.getTime() !== today.getTime()) {
-      return false;
+
+    // Base date at midnight for the selected calendar day
+    const selectedDay = new Date(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      selectedDate.getDate(),
+    );
+
+    // Build an exact Date for this slot. For hours between 12 PM–11:30 PM
+    // we use the selected day. For 12 AM–2 AM we treat them as happening
+    // in the early morning following the selected day.
+    const slotDateTime = new Date(selectedDay);
+    const slotHour = Math.floor(slotTime);
+    const slotMinutes = slotTime % 1 === 0 ? 0 : 30;
+
+    if (slotTime < 2) {
+      // 12:00–1:30 AM are considered the next calendar day
+      slotDateTime.setDate(slotDateTime.getDate() + 1);
     }
-    
-    // Get current hour and minutes
-    const currentHour = now.getHours();
-    const currentMinutes = now.getMinutes();
-    const currentTime = currentHour + (currentMinutes / 60);
-    
-    // Slot has passed if its start time is less than or equal to current time
-    return slotTime <= currentTime;
+
+    slotDateTime.setHours(slotHour, slotMinutes, 0, 0);
+
+    return slotDateTime.getTime() <= now.getTime();
   };
 
   const isSlotSelected = (courtId: string, slotTime: number) => {
     return selectedSlots.some(
-      (s) => s.courtId === courtId && s.slotTime === slotTime
+      (s) => s.courtId === courtId && s.slotTime === slotTime,
     );
   };
 
@@ -221,7 +251,7 @@ export default function BookingPage() {
       setTimeout(() => setSelectionError(""), 3000);
       return;
     }
-    
+
     if (isSlotBooked(courtId, slotTime)) {
       setSelectionError("This slot is already booked.");
       setTimeout(() => setSelectionError(""), 3000);
@@ -229,7 +259,7 @@ export default function BookingPage() {
     }
 
     const existingIndex = selectedSlots.findIndex(
-      (s) => s.courtId === courtId && s.slotTime === slotTime
+      (s) => s.courtId === courtId && s.slotTime === slotTime,
     );
 
     // Minimum slots required: 3 for Futsal (90 mins), 2 for others (60 mins)
@@ -306,7 +336,9 @@ export default function BookingPage() {
 
       // Consecutive slot - add it
       setSelectedSlots((prev) =>
-        [...prev, { courtId, slotTime }].sort((a, b) => a.slotTime - b.slotTime)
+        [...prev, { courtId, slotTime }].sort(
+          (a, b) => a.slotTime - b.slotTime,
+        ),
       );
       setSelectionError("");
     }
@@ -340,7 +372,7 @@ export default function BookingPage() {
       setErrorMessage(
         selectedCourtType === "FUTSAL"
           ? "Minimum booking time for Futsal is 90 minutes (3 consecutive slots)."
-          : "Minimum booking time is 1 hour (2 consecutive slots)."
+          : "Minimum booking time is 1 hour (2 consecutive slots).",
       );
       return;
     }
@@ -383,28 +415,44 @@ export default function BookingPage() {
     }
   };
 
-  // Generate 30-minute slots (e.g., 4.0, 4.5, 5.0, 5.5, ...)
+  // Generate 30-minute slots for business hours: 12:00 PM - 2:00 AM
   const timeSlots: number[] = [];
-  for (let hour = OPERATING_HOURS.start; hour < OPERATING_HOURS.end; hour++) {
+  // 12:00 PM (12) to 11:30 PM (23.5)
+  for (let hour = 12; hour < 24; hour++) {
+    timeSlots.push(hour);
+    timeSlots.push(hour + 0.5);
+  }
+  // 12:00 AM (0) to 1:30 AM (1.5)
+  for (let hour = 0; hour < 2; hour++) {
     timeSlots.push(hour);
     timeSlots.push(hour + 0.5);
   }
 
   const selectedDuration = selectedSlots.length * 0.5; // Duration in hours
   const selectedCourt = courts.find((c) => c._id === selectedSlots[0]?.courtId);
-  const originalPrice = selectedCourt
-    ? selectedCourt.pricePerHour * selectedDuration
-    : 0;
 
-  // Calculate discounts for the current selection
-  const discountCalcResult = React.useMemo(() => {
+  const pricingResult = React.useMemo(() => {
     if (!selectedCourtType || selectedSlots.length === 0 || !selectedCourt) {
-      return { finalPrice: originalPrice, discountAmount: 0, appliedDiscounts: [] };
+      return {
+        originalPrice: 0,
+        finalPrice: 0,
+        discountAmount: 0,
+        appliedDiscounts: [] as AppliedDiscount[],
+      };
     }
 
-    const sortedTimes = selectedSlots.map((s) => s.slotTime).sort((a, b) => a - b);
+    const sortedTimes = selectedSlots
+      .map((s) => s.slotTime)
+      .sort((a, b) => a - b);
     const startTime = sortedTimes[0];
+    const duration = selectedSlots.length * 0.5;
     const dateString = formatLocalDate(selectedDate);
+
+    const { originalPrice } = calculateOriginalPrice(
+      selectedCourt,
+      startTime,
+      duration,
+    );
 
     const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
       _id: d._id,
@@ -420,11 +468,45 @@ export default function BookingPage() {
       isActive: d.isActive,
     }));
 
-    const applicable = getApplicableDiscounts(discountsData, selectedCourtType, startTime, dateString);
-    return calculateDiscountedPrice(originalPrice, applicable);
-  }, [selectedCourtType, selectedSlots, selectedCourt, originalPrice, activeDiscounts, selectedDate]);
+    const applicable = getApplicableDiscounts(
+      discountsData,
+      selectedCourtType,
+      startTime,
+      dateString,
+    );
+    const { finalPrice, discountAmount, appliedDiscounts } =
+      calculateDiscountedPrice(originalPrice, applicable);
 
-  const { finalPrice: totalPrice, discountAmount, appliedDiscounts } = discountCalcResult;
+    return {
+      originalPrice,
+      finalPrice,
+      discountAmount,
+      appliedDiscounts,
+    };
+  }, [
+    selectedCourtType,
+    selectedSlots,
+    selectedCourt,
+    activeDiscounts,
+    selectedDate,
+  ]);
+
+  const {
+    originalPrice,
+    finalPrice: totalPrice,
+    discountAmount,
+    appliedDiscounts,
+  } = pricingResult;
+
+  const formatPeriodTime = (period: CourtPricingPeriod) => {
+    if (period.allDay) {
+      return "All day";
+    }
+
+    return `${formatTime12(period.startHour)} - ${formatTime12(
+      period.endHour,
+    )}`;
+  };
 
   return (
     <div className="min-h-screen bg-black text-white relative">
@@ -472,10 +554,10 @@ export default function BookingPage() {
                       {type === "PADEL"
                         ? "Padel"
                         : type === "CRICKET"
-                        ? "Cricket"
-                        : type === "PICKLEBALL"
-                        ? "Pickleball"
-                        : "Futsal"}
+                          ? "Cricket"
+                          : type === "PICKLEBALL"
+                            ? "Pickleball"
+                            : "Futsal"}
                     </button>
                   ))}
                 </div>
@@ -606,17 +688,14 @@ export default function BookingPage() {
                             Time
                           </div>
                           {timeSlots.map((slotTime) => {
-                            const startHour = Math.floor(slotTime);
-                            const startMin = slotTime % 1 === 0 ? "00" : "30";
                             const endTime = slotTime + 0.5;
-                            const endHour = Math.floor(endTime);
-                            const endMin = endTime % 1 === 0 ? "00" : "30";
                             return (
                               <div
                                 key={slotTime}
-                                className="h-7 flex items-center justify-center text-xs text-zinc-600 font-mono border-b border-dashed border-white/5"
+                                className="h-7 flex items-center justify-center text-[11px] text-zinc-600 font-mono border-b border-dashed border-white/5"
                               >
-                                {startHour}:{startMin}-{endHour}:{endMin}
+                                {formatTime12(slotTime)} -{" "}
+                                {formatTime12(endTime)}
                               </div>
                             );
                           })}
@@ -640,19 +719,46 @@ export default function BookingPage() {
                                   PKR {court.pricePerHour}/hr{" "}
                                   {court.pricePerHour === 0 && "(Free)"}
                                 </p>
+                                {court.timeBasedPricingEnabled &&
+                                  Array.isArray(court.pricingPeriods) &&
+                                  court.pricingPeriods.length > 0 && (
+                                    <div className="mt-1 space-y-0.5">
+                                      {court.pricingPeriods.map(
+                                        (
+                                          period: CourtPricingPeriod,
+                                          idx: number,
+                                        ) => (
+                                          <p
+                                            key={idx}
+                                            className="text-[10px] text-zinc-400"
+                                          >
+                                            {period.label === "peak"
+                                              ? "Peak"
+                                              : "Off-peak"}
+                                            : PKR{" "}
+                                            {period.pricePerHour.toLocaleString()}
+                                            /hr{" "}
+                                            <span className="text-zinc-500">
+                                              ({formatPeriodTime(period)})
+                                            </span>
+                                          </p>
+                                        ),
+                                      )}
+                                    </div>
+                                  )}
                               </div>
 
                               <div className="">
                                 {timeSlots.map((slotTime) => {
                                   const isBooked = isSlotBooked(
                                     court._id,
-                                    slotTime
+                                    slotTime,
                                   );
                                   const isPassed = isSlotPassed(slotTime);
                                   const isUnavailable = isBooked || isPassed;
                                   const isSelected = isSlotSelected(
                                     court._id,
-                                    slotTime
+                                    slotTime,
                                   );
 
                                   return (
@@ -666,7 +772,7 @@ export default function BookingPage() {
                                           (selectedSlots.length === 0 ||
                                             isSlotConsecutive(
                                               court._id,
-                                              slotTime
+                                              slotTime,
                                             ))
                                             ? { scale: 0.98 }
                                             : {}
@@ -676,7 +782,7 @@ export default function BookingPage() {
                                           (selectedSlots.length === 0 ||
                                             isSlotConsecutive(
                                               court._id,
-                                              slotTime
+                                              slotTime,
                                             ))
                                             ? { scale: 0.95 }
                                             : {}
@@ -689,13 +795,13 @@ export default function BookingPage() {
                                           isPassed
                                             ? "This time has passed"
                                             : selectedSlots.length > 0 &&
-                                              selectedSlots[0].courtId ===
-                                                court._id &&
-                                              !isSlotConsecutive(
-                                                court._id,
-                                                slotTime
-                                              ) &&
-                                              !isSelected
+                                                selectedSlots[0].courtId ===
+                                                  court._id &&
+                                                !isSlotConsecutive(
+                                                  court._id,
+                                                  slotTime,
+                                                ) &&
+                                                !isSelected
                                               ? "Select consecutive slots only"
                                               : ""
                                         }
@@ -705,18 +811,18 @@ export default function BookingPage() {
                                       isBooked
                                         ? "bg-red-500/80 border border-red-400 cursor-not-allowed opacity-75"
                                         : isPassed
-                                        ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
-                                        : isSelected
-                                        ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
-                                        : selectedSlots.length > 0 &&
-                                          selectedSlots[0].courtId ===
-                                            court._id &&
-                                          !isSlotConsecutive(
-                                            court._id,
-                                            slotTime
-                                          )
-                                        ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
-                                        : "bg-green-500/20 border border-green-400/60 hover:bg-green-500/30 hover:border-green-400"
+                                          ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
+                                          : isSelected
+                                            ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
+                                            : selectedSlots.length > 0 &&
+                                                selectedSlots[0].courtId ===
+                                                  court._id &&
+                                                !isSlotConsecutive(
+                                                  court._id,
+                                                  slotTime,
+                                                )
+                                              ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
+                                              : "bg-green-500/20 border border-green-400/60 hover:bg-green-500/30 hover:border-green-400"
                                     }
                                   `}
                                       >
@@ -758,6 +864,30 @@ export default function BookingPage() {
                             PKR {court.pricePerHour}/hr{" "}
                             {court.pricePerHour === 0 && "(Free)"}
                           </p>
+                          {court.timeBasedPricingEnabled &&
+                            Array.isArray(court.pricingPeriods) &&
+                            court.pricingPeriods.length > 0 && (
+                              <div className="mt-1 space-y-0.5">
+                                {court.pricingPeriods.map(
+                                  (period: CourtPricingPeriod, idx: number) => (
+                                    <p
+                                      key={idx}
+                                      className="text-[11px] text-zinc-400"
+                                    >
+                                      {period.label === "peak"
+                                        ? "Peak"
+                                        : "Off-peak"}
+                                      : PKR{" "}
+                                      {period.pricePerHour.toLocaleString()}
+                                      /hr{" "}
+                                      <span className="text-zinc-500">
+                                        ({formatPeriodTime(period)})
+                                      </span>
+                                    </p>
+                                  ),
+                                )}
+                              </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
@@ -767,17 +897,11 @@ export default function BookingPage() {
                             const isUnavailable = isBooked || isPassed;
                             const isSelected = isSlotSelected(
                               court._id,
-                              slotTime
+                              slotTime,
                             );
-                            const startHour = Math.floor(slotTime);
-                            const startMin = slotTime % 1 === 0 ? "00" : "30";
-                            const endTime = slotTime + 0.5;
-                            const endHour = Math.floor(endTime);
-                            const endMin = endTime % 1 === 0 ? "00" : "30";
-
                             const isConsecutive = isSlotConsecutive(
                               court._id,
-                              slotTime
+                              slotTime,
                             );
                             const canSelect =
                               selectedSlots.length === 0 || isConsecutive;
@@ -786,10 +910,14 @@ export default function BookingPage() {
                               <motion.button
                                 key={slotTime}
                                 whileHover={
-                                  !isUnavailable && canSelect ? { scale: 0.95 } : {}
+                                  !isUnavailable && canSelect
+                                    ? { scale: 0.95 }
+                                    : {}
                                 }
                                 whileTap={
-                                  !isUnavailable && canSelect ? { scale: 0.9 } : {}
+                                  !isUnavailable && canSelect
+                                    ? { scale: 0.9 }
+                                    : {}
                                 }
                                 onClick={() => toggleSlot(court._id, slotTime)}
                                 disabled={isUnavailable}
@@ -797,9 +925,10 @@ export default function BookingPage() {
                                   isPassed
                                     ? "This time has passed"
                                     : selectedSlots.length > 0 &&
-                                      selectedSlots[0].courtId === court._id &&
-                                      !isConsecutive &&
-                                      !isSelected
+                                        selectedSlots[0].courtId ===
+                                          court._id &&
+                                        !isConsecutive &&
+                                        !isSelected
                                       ? "Select consecutive slots only"
                                       : ""
                                 }
@@ -809,19 +938,21 @@ export default function BookingPage() {
                                 isBooked
                                   ? "bg-red-500/80 border border-red-400 cursor-not-allowed opacity-75"
                                   : isPassed
-                                  ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
-                                  : isSelected
-                                  ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
-                                  : selectedSlots.length > 0 &&
-                                    selectedSlots[0].courtId === court._id &&
-                                    !isConsecutive
-                                  ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
-                                  : "bg-green-500/20 border border-green-400/60 hover:bg-green-500/30 hover:border-green-400"
+                                    ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
+                                    : isSelected
+                                      ? "bg-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)]"
+                                      : selectedSlots.length > 0 &&
+                                          selectedSlots[0].courtId ===
+                                            court._id &&
+                                          !isConsecutive
+                                        ? "bg-zinc-700/50 border border-zinc-600 cursor-not-allowed opacity-50"
+                                        : "bg-green-500/20 border border-green-400/60 hover:bg-green-500/30 hover:border-green-400"
                               }
                             `}
                               >
-                                <span className="text-[10px] font-mono text-white/90 leading-tight text-center">
-                                  {startHour}:{startMin}
+                                <span className="text-[9px] md:text-[10px] font-mono text-white/90 leading-tight text-center">
+                                  {formatTime12(slotTime)} -{" "}
+                                  {formatTime12(slotTime + 0.5)}
                                 </span>
                                 {isSelected && (
                                   <motion.div
@@ -872,23 +1003,30 @@ export default function BookingPage() {
                         const sortedTimes = selectedSlots
                           .map((s) => s.slotTime)
                           .sort((a, b) => a - b);
-                        const startHour = Math.floor(sortedTimes[0]);
-                        const startMin = sortedTimes[0] % 1 === 0 ? "00" : "30";
+                        const startTime = sortedTimes[0];
                         const endTime =
                           sortedTimes[sortedTimes.length - 1] + 0.5;
-                        const endHour = Math.floor(endTime);
-                        const endMin = endTime % 1 === 0 ? "00" : "30";
-                        return `${startHour}:${startMin} - ${endHour}:${endMin}`;
+                        return `${formatTime12(startTime)} - ${formatTime12(
+                          endTime,
+                        )}`;
                       })()}
                   </p>
                   {discountAmount > 0 ? (
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-zinc-500 line-through text-xs">PKR {originalPrice.toLocaleString()}</span>
-                      <span className="text-[#2DD4BF] font-semibold text-sm">PKR {totalPrice.toLocaleString()}</span>
-                      <span className="text-green-400 text-xs">Save PKR {discountAmount.toLocaleString()}</span>
+                      <span className="text-zinc-500 line-through text-xs">
+                        PKR {originalPrice.toLocaleString()}
+                      </span>
+                      <span className="text-[#2DD4BF] font-semibold text-sm">
+                        PKR {totalPrice.toLocaleString()}
+                      </span>
+                      <span className="text-green-400 text-xs">
+                        Save PKR {discountAmount.toLocaleString()}
+                      </span>
                     </div>
                   ) : (
-                    <p className="text-[#2DD4BF] font-semibold text-sm mt-1">PKR {totalPrice.toLocaleString()}</p>
+                    <p className="text-[#2DD4BF] font-semibold text-sm mt-1">
+                      PKR {totalPrice.toLocaleString()}
+                    </p>
                   )}
                 </div>
               </div>
@@ -985,30 +1123,18 @@ export default function BookingPage() {
                                 year: "numeric",
                                 month: "short",
                                 day: "numeric",
-                              }
+                              },
                             )}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-zinc-400 text-sm">Time:</span>
                           <span className="text-white text-sm">
-                            {Math.floor(createdBooking.startTime)
-                              .toString()
-                              .padStart(2, "0")}
-                            :{createdBooking.startTime % 1 === 0 ? "00" : "30"}{" "}
-                            -{" "}
-                            {Math.floor(
-                              createdBooking.startTime + createdBooking.duration
-                            )
-                              .toString()
-                              .padStart(2, "0")}
-                            :
-                            {(createdBooking.startTime +
-                              createdBooking.duration) %
-                              1 ===
-                            0
-                              ? "00"
-                              : "30"}
+                            {formatTime12(createdBooking.startTime)} -{" "}
+                            {formatTime12(
+                              createdBooking.startTime +
+                                createdBooking.duration,
+                            )}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
@@ -1025,29 +1151,58 @@ export default function BookingPage() {
                           {createdBooking.discountAmount > 0 ? (
                             <div className="space-y-2">
                               <div className="flex justify-between items-center">
-                                <span className="text-zinc-400 text-sm">Subtotal:</span>
-                                <span className="text-zinc-300 text-sm">PKR {createdBooking.originalPrice?.toLocaleString()}</span>
+                                <span className="text-zinc-400 text-sm">
+                                  Subtotal:
+                                </span>
+                                <span className="text-zinc-300 text-sm">
+                                  PKR{" "}
+                                  {createdBooking.originalPrice?.toLocaleString()}
+                                </span>
                               </div>
-                              {createdBooking.discounts?.map((d: AppliedDiscount, idx: number) => (
-                                <div key={idx} className="flex justify-between items-center">
-                                  <span className="text-green-400 text-sm">
-                                    {d.name} ({d.type === 'percentage' ? `${d.value}%` : `PKR ${d.value}`})
-                                  </span>
-                                  <span className="text-green-400 text-sm">-PKR {d.amountSaved?.toLocaleString()}</span>
-                                </div>
-                              ))}
+                              {createdBooking.discounts?.map(
+                                (d: AppliedDiscount, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="flex justify-between items-center"
+                                  >
+                                    <span className="text-green-400 text-sm">
+                                      {d.name} (
+                                      {d.type === "percentage"
+                                        ? `${d.value}%`
+                                        : `PKR ${d.value}`}
+                                      )
+                                    </span>
+                                    <span className="text-green-400 text-sm">
+                                      -PKR {d.amountSaved?.toLocaleString()}
+                                    </span>
+                                  </div>
+                                ),
+                              )}
                               <div className="flex justify-between items-center pt-2 border-t border-zinc-700">
-                                <span className="text-zinc-300 text-sm font-semibold">Total:</span>
-                                <span className="text-[#2DD4BF] font-bold text-lg">PKR {createdBooking.totalPrice.toLocaleString()}</span>
+                                <span className="text-zinc-300 text-sm font-semibold">
+                                  Total:
+                                </span>
+                                <span className="text-[#2DD4BF] font-bold text-lg">
+                                  PKR{" "}
+                                  {createdBooking.totalPrice.toLocaleString()}
+                                </span>
                               </div>
                               <div className="bg-green-500/10 border border-green-500/30 rounded-md px-2 py-1 text-center">
-                                <span className="text-green-400 text-xs">You saved PKR {createdBooking.discountAmount?.toLocaleString()}!</span>
+                                <span className="text-green-400 text-xs">
+                                  You saved PKR{" "}
+                                  {createdBooking.discountAmount?.toLocaleString()}
+                                  !
+                                </span>
                               </div>
                             </div>
                           ) : (
                             <div className="flex justify-between items-center">
-                              <span className="text-zinc-400 text-sm font-semibold">Total Price:</span>
-                              <span className="text-[#2DD4BF] font-bold text-lg">PKR {createdBooking.totalPrice.toLocaleString()}</span>
+                              <span className="text-zinc-400 text-sm font-semibold">
+                                Total Price:
+                              </span>
+                              <span className="text-[#2DD4BF] font-bold text-lg">
+                                PKR {createdBooking.totalPrice.toLocaleString()}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -1138,16 +1293,14 @@ export default function BookingPage() {
                         const sortedTimes = selectedSlots
                           .map((s) => s.slotTime)
                           .sort((a, b) => a - b);
-                        const startHour = Math.floor(sortedTimes[0]);
-                        const startMin = sortedTimes[0] % 1 === 0 ? "00" : "30";
+                        const startTime = sortedTimes[0];
                         const endTime =
                           sortedTimes[sortedTimes.length - 1] + 0.5;
-                        const endHour = Math.floor(endTime);
-                        const endMin = endTime % 1 === 0 ? "00" : "30";
                         return (
                           <>
                             <span>
-                              {startHour}:{startMin} - {endHour}:{endMin}
+                              {formatTime12(startTime)} -{" "}
+                              {formatTime12(endTime)}
                             </span>
                             <span>•</span>
                           </>

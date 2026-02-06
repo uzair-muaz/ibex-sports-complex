@@ -3,12 +3,18 @@
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Plus, Edit2, Trash2, Loader2, Eye, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+  Plus,
+  Edit2,
+  Trash2,
+  Loader2,
+  Eye,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -43,7 +49,7 @@ import {
   updateCourt,
   deleteCourt,
 } from "../../actions/courts";
-import type { Court } from "@/types";
+import type { Court, CourtPricingPeriod, PricingLabel } from "@/types";
 
 export default function CourtsPage() {
   const { data: session } = useSession();
@@ -58,12 +64,23 @@ export default function CourtsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [sortColumn, setSortColumn] = useState<keyof Court | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [courtForm, setCourtForm] = useState({
+  const [courtError, setCourtError] = useState<string>("");
+  const [courtForm, setCourtForm] = useState<{
+    name: string;
+    type: "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
+    description: string;
+    pricePerHour: number;
+    isActive: boolean;
+    timeBasedPricingEnabled: boolean;
+    pricingPeriods: CourtPricingPeriod[];
+  }>({
     name: "",
-    type: "PADEL" as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
+    type: "PADEL",
     description: "",
     pricePerHour: 0,
     isActive: true,
+    timeBasedPricingEnabled: false,
+    pricingPeriods: [],
   });
 
   const userRole = (session?.user as any)?.role;
@@ -96,6 +113,7 @@ export default function CourtsPage() {
   const handleCourtSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingCourt(true);
+    setCourtError("");
 
     try {
       if (editingCourt) {
@@ -110,7 +128,7 @@ export default function CourtsPage() {
           resetCourtForm();
           loadData();
         } else {
-          alert(result.error || "Failed to update court");
+          setCourtError(result.error || "Failed to update court");
         }
       } else {
         const result = await createCourt({
@@ -123,11 +141,11 @@ export default function CourtsPage() {
           resetCourtForm();
           loadData();
         } else {
-          alert(result.error || "Failed to create court");
+          setCourtError(result.error || "Failed to create court");
         }
       }
     } catch (error: any) {
-      alert(error.message || "An error occurred");
+      setCourtError(error.message || "An error occurred");
     } finally {
       setIsSubmittingCourt(false);
     }
@@ -140,8 +158,11 @@ export default function CourtsPage() {
       description: "",
       pricePerHour: 0,
       isActive: true,
+      timeBasedPricingEnabled: false,
+      pricingPeriods: [],
     });
     setEditingCourt(null);
+    setCourtError("");
   };
 
   const handleEditCourt = (court: Court) => {
@@ -152,9 +173,85 @@ export default function CourtsPage() {
       description: court.description,
       pricePerHour: court.pricePerHour,
       isActive: court.isActive,
+      timeBasedPricingEnabled: court.timeBasedPricingEnabled ?? false,
+      pricingPeriods: court.pricingPeriods ?? [],
     });
     setShowCourtModal(true);
   };
+
+  const addPricingPeriod = (label: PricingLabel) => {
+    setCourtForm((prev) => {
+      const last = prev.pricingPeriods[prev.pricingPeriods.length - 1];
+      const defaultStart = last ? last.endHour : 12; // start after previous
+      let defaultEnd = defaultStart + 4;
+      if (defaultEnd <= defaultStart) {
+        defaultEnd = defaultStart + 1;
+      }
+      if (defaultEnd > 24) {
+        defaultEnd = 24;
+      }
+
+      return {
+        ...prev,
+        timeBasedPricingEnabled: true,
+        pricingPeriods: [
+          ...prev.pricingPeriods,
+          {
+            label,
+            startHour: defaultStart,
+            endHour: defaultEnd,
+            pricePerHour: prev.pricePerHour || 0,
+            allDay: false,
+          },
+        ],
+      };
+    });
+  };
+
+  const updatePricingPeriod = (
+    index: number,
+    updates: Partial<CourtPricingPeriod>,
+  ) => {
+    setCourtForm((prev) => {
+      const updated = [...prev.pricingPeriods];
+      updated[index] = { ...updated[index], ...updates };
+      return { ...prev, pricingPeriods: updated };
+    });
+  };
+
+  const removePricingPeriod = (index: number) => {
+    setCourtForm((prev) => {
+      const updated = [...prev.pricingPeriods];
+      updated.splice(index, 1);
+      return {
+        ...prev,
+        pricingPeriods: updated,
+        timeBasedPricingEnabled:
+          updated.length > 0 ? prev.timeBasedPricingEnabled : false,
+      };
+    });
+  };
+
+  const formatHourLabel = (hour: number) => {
+    const totalMinutes = Math.round(hour * 60);
+    let h = Math.floor(totalMinutes / 60) % 24;
+    const m = totalMinutes % 60;
+    const suffix = h >= 12 ? "PM" : "AM";
+    const displayHour = h % 12 === 0 ? 12 : h % 12;
+    const minuteStr = m.toString().padStart(2, "0");
+    return `${displayHour}:${minuteStr} ${suffix}`;
+  };
+
+  const timeOptions: { value: number; label: string }[] = [];
+  for (let h = 0; h < 24; h++) {
+    timeOptions.push({ value: h, label: formatHourLabel(h) });
+    timeOptions.push({
+      value: h + 0.5,
+      label: formatHourLabel(h + 0.5),
+    });
+  }
+  // Allow 12:00 AM next day as an end boundary
+  timeOptions.push({ value: 24, label: formatHourLabel(24) });
 
   const handleDeleteCourt = (court: Court) => {
     setDeletingCourt(court);
@@ -212,8 +309,16 @@ export default function CourtsPage() {
     // Handle boolean comparison
     if (typeof aValue === "boolean" && typeof bValue === "boolean") {
       return sortDirection === "asc"
-        ? (aValue === bValue ? 0 : aValue ? 1 : -1)
-        : (aValue === bValue ? 0 : aValue ? -1 : 1);
+        ? aValue === bValue
+          ? 0
+          : aValue
+            ? 1
+            : -1
+        : aValue === bValue
+          ? 0
+          : aValue
+            ? -1
+            : 1;
     }
 
     // String comparison
@@ -263,7 +368,7 @@ export default function CourtsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-zinc-800">
-                    <TableHead 
+                    <TableHead
                       className="min-w-[200px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("name")}
                     >
@@ -272,7 +377,7 @@ export default function CourtsPage() {
                         <SortIcon column="name" />
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="min-w-[120px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("type")}
                     >
@@ -282,7 +387,7 @@ export default function CourtsPage() {
                       </div>
                     </TableHead>
                     <TableHead className="min-w-[200px]">Description</TableHead>
-                    <TableHead 
+                    <TableHead
                       className="min-w-[120px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("pricePerHour")}
                     >
@@ -291,7 +396,7 @@ export default function CourtsPage() {
                         <SortIcon column="pricePerHour" />
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("isActive")}
                     >
@@ -300,7 +405,9 @@ export default function CourtsPage() {
                         <SortIcon column="isActive" />
                       </div>
                     </TableHead>
-                    <TableHead className="text-right min-w-[120px]">Actions</TableHead>
+                    <TableHead className="text-right min-w-[120px]">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -308,11 +415,21 @@ export default function CourtsPage() {
                     <>
                       {[...Array(5)].map((_, i) => (
                         <TableRow key={i} className="border-zinc-800">
-                          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                          <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-32" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-20" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-48" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-24" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-6 w-16" />
+                          </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
                               <Skeleton className="h-8 w-16" />
@@ -419,7 +536,9 @@ export default function CourtsPage() {
               {editingCourt ? "Edit Court" : "Add New Court"}
             </DialogTitle>
             <DialogDescription className="text-zinc-400">
-              {editingCourt ? "Update court details and pricing" : "Create a new court with details and pricing"}
+              {editingCourt
+                ? "Update court details and pricing"
+                : "Create a new court with details and pricing"}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCourtSubmit} className="space-y-4">
@@ -464,7 +583,10 @@ export default function CourtsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="court-description" className="text-zinc-200 text-sm">
+              <Label
+                htmlFor="court-description"
+                className="text-zinc-200 text-sm"
+              >
                 Description
               </Label>
               <textarea
@@ -483,7 +605,7 @@ export default function CourtsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="court-price" className="text-zinc-200 text-sm">
-                  Price Per Hour (PKR)
+                  Base Price Per Hour (PKR)
                 </Label>
                 <Input
                   id="court-price"
@@ -500,9 +622,15 @@ export default function CourtsPage() {
                   }
                   placeholder="5000"
                   className="text-sm"
+                  disabled={courtForm.timeBasedPricingEnabled}
                 />
+                <p className="text-[11px] text-zinc-500">
+                  Used when peak/off-peak pricing is disabled. When
+                  peak/off-peak is enabled, prices from the periods below are
+                  used instead.
+                </p>
               </div>
-              <div className="flex items-end">
+              <div className="flex flex-col justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -520,8 +648,214 @@ export default function CourtsPage() {
                     Active
                   </Label>
                 </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="court-dynamic-pricing"
+                    checked={courtForm.timeBasedPricingEnabled}
+                    onChange={(e) =>
+                      setCourtForm({
+                        ...courtForm,
+                        timeBasedPricingEnabled: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-[#2DD4BF] focus:ring-[#2DD4BF] focus:ring-2 accent-[#2DD4BF] cursor-pointer"
+                  />
+                  <Label
+                    htmlFor="court-dynamic-pricing"
+                    className="cursor-pointer text-zinc-200 text-sm"
+                  >
+                    Enable peak/off-peak pricing
+                  </Label>
+                </div>
               </div>
             </div>
+
+            {courtForm.timeBasedPricingEnabled && (
+              <div className="space-y-3 border border-zinc-800 rounded-lg p-3 mt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-100">
+                      Peak & Off-peak Hours
+                    </p>
+                    <p className="text-xs text-zinc-400">
+                      Configure different prices for specific time ranges.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-xs border-[#2DD4BF]/40 text-[#2DD4BF] hover:bg-[#2DD4BF]/10"
+                      onClick={() => addPricingPeriod("off_peak")}
+                    >
+                      Add Off-peak
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-xs border-[#2DD4BF]/40 text-[#2DD4BF] hover:bg-[#2DD4BF]/10"
+                      onClick={() => addPricingPeriod("peak")}
+                    >
+                      Add Peak
+                    </Button>
+                  </div>
+                </div>
+
+                {courtForm.pricingPeriods.length === 0 ? (
+                  <p className="text-xs text-zinc-500">
+                    No dynamic pricing periods yet. Use the buttons above to add
+                    off-peak or peak ranges.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {courtForm.pricingPeriods.map((period, index) => {
+                      const previous = courtForm.pricingPeriods[index - 1];
+                      const minStart = previous ? previous.endHour : 0;
+                      const startOptions = timeOptions.filter(
+                        (opt) => opt.value >= minStart && opt.value <= 24,
+                      );
+                      const endOptions = timeOptions.filter(
+                        (opt) => opt.value !== period.startHour,
+                      );
+
+                      return (
+                        <div
+                          key={index}
+                          className="bg-zinc-900/40 border border-zinc-800 rounded-md p-3 space-y-3"
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-zinc-300">
+                                Type
+                              </Label>
+                              <Select
+                                value={period.label}
+                                onValueChange={(v) =>
+                                  updatePricingPeriod(index, {
+                                    label: v as "off_peak" | "peak",
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="off_peak">
+                                    Off-peak
+                                  </SelectItem>
+                                  <SelectItem value="peak">Peak</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-xs text-zinc-300">
+                                Price / Hour (PKR)
+                              </Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={period.pricePerHour}
+                                onChange={(e) =>
+                                  updatePricingPeriod(index, {
+                                    pricePerHour:
+                                      parseFloat(e.target.value) || 0,
+                                  })
+                                }
+                                className="text-xs"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-xs text-zinc-300">
+                                Start Time
+                              </Label>
+                              <Select
+                                value={String(period.startHour)}
+                                onValueChange={(v) =>
+                                  updatePricingPeriod(index, {
+                                    startHour: parseFloat(v),
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-48! overflow-y-auto">
+                                  {startOptions.map((opt) => (
+                                    <SelectItem
+                                      key={opt.value}
+                                      value={String(opt.value)}
+                                    >
+                                      {opt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-xs text-zinc-300">
+                                End Time
+                              </Label>
+                              <Select
+                                value={String(period.endHour)}
+                                onValueChange={(v) =>
+                                  updatePricingPeriod(index, {
+                                    endHour: parseFloat(v),
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-96! overflow-y-auto">
+                                  {endOptions.map((opt) => (
+                                    <SelectItem
+                                      key={opt.value}
+                                      value={String(opt.value)}
+                                    >
+                                      {opt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="flex sm:justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+                              onClick={() => removePricingPeriod(index)}
+                              title="Remove period"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <p className="text-[11px] text-zinc-500">
+                      Ranges can also wrap past midnight (e.g. 16:00 - 02:00 for
+                      evening peak pricing).
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {courtError && (
+              <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                {courtError}
+              </div>
+            )}
 
             <DialogFooter>
               <Button
@@ -544,8 +878,10 @@ export default function CourtsPage() {
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     {editingCourt ? "Updating..." : "Creating..."}
                   </>
+                ) : editingCourt ? (
+                  "Update Court"
                 ) : (
-                  editingCourt ? "Update Court" : "Create Court"
+                  "Create Court"
                 )}
               </Button>
             </DialogFooter>
@@ -559,7 +895,8 @@ export default function CourtsPage() {
           <DialogHeader>
             <DialogTitle className="text-white">Delete Court</DialogTitle>
             <DialogDescription className="text-zinc-400">
-              Are you sure you want to delete this court? This action cannot be undone.
+              Are you sure you want to delete this court? This action cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           {deletingCourt && (
@@ -573,7 +910,9 @@ export default function CourtsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Type:</span>
-                  <span className="text-white text-sm">{deletingCourt.type}</span>
+                  <span className="text-white text-sm">
+                    {deletingCourt.type}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Price/Hour:</span>
@@ -596,7 +935,8 @@ export default function CourtsPage() {
                 </div>
               </div>
               <p className="text-zinc-300 text-sm">
-                This action will permanently delete the court from the system. All associated data will be lost and this cannot be undone.
+                This action will permanently delete the court from the system.
+                All associated data will be lost and this cannot be undone.
               </p>
             </div>
           )}
