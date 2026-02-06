@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tag, X } from "lucide-react";
 import { getActiveDiscounts } from "@/app/actions/discounts";
+import { LUXURY_EASE } from "@/lib/motion";
 import { formatDiscountValue, formatCourtTypes, isDiscountCurrentlyActive } from "@/lib/discount-utils";
 import type { Discount } from "@/types";
 
@@ -65,7 +66,7 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
           initial={{ y: -50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -50, opacity: 0 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.8 }}
+          transition={{ duration: 0.5, ease: LUXURY_EASE, delay: 0.8 }}
           className={`bg-gradient-to-r from-[#2DD4BF]/20 via-[#2DD4BF]/10 to-[#2DD4BF]/20 border-y border-[#2DD4BF]/30 backdrop-blur-sm ${className}`}
         >
           <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 relative">
@@ -84,7 +85,7 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
                   initial={{ y: 20, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   exit={{ y: -20, opacity: 0 }}
-                  transition={{ duration: 0.4, ease: "easeInOut" }}
+                  transition={{ duration: 0.4, ease: LUXURY_EASE }}
                   className="text-center"
                 >
                   {/* Mobile: Compact single line */}

@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { TextReveal } from "@/components/ui/TextReveal";
 import { Check, Sparkles } from "lucide-react";
+import { LUXURY_EASE, CARD_ENTRANCE } from "@/lib/motion";
 
 const PLANS = [
   {
@@ -50,7 +51,7 @@ export const MembershipSection = () => {
   return (
     <section className="relative py-28 px-6 overflow-hidden transition-colors duration-200">
       {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-zinc-100 via-zinc-50 to-white dark:from-[#060606] dark:via-[#080808] dark:to-[#050505]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#F5F4F2] via-[#FAF9F7] to-[#FAF9F7] dark:from-[#0A0A0A] dark:via-[#080808] dark:to-[#050505]" />
       <div
         className="absolute top-1/4 -left-32 w-96 h-96 rounded-full bg-[#2DD4BF]/8 dark:bg-[#2DD4BF]/5 blur-3xl"
         aria-hidden
@@ -68,6 +69,7 @@ export const MembershipSection = () => {
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            transition={{ duration: 0.7, ease: LUXURY_EASE }}
             className="inline-flex items-center gap-2 rounded-full border border-[#2DD4BF]/30 bg-[#2DD4BF]/5 dark:bg-[#2DD4BF]/10 px-4 py-1.5 mb-6"
           >
             <Sparkles className="w-3.5 h-3.5 text-[#2DD4BF]" />
@@ -89,22 +91,21 @@ export const MembershipSection = () => {
           {PLANS.map((plan, index) => (
             <motion.div
               key={plan.name}
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
+              initial={CARD_ENTRANCE.initial}
+              whileInView={CARD_ENTRANCE.whileInView}
+              viewport={CARD_ENTRANCE.viewport}
               transition={{
-                duration: 0.6,
+                ...CARD_ENTRANCE.transition,
                 delay: index * 0.1,
-                ease: [0.22, 1, 0.36, 1],
               }}
               whileHover={{
-                y: -10,
-                scale: 1.03,
-                transition: { duration: 0.25 },
+                y: -4,
+                scale: 1.02,
+                transition: { duration: 0.35, ease: LUXURY_EASE },
               }}
               className={`group relative cursor-default rounded-2xl overflow-hidden border bg-white dark:bg-zinc-900/80 backdrop-blur-sm shadow-lg transition-all duration-300 hover:shadow-xl ${plan.borderGlow} ${
                 plan.highlight
-                  ? "border-[#2DD4BF]/50 shadow-[#2DD4BF]/10 ring-2 ring-[#2DD4BF]/20 dark:ring-[#2DD4BF]/30"
+                  ? "border-[#2DD4BF]/50 shadow-[#2DD4BF]/10 ring-2 ring-[#2DD4BF]/20 dark:ring-[#2DD4BF]/30 shadow-lg"
                   : "border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
               }`}
             >
@@ -178,7 +179,7 @@ export const MembershipSection = () => {
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.6, delay: 0.4, ease: LUXURY_EASE }}
           className="mt-20 p-6 md:p-8 rounded-2xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm border border-zinc-200 dark:border-zinc-800 shadow-lg border-l-4 border-l-[#2DD4BF]"
         >
           <h4 className="text-sm font-semibold text-black dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { ParallaxSection } from '@/components/ui/ParallaxSection';
 import { TextReveal } from '@/components/ui/TextReveal';
 import { AnimatedCoffeeIcon, AnimatedFoodTruckIcon } from '@/components/ui/LottieIcon';
+import { LUXURY_EASE, SECTION_ENTRANCE } from '@/lib/motion';
 
 export const AmenitiesSection = () => {
   const premiumImages = {
@@ -13,7 +14,7 @@ export const AmenitiesSection = () => {
   };
 
   return (
-    <section className="py-32 px-6 bg-zinc-50 dark:bg-[#080808] transition-colors duration-200">
+    <section className="py-32 px-6 bg-[#F5F4F2] dark:bg-[#080808] transition-colors duration-500">
       <div className="max-w-7xl mx-auto">
         <ParallaxSection speed={0.2}>
           <div className="mb-24">
@@ -25,20 +26,20 @@ export const AmenitiesSection = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
           <ParallaxSection speed={0.15}>
-            <motion.div 
-              initial={{ opacity: 0, x: -50 }}
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
               whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
+              viewport={SECTION_ENTRANCE.viewport}
+              transition={{ duration: 0.85, ease: LUXURY_EASE }}
               className="group space-y-8"
             >
-              <div className="relative aspect-[4/3] overflow-hidden rounded-[2rem] shadow-xl">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-[2rem] shadow-lg border border-zinc-200/80 dark:border-white/10">
                 <Image 
                   src={premiumImages.cafe}
                   alt="Coffee Shop" 
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover transition-transform duration-700 group-hover:scale-110"
+                  className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                 />
                 <div className="absolute top-6 right-6 bg-black/50 backdrop-blur-md p-4 rounded-full">
                   <AnimatedCoffeeIcon className="w-8 h-8" color="#2DD4BF" />
@@ -55,20 +56,20 @@ export const AmenitiesSection = () => {
           </ParallaxSection>
 
           <ParallaxSection speed={0.15}>
-            <motion.div 
-              initial={{ opacity: 0, x: 50 }}
+            <motion.div
+              initial={{ opacity: 0, x: 40 }}
               whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8, delay: 0.2 }}
+              viewport={SECTION_ENTRANCE.viewport}
+              transition={{ duration: 0.85, delay: 0.15, ease: LUXURY_EASE }}
               className="group space-y-8 md:mt-24"
             >
-              <div className="relative aspect-[4/3] overflow-hidden rounded-[2rem] shadow-xl">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-[2rem] shadow-lg border border-zinc-200/80 dark:border-white/10">
                 <Image 
                   src={premiumImages.food}
                   alt="Food Cart" 
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover transition-transform duration-700 group-hover:scale-110"
+                  className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                 />
                 <div className="absolute top-6 right-6 bg-black/50 backdrop-blur-md p-4 rounded-full">
                   <AnimatedFoodTruckIcon className="w-8 h-8" color="#2DD4BF" />

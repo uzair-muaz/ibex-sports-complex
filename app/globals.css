@@ -92,6 +92,17 @@ body {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Luxury landing palette - warm neutrals */
+:root {
+  --landing-bg: #FAF9F7;
+  --landing-bg-dark: #0A0A0A;
+  --accent-champagne: #C9B896;
+}
+.dark {
+  --landing-bg: #0A0A0A;
+  --landing-bg-dark: #050505;
+}
+
 /* Custom Utilities */
 .gradient-text {
   background: linear-gradient(to right, #2dd4bf, #5eead4, #2dd4bf);
@@ -247,6 +258,16 @@ body {
   }
   body {
     @apply bg-background text-foreground overflow-x-hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gradient-text {
+    animation: none;
+    background-position: 0% 50%;
+  }
+  .animate-marquee {
+    animation-duration: 40s;
   }
 }
 

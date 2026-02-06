@@ -6,6 +6,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HeroScene } from "@/components/3d/HeroScene";
 import { TextReveal } from "@/components/ui/TextReveal";
+import { LUXURY_EASE } from "@/lib/motion";
 
 export const HeroSection = () => {
   return (
@@ -53,20 +54,20 @@ export const HeroSection = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1, duration: 0.8 }}
+          transition={{ delay: 1, duration: 0.85, ease: LUXURY_EASE }}
           className="flex items-center gap-8"
         >
           <Link href="/booking">
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.3, ease: LUXURY_EASE }}>
               <Button
                 size="lg"
-                className="group relative h-16 px-12 text-xl rounded-full bg-[#2DD4BF] text-[#0F172A] font-bold border-0 overflow-hidden shadow-2xl shadow-[#2DD4BF]/30 hover:shadow-[#2DD4BF]/50 transition-all duration-200 cursor-pointer"
+                className="group relative h-16 px-12 text-xl rounded-full bg-[#2DD4BF] text-[#0F172A] font-bold border-0 overflow-hidden shadow-2xl shadow-[#2DD4BF]/25 hover:shadow-[#2DD4BF]/45 transition-all duration-300 cursor-pointer"
               >
                 <span className="relative z-10 flex items-center">
                   Book Court
                   <motion.div
                     animate={{ x: [0, 5, 0] }}
-                    transition={{ repeat: Infinity, duration: 1.5 }}
+                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
                   >
                     <ArrowRight className="w-6 h-6 ml-2" />
                   </motion.div>
@@ -74,18 +75,18 @@ export const HeroSection = () => {
                 {/* Hover gradient overlay */}
                 <motion.div
                   className="absolute inset-0 bg-gradient-to-r from-[#14B8A6] to-[#2DD4BF] opacity-0 group-hover:opacity-100"
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.3, ease: LUXURY_EASE }}
                 />
-                {/* Shine effect */}
+                {/* Shine effect - slower for premium feel */}
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                   animate={{ x: ["-200%", "200%"] }}
-                  transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
+                  transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
                 />
                 {/* Glow on hover */}
                 <motion.div
                   className="absolute -inset-1 bg-[#2DD4BF] rounded-full blur-xl opacity-0 group-hover:opacity-40"
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.3, ease: LUXURY_EASE }}
                 />
               </Button>
             </motion.div>
