@@ -6,6 +6,7 @@ import { HeroSection } from "@/components/sections/HeroSection";
 import { MarqueeSection } from "@/components/sections/MarqueeSection";
 import { FacilitiesSection } from "@/components/sections/FacilitiesSection";
 import { AmenitiesSection } from "@/components/sections/AmenitiesSection";
+import { MembershipSection } from "@/components/sections/MembershipSection";
 import { GetInTouchSection } from "@/components/sections/GetInTouchSection";
 import { InfiniteGallery } from "@/components/ui/InfiniteScroll";
 import { ParallaxSection } from "@/components/ui/ParallaxSection";
@@ -74,6 +75,8 @@ export default async function Home() {
         pickleballCourts={pickleballCourts}
         futsalCourts={futsalCourts}
       />
+
+      <MembershipSection />
 
       <ParallaxSection speed={0.1}>
         <section className="py-24 bg-white dark:bg-black overflow-hidden transition-colors duration-200">
