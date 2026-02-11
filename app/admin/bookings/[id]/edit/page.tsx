@@ -57,6 +57,8 @@ export default function EditBookingPage() {
       | "cancelled"
       | "completed",
     amountPaid: 0,
+    amountReceivedOnline: 0,
+    amountReceivedCash: 0,
   });
 
   const userRole = (session?.user as any)?.role;
@@ -109,6 +111,9 @@ export default function EditBookingPage() {
               ? (booking.courtId as Court).type
               : "PADEL";
 
+          const hasNewPaymentFields =
+            booking.amountReceivedOnline != null ||
+            booking.amountReceivedCash != null;
           setFormData({
             date: new Date(booking.date),
             courtType: courtType as
@@ -121,6 +126,12 @@ export default function EditBookingPage() {
             userPhone: booking.userPhone || "",
             status: booking.status,
             amountPaid: booking.amountPaid || 0,
+            amountReceivedOnline: hasNewPaymentFields
+              ? (booking.amountReceivedOnline ?? 0)
+              : 0,
+            amountReceivedCash: hasNewPaymentFields
+              ? (booking.amountReceivedCash ?? 0)
+              : (booking.amountPaid || 0),
           });
         } else {
           alert("Booking not found");
@@ -344,7 +355,8 @@ export default function EditBookingPage() {
         userEmail: formData.userEmail,
         userPhone: formData.userPhone,
         status: formData.status,
-        amountPaid: formData.amountPaid,
+        amountReceivedOnline: formData.amountReceivedOnline,
+        amountReceivedCash: formData.amountReceivedCash,
       });
 
       if (result.success) {
@@ -763,48 +775,89 @@ export default function EditBookingPage() {
                   className="text-sm bg-zinc-800"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="amount-paid" className="text-zinc-200 text-sm">
-                  Amount Paid{" "}
-                  <span className="text-zinc-400 text-xs">(PKR)</span>
+              <div className="space-y-3">
+                <Label className="text-zinc-200 text-sm block">
+                  Payment received
                 </Label>
-                <Input
-                  id="amount-paid"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.amountPaid}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value) || 0;
-                    setFormData({ ...formData, amountPaid: value });
-                    // Auto-update status to confirmed if amount paid > 0
-                    if (value > 0 && formData.status === "pending_payment") {
-                      setFormData({
-                        ...formData,
-                        amountPaid: value,
-                        status: "confirmed",
-                      });
-                    } else if (value === 0 && formData.status === "confirmed") {
-                      setFormData({
-                        ...formData,
-                        amountPaid: value,
-                        status: "pending_payment",
-                      });
-                    } else {
-                      setFormData({ ...formData, amountPaid: value });
-                    }
-                  }}
-                  className="text-sm"
-                  placeholder="0.00"
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-lg border border-zinc-800 bg-zinc-900/30">
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="amount-online"
+                      className="text-zinc-400 text-xs"
+                    >
+                      Received online (PKR)
+                    </Label>
+                    <Input
+                      id="amount-online"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={formData.amountReceivedOnline === 0 ? "" : formData.amountReceivedOnline}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value) || 0;
+                        const total = value + formData.amountReceivedCash;
+                        setFormData((prev) => ({
+                          ...prev,
+                          amountReceivedOnline: value,
+                          amountPaid: total,
+                          status:
+                            total > 0 && prev.status === "pending_payment"
+                              ? "confirmed"
+                              : prev.status,
+                        }));
+                      }}
+                      className="text-sm"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="amount-cash"
+                      className="text-zinc-400 text-xs"
+                    >
+                      Received in cash (PKR)
+                    </Label>
+                    <Input
+                      id="amount-cash"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={formData.amountReceivedCash === 0 ? "" : formData.amountReceivedCash}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value) || 0;
+                        const total = formData.amountReceivedOnline + value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          amountReceivedCash: value,
+                          amountPaid: total,
+                          status:
+                            total > 0 && prev.status === "pending_payment"
+                              ? "confirmed"
+                              : prev.status,
+                        }));
+                      }}
+                      className="text-sm"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 flex items-center gap-2 pt-1 border-t border-zinc-800">
+                    <span className="text-zinc-400 text-xs">
+                      Account received (total)
+                    </span>
+                    <span className="text-[#2DD4BF] font-semibold text-sm">
+                      PKR{" "}
+                      {(
+                        formData.amountReceivedOnline +
+                        formData.amountReceivedCash
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
                 <p className="text-xs text-zinc-400">
-                  {formData.amountPaid > 0 &&
-                  formData.status === "pending_payment"
-                    ? 'Status will change to "Confirmed" when saved'
-                    : formData.amountPaid === 0 &&
-                        formData.status === "confirmed"
-                      ? 'Status will change to "Pending Payment" when saved'
-                      : ""}
+                  {(formData.amountReceivedOnline + formData.amountReceivedCash) >
+                    0 && formData.status === "pending_payment"
+                    ? 'Status will change to "Confirmed" when saved. Set status to "Completed" when payment is fully settled.'
+                    : ""}
                 </p>
               </div>
             </div>

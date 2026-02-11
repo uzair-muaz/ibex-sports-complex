@@ -23,7 +23,9 @@ export interface IBooking extends Document {
   discounts: IAppliedDiscount[]; // Applied discounts
   discountAmount: number; // Total discount in PKR
   totalPrice: number; // Final price after discounts
-  amountPaid: number;
+  amountPaid: number; // Total received (online + cash), kept for backward compatibility
+  amountReceivedOnline?: number; // Payment received online (e.g. bank transfer)
+  amountReceivedCash?: number; // Payment received in cash at venue
   createdAt: Date;
   updatedAt: Date;
 }
@@ -117,6 +119,16 @@ const BookingSchema: Schema = new Schema(
       min: 0,
     },
     amountPaid: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    amountReceivedOnline: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    amountReceivedCash: {
       type: Number,
       default: 0,
       min: 0,

@@ -289,6 +289,8 @@ export interface UpdateBookingInput {
   status?: 'pending_payment' | 'confirmed' | 'cancelled' | 'completed';
   totalPrice?: number;
   amountPaid?: number;
+  amountReceivedOnline?: number;
+  amountReceivedCash?: number;
 }
 
 export async function updateBooking(input: UpdateBookingInput) {
@@ -302,6 +304,14 @@ export async function updateBooking(input: UpdateBookingInput) {
       updateData.userEmail = updateData.userEmail.toLowerCase();
     }
 
+    // When received amounts are provided, set amountPaid = online + cash (for backward compat and analytics)
+    if (updateData.amountReceivedOnline !== undefined || updateData.amountReceivedCash !== undefined) {
+      const online = updateData.amountReceivedOnline ?? 0;
+      const cash = updateData.amountReceivedCash ?? 0;
+      (updateData as any).amountPaid = online + cash;
+      (updateData as any).amountReceivedOnline = online;
+      (updateData as any).amountReceivedCash = cash;
+    }
     // If amountPaid is provided and > 0, automatically change status to confirmed
     // BUT only if status wasn't explicitly set (to allow manual status changes like 'completed')
     if (updateData.amountPaid !== undefined && updateData.amountPaid > 0 && input.status === undefined) {

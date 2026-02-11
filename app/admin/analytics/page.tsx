@@ -64,8 +64,16 @@ export default function AnalyticsPage() {
   }
 
   const calculateStats = () => {
-    const totalRevenue = bookings.reduce(
-      (sum, b) => sum + (b.totalPrice || 0),
+    // Use actual received amount (online + cash) so analytics match manual sheet
+    const getReceivedAmount = (b: Booking) => {
+      const online = b.amountReceivedOnline ?? 0;
+      const cash = b.amountReceivedCash ?? 0;
+      return online + cash > 0 ? online + cash : (b.amountPaid ?? 0);
+    };
+
+    const revenueBookings = bookings.filter((b) => b.status === "completed");
+    const totalRevenue = revenueBookings.reduce(
+      (sum, b) => sum + getReceivedAmount(b),
       0
     );
     const confirmedBookings = bookings.filter((b) => b.status === "confirmed");
@@ -82,6 +90,7 @@ export default function AnalyticsPage() {
       };
     } = {};
     bookings.forEach((booking) => {
+      if (booking.status !== "completed") return;
       const key = booking.userEmail.toLowerCase();
       if (!userBookingCounts[key]) {
         userBookingCounts[key] = {
@@ -92,14 +101,14 @@ export default function AnalyticsPage() {
         };
       }
       userBookingCounts[key].count++;
-      userBookingCounts[key].revenue += booking.totalPrice || 0;
+      userBookingCounts[key].revenue += getReceivedAmount(booking);
     });
     const topUsers = Object.values(userBookingCounts)
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
     const revenueByType: { [key: string]: number } = {};
-    bookings.forEach((booking) => {
+    revenueBookings.forEach((booking) => {
       const courtType =
         typeof booking.courtId === "object" &&
         booking.courtId &&
@@ -107,7 +116,7 @@ export default function AnalyticsPage() {
           ? (booking.courtId as Court).type || "UNKNOWN"
           : "UNKNOWN";
       revenueByType[courtType] =
-        (revenueByType[courtType] || 0) + (booking.totalPrice || 0);
+        (revenueByType[courtType] || 0) + getReceivedAmount(booking);
     });
 
     const bookingsByStatus = {
@@ -117,7 +126,7 @@ export default function AnalyticsPage() {
     };
 
     const avgBookingValue =
-      bookings.length > 0 ? totalRevenue / bookings.length : 0;
+      revenueBookings.length > 0 ? totalRevenue / revenueBookings.length : 0;
 
     const courtTypeCounts: { [key: string]: number } = {};
     bookings.forEach((booking) => {
@@ -135,7 +144,7 @@ export default function AnalyticsPage() {
 
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
-    const thisMonthRevenue = bookings
+    const thisMonthRevenue = revenueBookings
       .filter((b) => {
         const bookingDate = new Date(b.date);
         return (
@@ -143,7 +152,7 @@ export default function AnalyticsPage() {
           bookingDate.getFullYear() === currentYear
         );
       })
-      .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+      .reduce((sum, b) => sum + getReceivedAmount(b), 0);
 
     return {
       totalRevenue,

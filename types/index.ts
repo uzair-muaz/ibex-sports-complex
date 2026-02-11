@@ -59,6 +59,8 @@ export interface Booking {
   discountAmount: number;
   totalPrice: number;
   amountPaid: number;
+  amountReceivedOnline?: number;
+  amountReceivedCash?: number;
   createdAt: string;
   updatedAt: string;
 }

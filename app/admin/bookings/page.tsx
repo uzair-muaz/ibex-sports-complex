@@ -55,7 +55,7 @@ import {
   updateBooking,
 } from "../../actions/bookings";
 import type { Booking, Court } from "@/types";
-import { formatDisplayDate } from "@/lib/utils";
+import { formatDisplayDate, formatTime12 } from "@/lib/utils";
 
 export default function BookingsPage() {
   const { data: session } = useSession();
@@ -307,7 +307,7 @@ export default function BookingsPage() {
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="min-w-[150px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
+                      className="min-w-[160px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("userName")}
                     >
                       <div className="flex items-center">
@@ -315,7 +315,6 @@ export default function BookingsPage() {
                         <SortIcon column="userName" />
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[120px]">Contact</TableHead>
                     <TableHead 
                       className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("courtName")}
@@ -326,7 +325,7 @@ export default function BookingsPage() {
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="min-w-[150px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
+                      className="min-w-[140px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("date")}
                     >
                       <div className="flex items-center">
@@ -339,9 +338,12 @@ export default function BookingsPage() {
                       onClick={() => handleSort("totalPrice")}
                     >
                       <div className="flex items-center">
-                        Price
+                        Booking total
                         <SortIcon column="totalPrice" />
                       </div>
+                    </TableHead>
+                    <TableHead className="min-w-[160px]">
+                      Received & discount
                     </TableHead>
                     <TableHead 
                       className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
@@ -366,12 +368,12 @@ export default function BookingsPage() {
                             <Skeleton className="h-3 w-40" />
                           </TableCell>
                           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                           <TableCell>
                             <Skeleton className="h-4 w-24 mb-2" />
                             <Skeleton className="h-3 w-32" />
                           </TableCell>
                           <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                           <TableCell><Skeleton className="h-6 w-16" /></TableCell>
                           <TableCell>
                             <div className="flex gap-2 justify-end">
@@ -409,17 +411,15 @@ export default function BookingsPage() {
                           <TableCell className="font-mono text-zinc-400 text-sm">
                             #{booking._id.slice(-8)}
                           </TableCell>
-                          <TableCell>
-                            <div className="font-medium text-white text-sm">
+                          <TableCell className="text-zinc-200 text-sm">
+                            <div className="font-medium text-white">
                               {booking.userName}
                             </div>
-                            <div className="text-zinc-400 text-xs">
+                            <div className="text-zinc-400 text-xs truncate max-w-[180px]" title={booking.userEmail}>
                               {booking.userEmail}
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-zinc-200 text-sm">
-                              {booking.userPhone || "N/A"}
+                            <div className="text-zinc-500 text-xs">
+                              {booking.userPhone || "—"}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -433,20 +433,41 @@ export default function BookingsPage() {
                           <TableCell className="text-zinc-200 text-sm">
                             <div>{formatDisplayDate(booking.date)}</div>
                             <div className="text-xs text-zinc-400">
-                              {Math.floor(booking.startTime)
-                                .toString()
-                                .padStart(2, "0")}
-                              :{booking.startTime % 1 === 0 ? "00" : "30"} -{" "}
-                              {Math.floor(booking.startTime + booking.duration)
-                                .toString()
-                                .padStart(2, "0")}
-                              :{(booking.startTime + booking.duration) % 1 === 0 ? "00" : "30"}
+                              {formatTime12(booking.startTime)} – {formatTime12(booking.startTime + booking.duration)}
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <span className="text-[#2DD4BF] font-semibold text-sm">
-                              PKR {booking.totalPrice.toFixed(2)}
+                          <TableCell className="text-zinc-200 text-sm">
+                            <span className="text-[#2DD4BF] font-semibold">
+                              PKR {booking.totalPrice.toLocaleString()}
                             </span>
+                          </TableCell>
+                          <TableCell className="text-zinc-200 text-sm align-top">
+                            {(() => {
+                              const online = booking.amountReceivedOnline ?? 0;
+                              const cash = booking.amountReceivedCash ?? 0;
+                              const received = online + cash > 0 ? online + cash : (booking.amountPaid ?? 0);
+                              const discount = booking.status === "completed" && booking.totalPrice - received > 0
+                                ? booking.totalPrice - received
+                                : 0;
+                              const hasBreakdown = online > 0 || cash > 0;
+                              return (
+                                <div className="space-y-1 text-xs">
+                                  {hasBreakdown ? (
+                                    <div className="text-zinc-400">
+                                      Online {online.toLocaleString()} + Cash {cash.toLocaleString()}
+                                    </div>
+                                  ) : null}
+                                  <div className="text-white font-medium">
+                                    Total {received.toLocaleString()}
+                                  </div>
+                                  {discount > 0 && (
+                                    <div className="text-amber-400">
+                                      Discount {discount.toLocaleString()}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>
                             <Select
@@ -608,14 +629,7 @@ export default function BookingsPage() {
                 <div className="space-y-1">
                   <Label className="text-zinc-400 text-xs">Time</Label>
                   <p className="text-white">
-                    {Math.floor(viewingBooking.startTime)
-                      .toString()
-                      .padStart(2, "0")}
-                    :{viewingBooking.startTime % 1 === 0 ? "00" : "30"} -{" "}
-                    {Math.floor(viewingBooking.startTime + viewingBooking.duration)
-                      .toString()
-                      .padStart(2, "0")}
-                    :{(viewingBooking.startTime + viewingBooking.duration) % 1 === 0 ? "00" : "30"}
+                    {formatTime12(viewingBooking.startTime)} – {formatTime12(viewingBooking.startTime + viewingBooking.duration)}
                   </p>
                 </div>
                 <div className="space-y-1">
@@ -653,15 +667,51 @@ export default function BookingsPage() {
                   </div>
                 )}
                 <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">Amount Paid</Label>
-                  <p className="text-white font-semibold">PKR {(viewingBooking.amountPaid || 0).toLocaleString()}</p>
+                  <Label className="text-zinc-400 text-xs">Account received</Label>
+                  <p className="text-white font-semibold">
+                    PKR{" "}
+                    {(
+                      (viewingBooking.amountReceivedOnline ?? 0) +
+                      (viewingBooking.amountReceivedCash ?? 0) ||
+                      (viewingBooking.amountPaid ?? 0)
+                    ).toLocaleString()}
+                  </p>
+                  {((viewingBooking.amountReceivedOnline ?? 0) > 0 ||
+                    (viewingBooking.amountReceivedCash ?? 0) > 0) && (
+                    <p className="text-zinc-500 text-xs">
+                      Online: PKR {(viewingBooking.amountReceivedOnline ?? 0).toLocaleString()} · Cash: PKR {(viewingBooking.amountReceivedCash ?? 0).toLocaleString()}
+                    </p>
+                  )}
                 </div>
-                {(viewingBooking.amountPaid || 0) < viewingBooking.totalPrice && (
-                  <div className="space-y-1">
-                    <Label className="text-zinc-400 text-xs">Remaining Balance</Label>
-                    <p className="text-yellow-400 font-semibold">PKR {(viewingBooking.totalPrice - (viewingBooking.amountPaid || 0)).toLocaleString()}</p>
-                  </div>
-                )}
+                {(() => {
+                  const received =
+                    (viewingBooking.amountReceivedOnline ?? 0) +
+                    (viewingBooking.amountReceivedCash ?? 0) ||
+                    (viewingBooking.amountPaid ?? 0);
+                  const discount = viewingBooking.status === "completed" && viewingBooking.totalPrice - received > 0
+                    ? viewingBooking.totalPrice - received
+                    : 0;
+                  return discount > 0 ? (
+                    <div className="space-y-1">
+                      <Label className="text-zinc-400 text-xs">Discount (total − received)</Label>
+                      <p className="text-amber-400 font-semibold">PKR {discount.toLocaleString()}</p>
+                    </div>
+                  ) : null;
+                })()}
+                {(() => {
+                  const received =
+                    (viewingBooking.amountReceivedOnline ?? 0) +
+                    (viewingBooking.amountReceivedCash ?? 0) ||
+                    (viewingBooking.amountPaid ?? 0);
+                  return received < viewingBooking.totalPrice ? (
+                    <div className="space-y-1">
+                      <Label className="text-zinc-400 text-xs">Remaining balance</Label>
+                      <p className="text-yellow-400 font-semibold">
+                        PKR {(viewingBooking.totalPrice - received).toLocaleString()}
+                      </p>
+                    </div>
+                  ) : null;
+                })()}
               </div>
 
               {/* QR Codes */}
@@ -743,14 +793,7 @@ export default function BookingsPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Time:</span>
                   <span className="text-white text-sm">
-                    {Math.floor(cancellingBooking.startTime)
-                      .toString()
-                      .padStart(2, "0")}
-                    :{cancellingBooking.startTime % 1 === 0 ? "00" : "30"} -{" "}
-                    {Math.floor(cancellingBooking.startTime + cancellingBooking.duration)
-                      .toString()
-                      .padStart(2, "0")}
-                    :{(cancellingBooking.startTime + cancellingBooking.duration) % 1 === 0 ? "00" : "30"}
+                    {formatTime12(cancellingBooking.startTime)} – {formatTime12(cancellingBooking.startTime + cancellingBooking.duration)}
                   </span>
                 </div>
               </div>
@@ -821,14 +864,7 @@ export default function BookingsPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Time:</span>
                   <span className="text-white text-sm">
-                    {Math.floor(deletingBooking.startTime)
-                      .toString()
-                      .padStart(2, "0")}
-                    :{deletingBooking.startTime % 1 === 0 ? "00" : "30"} -{" "}
-                    {Math.floor(deletingBooking.startTime + deletingBooking.duration)
-                      .toString()
-                      .padStart(2, "0")}
-                    :{(deletingBooking.startTime + deletingBooking.duration) % 1 === 0 ? "00" : "30"}
+                    {formatTime12(deletingBooking.startTime)} – {formatTime12(deletingBooking.startTime + deletingBooking.duration)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

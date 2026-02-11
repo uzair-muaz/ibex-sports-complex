@@ -27,6 +27,20 @@ export function formatTime(decimalTime: number): string {
 }
 
 /**
+ * Format decimal hour to 12-hour AM/PM string
+ * e.g., 15.5 -> "3:30 PM", 9 -> "9:00 AM"
+ */
+export function formatTime12(decimalTime: number): string {
+  const totalMinutes = Math.round(decimalTime * 60);
+  let h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  const suffix = h >= 12 ? "PM" : "AM";
+  const displayHour = h % 12 === 0 ? 12 : h % 12;
+  const minuteStr = m.toString().padStart(2, "0");
+  return `${displayHour}:${minuteStr} ${suffix}`;
+}
+
+/**
  * Format date from YYYY-MM-DD to DD-MM-YYYY for display
  */
 export function formatDisplayDate(dateStr: string): string {
