@@ -24,7 +24,7 @@ import {
   getAllBookings,
 } from "../../../../actions/bookings";
 import { OPERATING_HOURS, COMPLEX_OPENING_DATE } from "@/types";
-import type { Court, Booking } from "@/types";
+import type { Court, Booking, CourtPricingPeriod } from "@/types";
 import { formatLocalDate } from "@/lib/utils";
 
 export default function EditBookingPage() {
@@ -225,6 +225,11 @@ export default function EditBookingPage() {
     const displayHour = h % 12 === 0 ? 12 : h % 12;
     const minuteStr = m.toString().padStart(2, "0");
     return `${displayHour}:${minuteStr} ${suffix}`;
+  };
+
+  const formatPeriodTime = (period: CourtPricingPeriod) => {
+    if (period.allDay) return "All day";
+    return `${formatTime12(period.startHour)} - ${formatTime12(period.endHour)}`;
   };
 
   const isSlotBooked = (courtId: string, slotTime: number) => {
@@ -478,13 +483,41 @@ export default function EditBookingPage() {
                             key={court._id}
                             className="flex-1 min-w-[150px] border-r border-zinc-800 last:border-0"
                           >
-                            <div className="h-12 p-2 border-b border-zinc-800 flex flex-col justify-center bg-zinc-950">
+                            <div className="h-auto min-h-12 p-2 border-b border-zinc-800 flex flex-col justify-center bg-zinc-950">
                               <h3 className="font-medium text-white text-xs truncate">
                                 {court.name}
                               </h3>
-                              <p className="text-xs text-[#2DD4BF]">
-                                PKR {court.pricePerHour}/hr
-                              </p>
+                              {court.timeBasedPricingEnabled &&
+                              Array.isArray(court.pricingPeriods) &&
+                              court.pricingPeriods.length > 0 ? (
+                                <div className="mt-0.5 space-y-0.5">
+                                  {court.pricingPeriods.map(
+                                    (
+                                      period: CourtPricingPeriod,
+                                      idx: number,
+                                    ) => (
+                                      <p
+                                        key={idx}
+                                        className="text-[10px] text-zinc-400"
+                                      >
+                                        {period.label === "peak"
+                                          ? "Peak"
+                                          : "Off-peak"}
+                                        : PKR{" "}
+                                        {period.pricePerHour.toLocaleString()}
+                                        /hr{" "}
+                                        <span className="text-zinc-500">
+                                          ({formatPeriodTime(period)})
+                                        </span>
+                                      </p>
+                                    ),
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-[#2DD4BF]">
+                                  PKR {court.pricePerHour}/hr
+                                </p>
+                              )}
                             </div>
                             <div>
                               {timeSlots.map((slotTime) => {
@@ -513,8 +546,7 @@ export default function EditBookingPage() {
                                         toggleSlot(court._id, slotTime)
                                       }
                                       disabled={
-                                        isBooked ||
-                                        (!canSelect && !isSelected)
+                                        isBooked || (!canSelect && !isSelected)
                                       }
                                       className={`
                                         w-full h-full rounded transition-all duration-200 relative flex items-center justify-center
@@ -561,16 +593,40 @@ export default function EditBookingPage() {
                         <h3 className="font-medium text-white text-sm">
                           {court.name}
                         </h3>
-                        <p className="text-xs text-[#2DD4BF] mt-0.5">
-                          PKR {court.pricePerHour}/hr
-                        </p>
+                        {court.timeBasedPricingEnabled &&
+                        Array.isArray(court.pricingPeriods) &&
+                        court.pricingPeriods.length > 0 ? (
+                          <div className="mt-1 space-y-0.5">
+                            {court.pricingPeriods.map(
+                              (
+                                period: CourtPricingPeriod,
+                                idx: number,
+                              ) => (
+                                <p
+                                  key={idx}
+                                  className="text-[11px] text-zinc-400"
+                                >
+                                  {period.label === "peak"
+                                    ? "Peak"
+                                    : "Off-peak"}
+                                  : PKR{" "}
+                                  {period.pricePerHour.toLocaleString()}/hr{" "}
+                                  <span className="text-zinc-500">
+                                    ({formatPeriodTime(period)})
+                                  </span>
+                                </p>
+                              ),
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-[#2DD4BF] mt-0.5">
+                            PKR {court.pricePerHour}/hr
+                          </p>
+                        )}
                       </div>
                       <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                         {timeSlots.map((slotTime) => {
-                          const isBooked = isSlotBooked(
-                            court._id,
-                            slotTime,
-                          );
+                          const isBooked = isSlotBooked(court._id, slotTime);
                           const isSelected = isSlotSelected(
                             court._id,
                             slotTime,
@@ -585,12 +641,8 @@ export default function EditBookingPage() {
                             <button
                               key={slotTime}
                               type="button"
-                              onClick={() =>
-                                toggleSlot(court._id, slotTime)
-                              }
-                              disabled={
-                                isBooked || (!canSelect && !isSelected)
-                              }
+                              onClick={() => toggleSlot(court._id, slotTime)}
+                              disabled={isBooked || (!canSelect && !isSelected)}
                               className={`
                                 aspect-square rounded-lg transition-all duration-200 relative flex flex-col items-center justify-center p-1 text-[9px] font-mono text-white/90
                                 ${

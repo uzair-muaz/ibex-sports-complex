@@ -43,8 +43,9 @@ export function getApplicableDiscounts(
       return false;
     }
 
-    // Check court type (empty array means all courts)
-    if (discount.courtTypes.length > 0 && !discount.courtTypes.includes(courtType)) {
+    // Check court type (empty or missing array means all courts)
+    const courtTypes = Array.isArray(discount.courtTypes) ? discount.courtTypes : [];
+    if (courtTypes.length > 0 && !courtTypes.includes(courtType)) {
       return false;
     }
 

@@ -37,7 +37,7 @@ function isHourInPeriod(hour: number, period: CourtPricingPeriod): boolean {
 
 export function getPricePerHourForTime(
   court: CourtLike,
-  hour: number
+  hour: number,
 ): { pricePerHour: number; label?: PricingLabel } {
   const hasPeriods =
     Array.isArray(court.pricingPeriods) && court.pricingPeriods.length > 0;
@@ -67,7 +67,7 @@ export function getPricePerHourForTime(
 
   // If multiple match, prefer the highest priced one (treat as peak)
   const chosen = matching.reduce((prev, curr) =>
-    curr.pricePerHour > prev.pricePerHour ? curr : prev
+    curr.pricePerHour > prev.pricePerHour ? curr : prev,
   );
 
   return {
@@ -79,7 +79,7 @@ export function getPricePerHourForTime(
 export function calculateOriginalPrice(
   court: CourtLike,
   startTime: number,
-  duration: number
+  duration: number,
 ): { originalPrice: number } {
   if (!court || typeof startTime !== "number" || typeof duration !== "number") {
     return { originalPrice: 0 };
@@ -103,4 +103,3 @@ export function calculateOriginalPrice(
   const rounded = Number(total.toFixed(2));
   return { originalPrice: rounded };
 }
-

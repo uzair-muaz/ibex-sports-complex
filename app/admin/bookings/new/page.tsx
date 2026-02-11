@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, CheckCircle } from "lucide-react";
@@ -16,12 +16,20 @@ import {
 } from "@/components/ui/select";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { DatePicker } from "@/components/ui/date-picker";
-import { motion } from "framer-motion";
 import { getCourts } from "../../../actions/courts";
 import { getBookingsByDate, createBooking } from "../../../actions/bookings";
-import { OPERATING_HOURS, COMPLEX_OPENING_DATE } from "@/types";
-import type { Court } from "@/types";
+import { getActiveDiscounts } from "../../../actions/discounts";
+import { COMPLEX_OPENING_DATE } from "@/types";
+import type { Court, AppliedDiscount, CourtPricingPeriod } from "@/types";
+import type { Discount } from "@/types";
 import { formatLocalDate } from "@/lib/utils";
+import {
+  getApplicableDiscounts,
+  calculateDiscountedPrice,
+  type DiscountInput,
+} from "@/lib/discount-utils";
+import { calculateOriginalPrice } from "@/lib/pricing-utils";
+import { PriceBreakdown } from "@/components/PriceBreakdown";
 
 export default function NewBookingPage() {
   const { data: session } = useSession();
@@ -36,6 +44,7 @@ export default function NewBookingPage() {
   >([]);
   const [isLoadingCourts, setIsLoadingCourts] = useState(false);
   const [isLoadingDateBookings, setIsLoadingDateBookings] = useState(false);
+  const [activeDiscounts, setActiveDiscounts] = useState<Discount[]>([]);
 
   // Default to opening date if today is before it
   const getInitialDate = () => {
@@ -66,6 +75,20 @@ export default function NewBookingPage() {
       loadBookingsForDate();
     }
   }, [session, isAdmin, formData.date, formData.courtType]);
+
+  useEffect(() => {
+    if (session && isAdmin) {
+      const loadDiscounts = async () => {
+        try {
+          const result = await getActiveDiscounts();
+          if (result.success) setActiveDiscounts(result.discounts);
+        } catch (e) {
+          console.error("Failed to load discounts:", e);
+        }
+      };
+      loadDiscounts();
+    }
+  }, [session, isAdmin]);
 
   const loadCourts = async () => {
     setIsLoadingCourts(true);
@@ -124,6 +147,11 @@ export default function NewBookingPage() {
     return `${displayHour}:${minuteStr} ${suffix}`;
   };
 
+  const formatPeriodTime = (period: CourtPricingPeriod) => {
+    if (period.allDay) return "All day";
+    return `${formatTime12(period.startHour)} - ${formatTime12(period.endHour)}`;
+  };
+
   const isSlotBooked = (courtId: string, slotTime: number) => {
     return dateBookings.some((b) => {
       const bookingCourtId =
@@ -159,6 +187,77 @@ export default function NewBookingPage() {
       (slotTime >= minTime && slotTime <= maxTime)
     );
   };
+
+  const selectedCourt = courts.find(
+    (c) => c._id === selectedSlots[0]?.courtId,
+  );
+
+  const adminPricingResult = useMemo(() => {
+    if (
+      !formData.courtType ||
+      selectedSlots.length === 0 ||
+      !selectedCourt ||
+      !formData.date
+    ) {
+      return {
+        originalPrice: 0,
+        finalPrice: 0,
+        discountAmount: 0,
+        appliedDiscounts: [] as AppliedDiscount[],
+      };
+    }
+    const sortedTimes = selectedSlots
+      .map((s) => s.slotTime)
+      .sort((a, b) => a - b);
+    const startTime = sortedTimes[0];
+    const duration = selectedSlots.length * 0.5;
+    const dateString =
+      formData.date instanceof Date
+        ? formatLocalDate(formData.date)
+        : formData.date;
+
+    const { originalPrice } = calculateOriginalPrice(
+      selectedCourt,
+      startTime,
+      duration,
+    );
+
+    const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
+      _id: d._id,
+      name: d.name,
+      type: d.type,
+      value: d.value,
+      courtTypes: Array.isArray(d.courtTypes) ? d.courtTypes : [],
+      allDay: d.allDay,
+      startHour: d.startHour,
+      endHour: d.endHour,
+      validFrom: d.validFrom,
+      validUntil: d.validUntil,
+      isActive: d.isActive,
+    }));
+
+    const applicable = getApplicableDiscounts(
+      discountsData,
+      formData.courtType,
+      startTime,
+      dateString,
+    );
+    const { finalPrice, discountAmount, appliedDiscounts } =
+      calculateDiscountedPrice(originalPrice, applicable);
+
+    return {
+      originalPrice,
+      finalPrice,
+      discountAmount,
+      appliedDiscounts,
+    };
+  }, [
+    formData.courtType,
+    formData.date,
+    selectedSlots,
+    selectedCourt,
+    activeDiscounts,
+  ]);
 
   const toggleSlot = (courtId: string, slotTime: number) => {
     if (isSlotBooked(courtId, slotTime)) return;
@@ -366,13 +465,38 @@ export default function NewBookingPage() {
                           key={court._id}
                           className="flex-1 min-w-[150px] border-r border-zinc-800 last:border-0"
                         >
-                          <div className="h-12 p-2 border-b border-zinc-800 flex flex-col justify-center bg-zinc-950">
+                          <div className="h-auto min-h-12 p-2 border-b border-zinc-800 flex flex-col justify-center bg-zinc-950">
                             <h3 className="font-medium text-white text-xs truncate">
                               {court.name}
                             </h3>
-                            <p className="text-xs text-[#2DD4BF]">
-                              PKR {court.pricePerHour}/hr
-                            </p>
+                            {court.timeBasedPricingEnabled &&
+                            Array.isArray(court.pricingPeriods) &&
+                            court.pricingPeriods.length > 0 ? (
+                              <div className="mt-0.5 space-y-0.5">
+                                {court.pricingPeriods.map(
+                                  (period: CourtPricingPeriod, idx: number) => (
+                                    <p
+                                      key={idx}
+                                      className="text-[10px] text-zinc-400"
+                                    >
+                                      {period.label === "peak"
+                                        ? "Peak"
+                                        : "Off-peak"}
+                                      : PKR{" "}
+                                      {period.pricePerHour.toLocaleString()}
+                                      /hr{" "}
+                                      <span className="text-zinc-500">
+                                        ({formatPeriodTime(period)})
+                                      </span>
+                                    </p>
+                                  ),
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-[#2DD4BF]">
+                                PKR {court.pricePerHour}/hr
+                              </p>
+                            )}
                           </div>
 
                           <div>
@@ -446,6 +570,18 @@ export default function NewBookingPage() {
                 {selectedSlots.length !== 1 ? "s" : ""}(
                 {selectedSlots.length * 0.5} hour
                 {selectedSlots.length * 0.5 !== 1 ? "s" : ""})
+              </div>
+            )}
+
+            {selectedSlots.length > 0 && adminPricingResult.finalPrice > 0 && (
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 mt-4">
+                <p className="text-zinc-400 text-sm mb-2">Price (discounts applied)</p>
+                <PriceBreakdown
+                  originalPrice={adminPricingResult.originalPrice}
+                  totalPrice={adminPricingResult.finalPrice}
+                  discounts={adminPricingResult.appliedDiscounts}
+                  discountAmount={adminPricingResult.discountAmount}
+                />
               </div>
             )}
           </div>

@@ -106,13 +106,13 @@ export async function createBooking(input: CreateBookingInput) {
       validUntil: { $gte: now },
     });
 
-    // Get applicable discounts for this booking
+    // Get applicable discounts for this booking (empty courtTypes = all court types)
     const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
       _id: d._id.toString(),
       name: d.name,
       type: d.type,
       value: d.value,
-      courtTypes: d.courtTypes,
+      courtTypes: Array.isArray(d.courtTypes) ? d.courtTypes : [],
       allDay: d.allDay,
       startHour: d.startHour,
       endHour: d.endHour,
@@ -362,13 +362,13 @@ export async function updateBooking(input: UpdateBookingInput) {
         validUntil: { $gte: now },
       });
 
-      // Get applicable discounts
+      // Get applicable discounts (empty courtTypes = all court types)
       const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
         _id: d._id.toString(),
         name: d.name,
         type: d.type,
         value: d.value,
-        courtTypes: d.courtTypes,
+        courtTypes: Array.isArray(d.courtTypes) ? d.courtTypes : [],
         allDay: d.allDay,
         startHour: d.startHour,
         endHour: d.endHour,

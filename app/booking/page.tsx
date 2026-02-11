@@ -459,7 +459,7 @@ export default function BookingPage() {
       name: d.name,
       type: d.type,
       value: d.value,
-      courtTypes: d.courtTypes,
+      courtTypes: Array.isArray(d.courtTypes) ? d.courtTypes : [],
       allDay: d.allDay,
       startHour: d.startHour,
       endHour: d.endHour,
