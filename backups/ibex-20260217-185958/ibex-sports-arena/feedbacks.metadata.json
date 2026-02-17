@@ -1,0 +1,30 @@
+{
+  "indexes": [
+    {
+      "v": { "$numberInt": "2" },
+      "key": { "_id": { "$numberInt": "1" } },
+      "name": "_id_"
+    },
+    {
+      "v": { "$numberInt": "2" },
+      "key": { "bookingId": { "$numberInt": "1" } },
+      "name": "bookingId_1",
+      "background": true
+    },
+    {
+      "v": { "$numberInt": "2" },
+      "key": { "createdAt": { "$numberInt": "-1" } },
+      "name": "createdAt_-1",
+      "background": true
+    },
+    {
+      "v": { "$numberInt": "2" },
+      "key": { "rating": { "$numberInt": "1" } },
+      "name": "rating_1",
+      "background": true
+    }
+  ],
+  "uuid": "2fdbe9c05a40450886e9888ef7419865",
+  "collectionName": "feedbacks",
+  "type": "collection"
+}

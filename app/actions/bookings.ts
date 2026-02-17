@@ -143,6 +143,10 @@ export async function createBooking(input: CreateBookingInput) {
       amountSaved: d.amountSaved,
     }));
 
+    // Determine next booking serial number (incremental)
+    const lastBooking = await Booking.findOne().sort({ serialNumber: -1, createdAt: -1 });
+    const nextSerialNumber = (lastBooking?.serialNumber ?? 0) + 1;
+
     // Create booking with discount information
     const booking = await Booking.create({
       courtId: assignedCourt._id,
@@ -152,6 +156,7 @@ export async function createBooking(input: CreateBookingInput) {
       userName: input.userName,
       userEmail: input.userEmail.toLowerCase(),
       userPhone: input.userPhone,
+      serialNumber: nextSerialNumber,
       originalPrice,
       discounts: discountsForDB,
       discountAmount,
@@ -232,7 +237,8 @@ export async function getAllBookings() {
 
     const bookings = await Booking.find()
       .populate('courtId')
-      .sort({ date: -1, startTime: -1 });
+      // Default ordering: newest bookings first
+      .sort({ createdAt: -1 });
 
     return {
       success: true,

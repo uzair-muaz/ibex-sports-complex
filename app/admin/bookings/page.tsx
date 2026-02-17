@@ -72,8 +72,8 @@ export default function BookingsPage() {
   const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [updatingStatusBookingId, setUpdatingStatusBookingId] = useState<string | null>(null);
-  const [sortColumn, setSortColumn] = useState<keyof Booking | "courtName" | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [sortColumn, setSortColumn] = useState<keyof Booking | "courtName" | null>("createdAt");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const userRole = (session?.user as any)?.role;
   const isSuperAdmin = userRole === "super_admin";
@@ -221,6 +221,12 @@ export default function BookingsPage() {
       bValue = typeof b.courtId === "object" && b.courtId && "name" in b.courtId
         ? (b.courtId as Court).name || "Unknown Court"
         : "Unknown Court";
+    } else if (sortColumn === "createdAt" || sortColumn === "updatedAt") {
+      // Sort by date fields using actual Date comparison
+      const aDate = new Date(a[sortColumn]);
+      const bDate = new Date(b[sortColumn]);
+      const diff = aDate.getTime() - bDate.getTime();
+      return sortDirection === "asc" ? diff : -diff;
     } else {
       aValue = a[sortColumn];
       bValue = b[sortColumn];
@@ -297,13 +303,9 @@ export default function BookingsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-zinc-800">
-                    <TableHead 
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("_id")}
-                    >
+                    <TableHead className="w-[70px]">
                       <div className="flex items-center">
-                        Booking ID
-                        <SortIcon column="_id" />
+                        No.
                       </div>
                     </TableHead>
                     <TableHead 
@@ -362,7 +364,7 @@ export default function BookingsPage() {
                     <>
                       {[...Array(5)].map((_, i) => (
                         <TableRow key={i} className="border-zinc-800">
-                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-10" /></TableCell>
                           <TableCell>
                             <Skeleton className="h-4 w-32 mb-2" />
                             <Skeleton className="h-3 w-40" />
@@ -408,8 +410,10 @@ export default function BookingsPage() {
                           key={booking._id}
                           className="border-zinc-800"
                         >
-                          <TableCell className="font-mono text-zinc-400 text-sm">
-                            #{booking._id.slice(-8)}
+                          <TableCell className="font-mono text-zinc-400 text-xs">
+                            {typeof booking.serialNumber === "number"
+                              ? booking.serialNumber.toString().padStart(3, "0")
+                              : "—"}
                           </TableCell>
                           <TableCell className="text-zinc-200 text-sm">
                             <div className="font-medium text-white">

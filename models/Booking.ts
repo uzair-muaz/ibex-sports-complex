@@ -15,6 +15,7 @@ export interface IBooking extends Document {
   date: string; // YYYY-MM-DD
   startTime: number; // Hour (0-23)
   duration: number; // Hours (minimum 1, can add 0.5 for 30 min)
+  serialNumber?: number; // Incremental booking serial (1, 2, 3, ...)
   userName: string;
   userEmail: string;
   userPhone: string;
@@ -53,6 +54,13 @@ const BookingSchema: Schema = new Schema(
       required: [true, 'Duration is required'],
       min: 1,
       max: 12,
+    },
+    serialNumber: {
+      type: Number,
+      min: 1,
+      index: true,
+      unique: true,
+      sparse: true, // allow existing documents without serialNumber
     },
     userName: {
       type: String,

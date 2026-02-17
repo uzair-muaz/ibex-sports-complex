@@ -1,0 +1,28 @@
+{
+  "indexes": [
+    {
+      "v": { "$numberInt": "2" },
+      "key": { "_id": { "$numberInt": "1" } },
+      "name": "_id_"
+    },
+    {
+      "v": { "$numberInt": "2" },
+      "key": {
+        "courtId": { "$numberInt": "1" },
+        "date": { "$numberInt": "1" },
+        "startTime": { "$numberInt": "1" }
+      },
+      "name": "courtId_1_date_1_startTime_1",
+      "background": true
+    },
+    {
+      "v": { "$numberInt": "2" },
+      "key": { "date": { "$numberInt": "1" }, "status": { "$numberInt": "1" } },
+      "name": "date_1_status_1",
+      "background": true
+    }
+  ],
+  "uuid": "0e87012cc539446e8a80e543c019d44c",
+  "collectionName": "bookings",
+  "type": "collection"
+}

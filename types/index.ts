@@ -50,6 +50,8 @@ export interface Booking {
   date: string; // YYYY-MM-DD
   startTime: number; // Hour (0-23)
   duration: number; // Hours
+   /** Incremental booking serial (1, 2, 3, ...) */
+  serialNumber?: number;
   userName: string;
   userEmail: string;
   userPhone?: string;
