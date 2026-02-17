@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { DollarSign, Users, TrendingUp } from "lucide-react";
+import { DollarSign, Users, TrendingUp, CreditCard, Banknote } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
   Card,
@@ -71,9 +71,19 @@ export default function AnalyticsPage() {
       return online + cash > 0 ? online + cash : (b.amountPaid ?? 0);
     };
 
-    const revenueBookings = bookings.filter((b) => b.status === "completed");
+    const revenueBookings = bookings.filter(
+      (b) => b.status === "completed" || b.status === "confirmed"
+    );
     const totalRevenue = revenueBookings.reduce(
       (sum, b) => sum + getReceivedAmount(b),
+      0
+    );
+    const totalCashReceived = revenueBookings.reduce(
+      (sum, b) => sum + (b.amountReceivedCash ?? 0),
+      0
+    );
+    const totalOnlineReceived = revenueBookings.reduce(
+      (sum, b) => sum + (b.amountReceivedOnline ?? 0),
       0
     );
     const confirmedBookings = bookings.filter((b) => b.status === "confirmed");
@@ -156,6 +166,8 @@ export default function AnalyticsPage() {
 
     return {
       totalRevenue,
+      totalCashReceived,
+      totalOnlineReceived,
       confirmedBookings: confirmedBookings.length,
       todayBookings: todayBookings.length,
       totalBookings: bookings.length,
@@ -180,7 +192,7 @@ export default function AnalyticsPage() {
       isLoading={isLoading}
     >
       {/* Dashboard Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="border-zinc-800 bg-zinc-950">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -199,7 +211,56 @@ export default function AnalyticsPage() {
               })}
             </CardTitle>
             <p className="text-xs text-zinc-400 mt-2">
-              {stats.confirmedBookings} confirmed
+              {stats.bookingsByStatus.completed} completed ·{" "}
+              {stats.bookingsByStatus.confirmed} confirmed
+            </p>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-zinc-800 bg-zinc-950">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
+                <Banknote className="w-6 h-6 text-[#2DD4BF]" />
+              </div>
+            </div>
+            <CardDescription className="text-zinc-400">
+              Cash Received
+            </CardDescription>
+            <CardTitle className="text-3xl text-[#2DD4BF]">
+              PKR{" "}
+              {stats.totalCashReceived.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </CardTitle>
+            <p className="text-xs text-zinc-400 mt-2">
+              {stats.bookingsByStatus.completed} completed ·{" "}
+              {stats.bookingsByStatus.confirmed} confirmed
+            </p>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-zinc-800 bg-zinc-950">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
+                <CreditCard className="w-6 h-6 text-[#2DD4BF]" />
+              </div>
+            </div>
+            <CardDescription className="text-zinc-400">
+              Online Received
+            </CardDescription>
+            <CardTitle className="text-3xl text-[#2DD4BF]">
+              PKR{" "}
+              {stats.totalOnlineReceived.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </CardTitle>
+            <p className="text-xs text-zinc-400 mt-2">
+              {stats.bookingsByStatus.completed} completed ·{" "}
+              {stats.bookingsByStatus.confirmed} confirmed
             </p>
           </CardHeader>
         </Card>
@@ -214,7 +275,7 @@ export default function AnalyticsPage() {
             <CardDescription className="text-zinc-400">
               Total Bookings
             </CardDescription>
-            <CardTitle className="text-3xl text-white">
+            <CardTitle className="text-3xl text-[#2DD4BF]">
               {stats.totalBookings}
             </CardTitle>
             <p className="text-xs text-zinc-400 mt-2">
@@ -268,7 +329,7 @@ export default function AnalyticsPage() {
 
       {/* Analytics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <Card className="border-zinc-800 bg-black/40">
+        <Card className="border-zinc-800 bg-zinc-950">
           <CardHeader>
             <CardDescription className="text-zinc-400">
               This Month Revenue
@@ -283,7 +344,7 @@ export default function AnalyticsPage() {
           </CardHeader>
         </Card>
 
-        <Card className="border-zinc-800 bg-black/40">
+        <Card className="border-zinc-800 bg-zinc-950">
           <CardHeader>
             <CardDescription className="text-zinc-400">
               Most Popular Court
@@ -294,7 +355,7 @@ export default function AnalyticsPage() {
           </CardHeader>
         </Card>
 
-        <Card className="border-zinc-800 bg-black/40">
+        <Card className="border-zinc-800 bg-zinc-950">
           <CardHeader>
             <CardDescription className="text-zinc-400">
               Bookings by Status
@@ -335,7 +396,7 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        <Card className="border-zinc-800 bg-black/40">
+        <Card className="border-zinc-800 bg-zinc-950">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2 text-white">
               <Users className="w-5 h-5 text-[#2DD4BF]" />
@@ -380,7 +441,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-zinc-800 bg-black/40">
+        <Card className="border-zinc-800 bg-zinc-950">
           <CardHeader>
             <CardTitle className="text-lg text-white">
               Revenue by Court Type
