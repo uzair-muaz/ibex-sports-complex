@@ -64,6 +64,7 @@ export default function BookingPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isSticky, setIsSticky] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
+  const slotsContainerRef = useRef<HTMLDivElement>(null);
 
   // Detect when sticky element becomes stuck
   useEffect(() => {
@@ -81,6 +82,41 @@ export default function BookingPage() {
 
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Only scroll when drawer opens AND selected slots would be covered by the drawer
+  useEffect(() => {
+    const minSlots = selectedCourtType === "FUTSAL" ? 3 : 2;
+    if (selectedSlots.length >= minSlots && slotsContainerRef.current) {
+      const drawerHeight =
+        window.innerWidth >= 1024 ? 150 : window.innerWidth >= 768 ? 145 : 130;
+      const safeBottom = window.innerHeight - drawerHeight - 24;
+
+      setTimeout(() => {
+        const sortedSlots = [...selectedSlots].sort(
+          (a, b) => a.slotTime - b.slotTime,
+        );
+        const lastSlot = sortedSlots[sortedSlots.length - 1];
+        if (!lastSlot) return;
+
+        const slotElement = document.querySelector(
+          `[data-slot-time="${lastSlot.slotTime}"][data-court-id="${lastSlot.courtId}"]`,
+        );
+        if (!slotElement) return;
+
+        const elementRect = slotElement.getBoundingClientRect();
+        // Only scroll if the slot is in or below the drawer zone (would be covered)
+        if (elementRect.bottom > safeBottom) {
+          const absoluteElementTop =
+            elementRect.top + window.scrollY;
+          const targetScroll = absoluteElementTop - safeBottom + elementRect.height;
+          window.scrollTo({
+            top: Math.max(0, targetScroll),
+            behavior: "smooth",
+          });
+        }
+      }, 300);
+    }
+  }, [selectedSlots, selectedCourtType]);
 
   const formatTime12 = (time: number) => {
     const totalMinutes = Math.round(time * 60);
@@ -515,7 +551,13 @@ export default function BookingPage() {
 
       <div className="fixed top-0 left-0 w-full h-[50vh] bg-gradient-to-b from-[#2DD4BF]/10 to-transparent pointer-events-none" />
 
-      <div className="pt-20 md:pt-24 lg:pt-32 pb-20 md:pb-24 px-4 md:px-6">
+      <div
+        className={`pt-20 md:pt-24 lg:pt-32 px-4 md:px-6 transition-all duration-300 ${
+          selectedSlots.length >= (selectedCourtType === "FUTSAL" ? 3 : 2)
+            ? "pb-[130px] md:pb-[145px] lg:pb-[150px]"
+            : "pb-20 md:pb-24"
+        }`}
+      >
         <div className="max-w-7xl mx-auto space-y-4 md:space-y-6 relative z-10">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 md:gap-8 pb-6 md:pb-8 border-b border-white/5">
@@ -625,7 +667,7 @@ export default function BookingPage() {
             )}
 
             {/* Main Booking Grid */}
-            <div className="mt-4">
+            <div ref={slotsContainerRef} className="mt-4">
               {isLoadingTypes || isLoadingCourts ? (
                 <div className="space-y-4 ">
                   {/* Desktop Skeleton */}
@@ -767,6 +809,8 @@ export default function BookingPage() {
                                       className="h-7 p-0.5 border-b border-white/5"
                                     >
                                       <motion.button
+                                        data-slot-time={slotTime}
+                                        data-court-id={court._id}
                                         whileHover={
                                           !isUnavailable &&
                                           (selectedSlots.length === 0 ||
@@ -909,6 +953,8 @@ export default function BookingPage() {
                             return (
                               <motion.button
                                 key={slotTime}
+                                data-slot-time={slotTime}
+                                data-court-id={court._id}
                                 whileHover={
                                   !isUnavailable && canSelect
                                     ? { scale: 0.95 }
