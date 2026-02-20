@@ -126,13 +126,13 @@ export default function NewBookingPage() {
     }
   };
 
-  // Generate time slots for business hours: 12:00 PM - 2:00 AM
+  // Generate time slots for business hours: 12:00 PM - 4:00 AM
   const timeSlots: number[] = [];
   for (let hour = 12; hour < 24; hour++) {
     timeSlots.push(hour);
     timeSlots.push(hour + 0.5);
   }
-  for (let hour = 0; hour < 2; hour++) {
+  for (let hour = 0; hour < 4; hour++) {
     timeSlots.push(hour);
     timeSlots.push(hour + 0.5);
   }

@@ -114,15 +114,15 @@ export const GetInTouchSection = () => {
             <ul className="space-y-4 font-mono text-xs md:text-sm text-zinc-400">
               <li className="flex justify-between border-b border-white/10 pb-2">
                 <span>Mon - Fri</span>
-                <span className="text-white">12:00 PM - 2:00 AM</span>
+                <span className="text-white">12:00 PM - 4:00 AM</span>
               </li>
               <li className="flex justify-between border-b border-white/10 pb-2">
                 <span>Saturday</span>
-                <span className="text-white">12:00 PM - 2:00 AM</span>
+                <span className="text-white">12:00 PM - 4:00 AM</span>
               </li>
               <li className="flex justify-between pt-2">
                 <span>Sunday</span>
-                <span className="text-white">12:00 PM - 2:00 AM</span>
+                <span className="text-white">12:00 PM - 4:00 AM</span>
               </li>
             </ul>
           </div>

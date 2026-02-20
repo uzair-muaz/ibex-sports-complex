@@ -6,10 +6,10 @@ import { revalidatePath } from 'next/cache';
 import type { CourtPricingPeriod } from '@/types';
 
 const BUSINESS_START_HOUR = 12; // 12 PM
-const BUSINESS_END_HOUR = 26; // 2 AM next day (24 + 2)
+const BUSINESS_END_HOUR = 28; // 4 AM next day (24 + 4)
 
 function normalizeHour(hour: number): number {
-  // Map 0-2 (AM) to 24-26 for continuous timeline
+  // Map 0-4 (AM) to 24-28 for continuous timeline
   if (hour < BUSINESS_START_HOUR) {
     return hour + 24;
   }
@@ -28,7 +28,7 @@ function validateTimeBasedPricing(periods: CourtPricingPeriod[]): string | null 
     const ne = normalizeHour(period.endHour);
 
     if (ns < BUSINESS_START_HOUR || ne > BUSINESS_END_HOUR) {
-      return 'Peak/off-peak hours must be within 12:00 PM to 2:00 AM.';
+      return 'Peak/off-peak hours must be within 12:00 PM to 4:00 AM.';
     }
 
     if (ne <= ns) {
@@ -40,11 +40,11 @@ function validateTimeBasedPricing(periods: CourtPricingPeriod[]): string | null 
     }
   }
 
-  // Ensure full coverage from 12 PM (12) to 2 AM next day (26) in 30-minute steps
+  // Ensure full coverage from 12 PM (12) to 4 AM next day (28) in 30-minute steps
   for (let t = BUSINESS_START_HOUR; t < BUSINESS_END_HOUR; t += 0.5) {
     const key = Number(t.toFixed(2));
     if (!covered.has(key)) {
-      return 'Peak/off-peak periods must fully cover 12:00 PM to 2:00 AM without gaps.';
+      return 'Peak/off-peak periods must fully cover 12:00 PM to 4:00 AM without gaps.';
     }
   }
 

@@ -194,7 +194,7 @@ export default function BookingPage() {
     });
   };
 
-  // Check if a time slot has already passed, handling 12 PM – 2 AM business day
+  // Check if a time slot has already passed, handling 12 PM – 4 AM business day
   const isSlotPassed = (slotTime: number) => {
     const now = new Date();
 
@@ -206,14 +206,14 @@ export default function BookingPage() {
     );
 
     // Build an exact Date for this slot. For hours between 12 PM–11:30 PM
-    // we use the selected day. For 12 AM–2 AM we treat them as happening
+    // we use the selected day. For 12 AM–4 AM we treat them as happening
     // in the early morning following the selected day.
     const slotDateTime = new Date(selectedDay);
     const slotHour = Math.floor(slotTime);
     const slotMinutes = slotTime % 1 === 0 ? 0 : 30;
 
-    if (slotTime < 2) {
-      // 12:00–1:30 AM are considered the next calendar day
+    if (slotTime < 4) {
+      // 12:00–3:30 AM are considered the next calendar day
       slotDateTime.setDate(slotDateTime.getDate() + 1);
     }
 
@@ -415,15 +415,15 @@ export default function BookingPage() {
     }
   };
 
-  // Generate 30-minute slots for business hours: 12:00 PM - 2:00 AM
+  // Generate 30-minute slots for business hours: 12:00 PM - 4:00 AM
   const timeSlots: number[] = [];
   // 12:00 PM (12) to 11:30 PM (23.5)
   for (let hour = 12; hour < 24; hour++) {
     timeSlots.push(hour);
     timeSlots.push(hour + 0.5);
   }
-  // 12:00 AM (0) to 1:30 AM (1.5)
-  for (let hour = 0; hour < 2; hour++) {
+  // 12:00 AM (0) to 3:30 AM (3.5)
+  for (let hour = 0; hour < 4; hour++) {
     timeSlots.push(hour);
     timeSlots.push(hour + 0.5);
   }

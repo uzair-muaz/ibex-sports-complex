@@ -93,7 +93,7 @@ export const HeroSection = () => {
           <div className="hidden md:flex flex-col text-xs font-mono text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-l border-zinc-400/30 dark:border-zinc-700 pl-4 md:pl-6">
             <span>Open Daily</span>
             <span className="text-white dark:text-white font-bold">
-              12:00 PM - 2:00 AM
+              12:00 PM - 4:00 AM
             </span>
           </div>
         </motion.div>
