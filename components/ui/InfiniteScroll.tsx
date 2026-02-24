@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef } from 'react';
+import Image from 'next/image';
 import {
   motion,
   useScroll,
@@ -64,10 +65,13 @@ export const InfiniteGallery = ({ images }: { images: { url: string; title: stri
       <ParallaxText baseVelocity={-2}>
         {images.map((img, i) => (
           <div key={i} className="relative w-[400px] h-[300px] md:w-[600px] md:h-[400px] flex-shrink-0 rounded-3xl overflow-hidden mx-4 group shadow-2xl">
-            <img 
-              src={img.url} 
+            <Image
+              src={img.url}
               alt={img.title}
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              fill
+              sizes="(max-width: 768px) 400px, 600px"
+              className="object-cover transition-transform duration-700 group-hover:scale-110"
+              loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-80 group-hover:opacity-60 transition-opacity" />
             <div className="absolute bottom-6 left-6 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-y-4 group-hover:translate-y-0">
