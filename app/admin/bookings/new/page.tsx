@@ -136,6 +136,7 @@ export default function NewBookingPage() {
     timeSlots.push(hour);
     timeSlots.push(hour + 0.5);
   }
+  const getSlotIndex = (slotTime: number) => timeSlots.indexOf(slotTime);
 
   const formatTime12 = (time: number) => {
     const totalMinutes = Math.round(time * 60);
@@ -161,7 +162,13 @@ export default function NewBookingPage() {
       const bookingStart = b.startTime;
       const bookingEnd = b.startTime + b.duration;
 
-      return slotTime >= bookingStart && slotTime < bookingEnd;
+      if (bookingEnd <= 24) {
+        return slotTime >= bookingStart && slotTime < bookingEnd;
+      }
+
+      const inLateSegment = slotTime >= bookingStart && slotTime < 24;
+      const inEarlySegment = slotTime >= 0 && slotTime < bookingEnd - 24;
+      return inLateSegment || inEarlySegment;
     });
   };
 
@@ -175,17 +182,16 @@ export default function NewBookingPage() {
     if (selectedSlots.length === 0) return true;
     if (selectedSlots[0].courtId !== courtId) return false;
 
-    const sortedTimes = selectedSlots
-      .map((s) => s.slotTime)
+    const indices = selectedSlots
+      .map((s) => getSlotIndex(s.slotTime))
+      .filter((i) => i >= 0)
       .sort((a, b) => a - b);
-    const minTime = sortedTimes[0];
-    const maxTime = sortedTimes[sortedTimes.length - 1];
+    const newIndex = getSlotIndex(slotTime);
+    if (newIndex === -1 || indices.length === 0) return false;
 
-    return (
-      slotTime === minTime - 0.5 ||
-      slotTime === maxTime + 0.5 ||
-      (slotTime >= minTime && slotTime <= maxTime)
-    );
+    const minIndex = indices[0];
+    const maxIndex = indices[indices.length - 1];
+    return newIndex === minIndex - 1 || newIndex === maxIndex + 1;
   };
 
   const selectedCourt = courts.find(
@@ -206,9 +212,10 @@ export default function NewBookingPage() {
         appliedDiscounts: [] as AppliedDiscount[],
       };
     }
-    const sortedTimes = selectedSlots
-      .map((s) => s.slotTime)
-      .sort((a, b) => a - b);
+    const sortedByIndex = [...selectedSlots].sort(
+      (a, b) => getSlotIndex(a.slotTime) - getSlotIndex(b.slotTime),
+    );
+    const sortedTimes = sortedByIndex.map((s) => s.slotTime);
     const startTime = sortedTimes[0];
     const duration = selectedSlots.length * 0.5;
     const dateString =
@@ -281,7 +288,7 @@ export default function NewBookingPage() {
           const sortedTimes = [
             ...selectedSlots.map((s) => s.slotTime),
             slotTime,
-          ].sort((a, b) => a - b);
+          ].sort((a, b) => getSlotIndex(a) - getSlotIndex(b));
           const newSlots = sortedTimes.map((t) => ({ courtId, slotTime: t }));
           setSelectedSlots(newSlots);
         }
@@ -316,9 +323,10 @@ export default function NewBookingPage() {
     setIsSubmitting(true);
 
     try {
-      const sortedTimes = selectedSlots
-        .map((s) => s.slotTime)
-        .sort((a, b) => a - b);
+      const sortedByIndex = [...selectedSlots].sort(
+        (a, b) => getSlotIndex(a.slotTime) - getSlotIndex(b.slotTime),
+      );
+      const sortedTimes = sortedByIndex.map((s) => s.slotTime);
       const startTime = sortedTimes[0];
       const duration = selectedSlots.length * 0.5;
       const dateString =

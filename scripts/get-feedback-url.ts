@@ -31,7 +31,9 @@ async function getFeedbackUrl() {
     console.log(`   User: ${booking.userName} (${booking.userEmail})`);
     console.log(`   Court Type: ${(booking as any).courtType || 'N/A'}`);
     console.log(`   Date: ${booking.date}`);
-    console.log(`   Time: ${booking.startTime}:00 - ${booking.startTime + booking.duration}:00`);
+    const rawEndTime = booking.startTime + booking.duration;
+    const endTime = ((rawEndTime % 24) + 24) % 24;
+    console.log(`   Time: ${booking.startTime}:00 - ${endTime}:00`);
     console.log(`   Status: ${booking.status}`);
     
     console.log("\n🔗 Feedback URL:");

@@ -225,8 +225,16 @@ export default function BookingPage() {
       const bookingStart = b.startTime;
       const bookingEnd = b.startTime + b.duration;
 
-      // Check if 30-minute slot falls within booking range
-      return slotTime >= bookingStart && slotTime < bookingEnd;
+      // Handle bookings that may span past midnight
+      if (bookingEnd <= 24) {
+        // Simple case: does the slot fall within [start, end)?
+        return slotTime >= bookingStart && slotTime < bookingEnd;
+      }
+
+      // Wraps past midnight: [start, 24) U [0, end - 24)
+      const inLateSegment = slotTime >= bookingStart && slotTime < 24;
+      const inEarlySegment = slotTime >= 0 && slotTime < bookingEnd - 24;
+      return inLateSegment || inEarlySegment;
     });
   };
 
@@ -268,17 +276,18 @@ export default function BookingPage() {
     if (selectedSlots.length === 0) return true;
     if (selectedSlots[0].courtId !== courtId) return false;
 
-    const sortedTimes = selectedSlots
-      .map((s) => s.slotTime)
+    const indices = selectedSlots
+      .map((s) => timeSlots.indexOf(s.slotTime))
+      .filter((i) => i >= 0)
       .sort((a, b) => a - b);
-    const minTime = sortedTimes[0];
-    const maxTime = sortedTimes[sortedTimes.length - 1];
+    const newIndex = timeSlots.indexOf(slotTime);
+    if (newIndex === -1 || indices.length === 0) return false;
 
-    // Check if slotTime is exactly 0.5 hours before min or after max
-    return (
-      Math.abs(slotTime - (minTime - 0.5)) < 0.01 ||
-      Math.abs(slotTime - (maxTime + 0.5)) < 0.01
-    );
+    const minIndex = indices[0];
+    const maxIndex = indices[indices.length - 1];
+
+    // Allow extending selection by one slot in business-day order
+    return newIndex === minIndex - 1 || newIndex === maxIndex + 1;
   };
 
   const toggleSlot = (courtId: string, slotTime: number) => {
@@ -347,16 +356,16 @@ export default function BookingPage() {
         return;
       }
 
-      // Same court - check if consecutive (0.5 hour increments, no breaks)
-      const sortedTimes = [
-        ...selectedSlots.map((s) => s.slotTime),
-        slotTime,
-      ].sort((a, b) => a - b);
+      // Same court - check if consecutive in the business-day order (no gaps)
+      const allSlots = [...selectedSlots.map((s) => s.slotTime), slotTime];
+      const indices = allSlots
+        .map((t) => timeSlots.indexOf(t))
+        .filter((i) => i >= 0)
+        .sort((a, b) => a - b);
 
       let isConsecutive = true;
-      for (let i = 0; i < sortedTimes.length - 1; i++) {
-        // Check if next slot is exactly 0.5 hours after current slot
-        if (Math.abs(sortedTimes[i + 1] - sortedTimes[i] - 0.5) > 0.01) {
+      for (let i = 0; i < indices.length - 1; i++) {
+        if (indices[i + 1] - indices[i] !== 1) {
           isConsecutive = false;
           break;
         }
@@ -370,12 +379,14 @@ export default function BookingPage() {
         return;
       }
 
-      // Consecutive slot - add it
-      setSelectedSlots((prev) =>
-        [...prev, { courtId, slotTime }].sort(
-          (a, b) => a.slotTime - b.slotTime,
-        ),
-      );
+      // Consecutive slot - add it, keeping business-day order
+      setSelectedSlots((prev) => {
+        const next = [...prev, { courtId, slotTime }];
+        return next.sort(
+          (a, b) =>
+            timeSlots.indexOf(a.slotTime) - timeSlots.indexOf(b.slotTime),
+        );
+      });
       setSelectionError("");
     }
   };
@@ -384,14 +395,22 @@ export default function BookingPage() {
     e.preventDefault();
     if (selectedSlots.length === 0) return;
 
-    const sortedTimes = selectedSlots
-      .map((s) => s.slotTime)
-      .sort((a, b) => a - b);
+    const sortedByIndex = [...selectedSlots].sort(
+      (a, b) =>
+        timeSlots.indexOf(a.slotTime) - timeSlots.indexOf(b.slotTime),
+    );
+    const sortedTimes = sortedByIndex.map((s) => s.slotTime);
 
-    // Check if slots are consecutive (0.5 hour increments, no breaks)
+    // Check if slots are consecutive in the business-day order
     let isConsecutive = true;
     for (let i = 0; i < sortedTimes.length - 1; i++) {
-      if (Math.abs(sortedTimes[i + 1] - sortedTimes[i] - 0.5) > 0.01) {
+      const currentIndex = timeSlots.indexOf(sortedTimes[i]);
+      const nextIndex = timeSlots.indexOf(sortedTimes[i + 1]);
+      if (currentIndex === -1 || nextIndex === -1) {
+        isConsecutive = false;
+        break;
+      }
+      if (nextIndex - currentIndex !== 1) {
         isConsecutive = false;
         break;
       }
@@ -477,9 +496,11 @@ export default function BookingPage() {
       };
     }
 
-    const sortedTimes = selectedSlots
-      .map((s) => s.slotTime)
-      .sort((a, b) => a - b);
+    const sortedByIndex = [...selectedSlots].sort(
+      (a, b) =>
+        timeSlots.indexOf(a.slotTime) - timeSlots.indexOf(b.slotTime),
+    );
+    const sortedTimes = sortedByIndex.map((s) => s.slotTime);
     const startTime = sortedTimes[0];
     const duration = selectedSlots.length * 0.5;
     const dateString = formatLocalDate(selectedDate);
@@ -525,6 +546,7 @@ export default function BookingPage() {
     selectedCourt,
     activeDiscounts,
     selectedDate,
+    timeSlots,
   ]);
 
   const {
@@ -1046,9 +1068,14 @@ export default function BookingPage() {
                     {selectedCourt ? `${selectedCourt.name} • ` : ""}
                     {selectedSlots.length > 0 &&
                       (() => {
-                        const sortedTimes = selectedSlots
-                          .map((s) => s.slotTime)
-                          .sort((a, b) => a - b);
+                        const sortedByIndex = [...selectedSlots].sort(
+                          (a, b) =>
+                            timeSlots.indexOf(a.slotTime) -
+                            timeSlots.indexOf(b.slotTime),
+                        );
+                        const sortedTimes = sortedByIndex.map(
+                          (s) => s.slotTime,
+                        );
                         const startTime = sortedTimes[0];
                         const endTime =
                           sortedTimes[sortedTimes.length - 1] + 0.5;
@@ -1336,9 +1363,14 @@ export default function BookingPage() {
                     <span>•</span>
                     {selectedSlots.length > 0 &&
                       (() => {
-                        const sortedTimes = selectedSlots
-                          .map((s) => s.slotTime)
-                          .sort((a, b) => a - b);
+                        const sortedByIndex = [...selectedSlots].sort(
+                          (a, b) =>
+                            timeSlots.indexOf(a.slotTime) -
+                            timeSlots.indexOf(b.slotTime),
+                        );
+                        const sortedTimes = sortedByIndex.map(
+                          (s) => s.slotTime,
+                        );
                         const startTime = sortedTimes[0];
                         const endTime =
                           sortedTimes[sortedTimes.length - 1] + 0.5;

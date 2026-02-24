@@ -36,7 +36,8 @@ export interface BookingEmailData {
  */
 export function generateBookingConfirmationEmail(data: BookingEmailData): string {
   const startTimeFormatted = `${Math.floor(data.startTime).toString().padStart(2, '0')}:${data.startTime % 1 === 0 ? '00' : '30'}`;
-  const endTime = data.startTime + data.duration;
+  const rawEndTime = data.startTime + data.duration;
+  const endTime = ((rawEndTime % 24) + 24) % 24;
   const endTimeFormatted = `${Math.floor(endTime).toString().padStart(2, '0')}:${endTime % 1 === 0 ? '00' : '30'}`;
   const formattedDate = new Date(data.date).toLocaleDateString('en-US', {
     weekday: 'long',

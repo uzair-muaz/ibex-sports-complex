@@ -94,7 +94,9 @@ export function calculateOriginalPrice(
   let total = 0;
 
   for (let i = 0; i < slots; i++) {
-    const slotStart = startTime + i * 0.5;
+    // Allow bookings that span past midnight by wrapping into 0–24 range
+    const rawSlotStart = startTime + i * 0.5;
+    const slotStart = ((rawSlotStart % 24) + 24) % 24;
     const { pricePerHour } = getPricePerHourForTime(court, slotStart);
     total += pricePerHour * 0.5;
   }

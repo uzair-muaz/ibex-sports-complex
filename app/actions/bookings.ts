@@ -12,6 +12,35 @@ import { getBaseUrl } from '@/lib/utils';
 import { getApplicableDiscounts, calculateDiscountedPrice, DiscountInput } from '@/lib/discount-utils';
 import { calculateOriginalPrice } from '@/lib/pricing-utils';
 
+function getTimeSegments(start: number, duration: number): [number, number][] {
+  const end = start + duration;
+
+  if (end <= 24) {
+    return [[start, end]];
+  }
+
+  // Wrap past midnight: [start, 24) U [0, end - 24)
+  return [
+    [start, 24],
+    [0, end - 24],
+  ];
+}
+
+function doTimeRangesOverlap(
+  startA: number,
+  durationA: number,
+  startB: number,
+  durationB: number,
+): boolean {
+  const segmentsA = getTimeSegments(startA, durationA);
+  const segmentsB = getTimeSegments(startB, durationB);
+
+  // Two ranges overlap if any of their non-wrapping segments intersect
+  return segmentsA.some(([aStart, aEnd]) =>
+    segmentsB.some(([bStart, bEnd]) => aStart < bEnd && bStart < aEnd),
+  );
+}
+
 export interface CreateBookingInput {
   courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
   date: string;
@@ -62,7 +91,6 @@ export async function createBooking(input: CreateBookingInput) {
 
     // Find available court
     let assignedCourt = null;
-    const endTime = input.startTime + input.duration;
 
     for (const court of availableCourts) {
       // Check if this court has any conflicts
@@ -71,13 +99,12 @@ export async function createBooking(input: CreateBookingInput) {
           return false;
         }
 
-        const bookingEndTime = booking.startTime + booking.duration;
-
-        // Check for overlap
-        return (
-          (input.startTime >= booking.startTime && input.startTime < bookingEndTime) ||
-          (booking.startTime >= input.startTime && booking.startTime < endTime) ||
-          (input.startTime <= booking.startTime && endTime >= bookingEndTime)
+        // Check for overlap, including bookings that span past midnight
+        return doTimeRangesOverlap(
+          input.startTime,
+          input.duration,
+          booking.startTime,
+          booking.duration,
         );
       });
 
@@ -344,17 +371,16 @@ export async function updateBooking(input: UpdateBookingInput) {
           _id: { $ne: bookingId },
         });
 
-        const endTime = finalStartTime + finalDuration;
         const hasConflict = existingBookings.some((b) => {
           if (b.courtId.toString() !== court._id.toString()) {
             return false;
           }
 
-          const bookingEndTime = b.startTime + b.duration;
-          return (
-            (finalStartTime >= b.startTime && finalStartTime < bookingEndTime) ||
-            (b.startTime >= finalStartTime && b.startTime < endTime) ||
-            (finalStartTime <= b.startTime && endTime >= bookingEndTime)
+          return doTimeRangesOverlap(
+            finalStartTime,
+            finalDuration,
+            b.startTime,
+            b.duration,
           );
         });
 

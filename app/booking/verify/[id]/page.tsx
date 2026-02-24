@@ -70,7 +70,8 @@ export default function VerifyBookingPage() {
     : null;
 
   const startTimeFormatted = `${Math.floor(booking.startTime).toString().padStart(2, "0")}:${booking.startTime % 1 === 0 ? "00" : "30"}`;
-  const endTime = booking.startTime + booking.duration;
+  const rawEndTime = booking.startTime + booking.duration;
+  const endTime = ((rawEndTime % 24) + 24) % 24;
   const endTimeFormatted = `${Math.floor(endTime).toString().padStart(2, "0")}:${endTime % 1 === 0 ? "00" : "30"}`;
 
   return (

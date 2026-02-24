@@ -47,7 +47,8 @@ const BookingSchema: Schema = new Schema(
       type: Number,
       required: [true, 'Start time is required'],
       min: 0,
-      max: 23,
+      // Allow half-hour increments up to 11:30 PM (23.5)
+      max: 23.5,
     },
     duration: {
       type: Number,
