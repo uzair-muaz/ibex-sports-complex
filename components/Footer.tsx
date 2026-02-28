@@ -4,10 +4,10 @@ import Link from 'next/link';
 
 export const Footer = () => {
   return (
-    <footer className="bg-white dark:bg-black border-t border-zinc-200 dark:border-white/5 py-8 px-6 transition-colors duration-500">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-mono uppercase tracking-widest text-zinc-500">
-        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="relative w-8 h-8">
+    <footer className="bg-white dark:bg-black border-t border-zinc-200 dark:border-white/5 py-6 sm:py-8 px-4 sm:px-6 transition-colors duration-500">
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6 text-xs font-mono uppercase tracking-widest text-zinc-500 text-center md:text-left">
+        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity justify-center md:justify-start">
+          <div className="relative w-8 h-8 shrink-0">
             <Image
               src="/logo.png"
               alt="IBEX Sports Complex Logo"

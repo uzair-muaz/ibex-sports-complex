@@ -7,11 +7,15 @@ import { usePathname } from "next/navigation";
 import { Menu, X, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
+import { useSectionTheme } from "@/contexts/SectionThemeContext";
 
 export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const sectionTheme = useSectionTheme();
+  const isLightNav =
+    sectionTheme?.sectionTheme === "light" && pathname === "/" && !isScrolled;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -28,9 +32,13 @@ export const Navbar = () => {
       initial={{ y: -100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed top-0 left-0 right-0 z-50 bg-black/95 dark:bg-black/95 backdrop-blur-xl border-b border-white/10 transition-all duration-300"
+      className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b transition-all duration-500 ${
+        isLightNav
+          ? "bg-white/90 dark:bg-white/90 border-zinc-200/50 dark:border-zinc-200/50"
+          : "bg-black/95 dark:bg-black/95 border-white/10"
+      }`}
     >
-      <div className="max-w-7xl mx-auto px-6 md:px-8 h-16 md:h-20 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 h-14 sm:h-16 md:h-20 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="relative group z-10">
           <motion.div
@@ -38,7 +46,7 @@ export const Navbar = () => {
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-3"
           >
-            <div className="relative w-10 h-10 md:w-12 md:h-12">
+            <div className="relative w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12">
               <Image
                 src="/logo.png"
                 alt="IBEX Sports Complex Logo"
@@ -49,8 +57,9 @@ export const Navbar = () => {
               />
             </div>
             <motion.span
-              className="text-xl md:text-2xl font-black tracking-tighter text-white dark:text-white"
-              whileHover={{ color: "#2DD4BF" }}
+              className={`text-lg sm:text-xl md:text-2xl font-black tracking-tighter ${
+                isLightNav ? "text-[#0F172A] dark:text-[#0F172A]" : "text-white dark:text-white"
+              }`}
               transition={{ duration: 0.2 }}
             >
               IBEX
@@ -73,17 +82,19 @@ export const Navbar = () => {
                   <motion.span
                     className={`relative text-sm font-medium tracking-wide px-4 py-2 rounded-lg transition-all duration-300 ${
                       isActive
-                        ? "text-white"
-                        : "text-zinc-300 dark:text-zinc-400"
+                        ? isLightNav
+                          ? "text-[#0F172A] dark:text-[#0F172A]"
+                          : "text-white"
+                        : isLightNav
+                          ? "text-zinc-600 dark:text-zinc-500"
+                          : "text-zinc-300 dark:text-zinc-400"
                     }`}
-                    whileHover={{ color: "#2DD4BF" }}
                   >
                     {link.name}
-                    {/* Active indicator */}
                     {isActive && (
                       <motion.div
                         layoutId="navbarIndicator"
-                        className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#2DD4BF] rounded-full"
+                        className="absolute -bottom-1 left-0 right-0 h-0.5 bg-black dark:bg-white rounded-full"
                         initial={false}
                         transition={{
                           type: "spring",
@@ -105,17 +116,17 @@ export const Navbar = () => {
             transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
           >
             <Link href="/admin">
-              <motion.button
+                <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="relative px-4 py-2 rounded-lg text-zinc-300 dark:text-zinc-400 hover:text-[#2DD4BF] hover:bg-white/5 dark:hover:bg-white/5 transition-all duration-200 group cursor-pointer flex items-center gap-2"
+                className={`relative px-4 py-2 rounded-lg transition-all duration-200 group cursor-pointer flex items-center gap-2 ${
+                  isLightNav
+                    ? "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-black hover:bg-zinc-100 dark:hover:bg-zinc-100"
+                    : "text-zinc-300 dark:text-zinc-400 hover:text-white hover:bg-white/5 dark:hover:bg-white/5"
+                }`}
               >
                 <Lock className="w-4 h-4" />
                 <span className="text-sm font-medium">Admin</span>
-                <motion.div
-                  className="absolute inset-0 bg-[#2DD4BF]/10 rounded-lg opacity-0 group-hover:opacity-100"
-                  transition={{ duration: 0.2 }}
-                />
               </motion.button>
             </Link>
           </motion.div>
@@ -131,7 +142,7 @@ export const Navbar = () => {
             <Link href="/booking">
               <Button
                 size="sm"
-                className="relative overflow-hidden bg-[#2DD4BF] text-[#0F172A] font-bold px-6 py-2.5 rounded-lg border-0 shadow-lg shadow-[#2DD4BF]/30 hover:shadow-[#2DD4BF]/50 transition-all duration-200 group cursor-pointer"
+                className="relative overflow-hidden bg-[#2DD4BF] text-[#0F172A] font-bold px-6 py-2.5 rounded-lg border-0 shadow-md hover:shadow-lg transition-all duration-200 group cursor-pointer"
               >
                 <span className="relative z-10 flex items-center gap-2">
                   Book Now
@@ -163,16 +174,16 @@ export const Navbar = () => {
           {/* Book Now Mobile (primary action) */}
           <Link href="/booking">
             <motion.button
-              whileTap={{ scale: 0.9 }}
-              className="relative px-3 py-2 rounded-lg bg-[#2DD4BF] text-[#0F172A] font-semibold text-sm hover:bg-[#14B8A6] transition-colors cursor-pointer flex items-center gap-2"
+              whileTap={{ scale: 0.98 }}
+              className="relative min-h-10 px-4 py-2.5 rounded-lg bg-[#2DD4BF] text-[#0F172A] font-semibold text-sm hover:bg-[#14B8A6] transition-colors cursor-pointer flex items-center gap-2"
             >
               <span>Book Now</span>
             </motion.button>
           </Link>
 
           <motion.button
-            whileTap={{ scale: 0.9 }}
-            className="relative p-2 rounded-lg text-white hover:bg-white/10 transition-colors"
+            whileTap={{ scale: 0.98 }}
+            className="relative min-h-10 min-w-10 p-2.5 rounded-lg text-white hover:bg-white/10 transition-colors"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             <AnimatePresence mode="wait">
@@ -210,9 +221,13 @@ export const Navbar = () => {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="md:hidden absolute top-16 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/10 overflow-hidden"
+            className={`md:hidden absolute top-14 sm:top-16 left-0 right-0 backdrop-blur-xl border-t overflow-hidden ${
+              isLightNav
+                ? "bg-white/95 dark:bg-white/95 border-zinc-200/50"
+                : "bg-black/95 dark:bg-black/95 border-white/10"
+            }`}
           >
-            <div className="px-6 py-8 flex flex-col gap-6">
+            <div className="px-4 py-6 sm:px-6 sm:py-8 flex flex-col gap-1">
               {navLinks.map((link, index) => {
                 const isActive = pathname === link.path;
                 return (
@@ -224,15 +239,15 @@ export const Navbar = () => {
                   >
                     <Link
                       href={link.path}
-                      className={`relative text-2xl font-bold transition-colors ${
-                        isActive ? "text-[#2DD4BF]" : "text-white"
-                      } hover:text-[#2DD4BF]`}
+                      className={`relative block py-3.5 text-xl sm:text-2xl font-bold transition-colors ${
+                        isActive ? "text-black dark:text-white" : isLightNav ? "text-[#0F172A]" : "text-white"
+                      } hover:text-zinc-600 dark:hover:text-zinc-300`}
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       {link.name}
                       {isActive && (
                         <motion.div
-                          className="absolute -left-4 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#2DD4BF] rounded-r-full"
+                          className="absolute -left-4 top-1/2 -translate-y-1/2 w-1 h-8 bg-black dark:bg-white rounded-r-full"
                           layoutId="mobileActiveIndicator"
                           initial={false}
                         />

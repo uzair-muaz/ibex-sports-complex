@@ -70,14 +70,6 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
         >
           <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 relative">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 pr-8 sm:pr-0">
-              <motion.div
-                animate={{ rotate: [0, 15, -15, 0] }}
-                transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                className="hidden sm:block"
-              >
-                <Tag className="w-4 h-4 text-[#2DD4BF] shrink-0" />
-              </motion.div>
-              
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentIndex}
@@ -155,12 +147,12 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
             
             <motion.button
               onClick={() => setIsVisible(false)}
-              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors p-1"
+              className="absolute right-1 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors min-h-10 min-w-10 flex items-center justify-center sm:right-4"
               aria-label="Dismiss banner"
               whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+              whileTap={{ scale: 0.95 }}
             >
-              <X className="w-4 h-4 sm:w-4 sm:h-4" />
+              <X className="w-4 h-4" />
             </motion.button>
           </div>
         </motion.div>

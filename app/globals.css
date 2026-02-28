@@ -93,6 +93,10 @@ body {
 }
 
 /* Custom Utilities */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 .gradient-text {
   background: linear-gradient(to right, #2dd4bf, #5eead4, #2dd4bf);
   background-size: 200% 200%;
@@ -134,6 +138,21 @@ body {
 
 .animate-marquee {
   animation: marquee 20s linear infinite;
+}
+
+/* Respect prefers-reduced-motion (accessibility) */
+@media (prefers-reduced-motion: reduce) {
+  .gradient-text,
+  .animate-marquee {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.15s !important;
+  }
 }
 
 /* Clock animations for hover effect */

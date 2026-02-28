@@ -97,35 +97,12 @@ export const OPERATING_HOURS = {
 // Complex opening date - no bookings allowed before this date
 export const COMPLEX_OPENING_DATE = new Date(2026, 1, 1); // February 1st, 2026 (month is 0-indexed)
 
+/** Lifestyle section gallery — curated images, ordered for collage rhythm */
 export const GALLERY_IMAGES = [
-  {
-    url: "/images/paddle.jpg",
-    title: "Elite Padel Court",
-    category: "Padel",
-  },
-  {
-    url: "/images/cricket.webp",
-    title: "Professional Cricket",
-    category: "Cricket",
-  },
-  {
-    url: "/images/pickleball.jpg",
-    title: "Premium Pickleball",
-    category: "Pickleball",
-  },
-  {
-    url: "/images/futsal.jpg",
-    title: "Futsal Action",
-    category: "Futsal",
-  },
-  {
-    url: "/images/paddle.jpg",
-    title: "Padel Excellence",
-    category: "Padel",
-  },
-  {
-    url: "/images/cricket.webp",
-    title: "Cricket Training",
-    category: "Cricket",
-  },
+  { url: "/lifestyle/lifestyle-11.webp", title: "Paddle Courts at Dusk" },
+  { url: "/lifestyle/lifestyle-8.webp", title: "Sunset on the Pitch" },
+  { url: "/lifestyle/lifestyle-12.webp", title: "The Social Scene" },
+  { url: "/lifestyle/lifestyle-3.webp", title: "The Complex at Night" },
+  { url: "/lifestyle/lifestyle-10.webp", title: "Courtside" },
+  { url: "/lifestyle/lifestyle-7.webp", title: "Through the Net" },
 ];
