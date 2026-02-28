@@ -25,10 +25,10 @@ export const GetInTouchSection = () => {
   const mapEmbedUrl = `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3323.7842767507145!2d73.1439709!3d33.5849499!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x38dfed0d4fd052a7%3A0x36114e312659cf3a!2sIbex%20Sports%20Complex!5e0!3m2!1sen!2s!4v1768089209428!5m2!1sen!2s`;
 
   return (
-    <section className="py-16 sm:py-20 px-4 sm:px-6 bg-white dark:bg-[#050505] border-t border-zinc-200 dark:border-white/5 transition-colors duration-200">
+    <section className="py-12 sm:py-16 md:py-24 lg:py-32 px-4 sm:px-6 bg-white dark:bg-[#050505] border-t border-zinc-200 dark:border-white/5 transition-colors duration-200">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-14 sm:mb-20 md:mb-28">
-          <p className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-4 sm:mb-6">
+        <div className="mb-10 sm:mb-14 md:mb-20 lg:mb-28">
+          <p className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-3 sm:mb-5">
             Contact
           </p>
           <h2 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight gradient-text">

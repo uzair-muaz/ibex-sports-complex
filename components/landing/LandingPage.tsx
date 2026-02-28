@@ -21,7 +21,7 @@ export function LandingPage() {
     <SectionThemeProvider>
       <div className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white overflow-x-hidden transition-colors duration-500">
         <Navbar />
-        <DiscountBanner className="fixed top-14 sm:top-16 md:top-20 left-0 right-0 z-40" />
+        <DiscountBanner className="fixed left-0 right-0 z-40 top-16 sm:top-[4.25rem]" />
 
         <a
           href="#main-content"
@@ -53,9 +53,9 @@ export function LandingPage() {
           <SectionWrapper id="lifestyle" useChapterBg className="relative">
             <LifestyleParallaxBg />
             <ParallaxSection speed={0.1}>
-              <section className="relative z-10 py-16 sm:py-24 md:py-32 lg:py-36 overflow-hidden">
-                <div className="px-4 sm:px-6 mb-14 sm:mb-20 md:mb-28 max-w-7xl mx-auto">
-                  <p className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-6">
+              <section className="relative z-10 py-12 sm:py-20 md:py-28 lg:py-36 overflow-hidden">
+                <div className="px-4 sm:px-6 mb-10 sm:mb-14 md:mb-20 lg:mb-28 max-w-7xl mx-auto">
+                  <p className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-3 sm:mb-5">
                     Life at Ibex
                   </p>
                   <h2 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight gradient-text">
