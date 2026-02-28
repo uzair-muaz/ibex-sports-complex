@@ -8,7 +8,7 @@ import { ScrollReveal } from "@/components/ui/ScrollReveal";
 
 export const AmenitiesSection = () => {
   return (
-    <section className="py-16 sm:py-20 md:py-28 lg:py-40 px-4 sm:px-6 bg-white dark:bg-[#050505] transition-colors duration-500 relative overflow-hidden">
+    <section className="py-12 sm:py-16 md:py-24 lg:py-36 px-4 sm:px-6 bg-white dark:bg-[#050505] transition-colors duration-500 relative overflow-hidden">
       {/* Subtle background glow */}
       <div
         className="absolute top-1/3 left-1/4 w-[50vw] h-[50vw] max-w-[600px] max-h-[600px] rounded-full bg-zinc-200/30 dark:bg-white/[0.02] blur-[100px]"
@@ -18,13 +18,13 @@ export const AmenitiesSection = () => {
       <div className="relative max-w-7xl mx-auto">
         {/* Header */}
         <ScrollReveal range={[0.05, 0.3]}>
-          <div className="mb-14 sm:mb-20 md:mb-28">
+          <div className="mb-10 sm:mb-14 md:mb-20 lg:mb-28">
             <motion.p
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-4 sm:mb-6"
+              className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-3 sm:mb-5"
             >
               The Social Hub
             </motion.p>
@@ -53,9 +53,9 @@ export const AmenitiesSection = () => {
         </ScrollReveal>
 
         {/* Content grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-12 md:gap-20 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 md:gap-16 lg:gap-20 items-start">
           {/* Left — features */}
-          <div className="space-y-8 sm:space-y-12">
+          <div className="space-y-6 sm:space-y-10">
             <ParallaxSection speed={0.1}>
               <motion.div
                 initial={{ opacity: 0, x: -30 }}

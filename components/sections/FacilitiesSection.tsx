@@ -37,17 +37,17 @@ const SPORTS = [
 
 export const FacilitiesSection = () => {
   return (
-    <section className="py-16 sm:py-20 md:py-28 lg:py-40 px-4 sm:px-6 bg-zinc-50 dark:bg-[#0a0a0a] transition-colors duration-500 relative z-20">
+    <section className="py-12 sm:py-16 md:py-24 lg:py-36 px-4 sm:px-6 bg-zinc-50 dark:bg-[#0a0a0a] transition-colors duration-500 relative z-20">
       <div className="max-w-7xl mx-auto">
         {/* Section intro */}
         <ScrollReveal range={[0.05, 0.3]}>
-          <div className="mb-14 sm:mb-20 md:mb-28">
+          <div className="mb-10 sm:mb-14 md:mb-20 lg:mb-28">
             <motion.p
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-4 sm:mb-6"
+              className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-3 sm:mb-5"
             >
               Choose Your Arena
             </motion.p>
@@ -75,7 +75,7 @@ export const FacilitiesSection = () => {
         </ScrollReveal>
 
         {/* Sport cards */}
-        <div className="space-y-14 sm:space-y-20 md:space-y-32">
+        <div className="space-y-12 sm:space-y-16 md:space-y-24 lg:space-y-32">
           {SPORTS.map((sport, index) => (
             <ParallaxSection key={sport.key} speed={0.15 + index * 0.05}>
               <motion.div

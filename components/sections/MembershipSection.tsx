@@ -57,18 +57,18 @@ const TERMS = [
 
 export const MembershipSection = () => {
   return (
-    <section className="relative py-16 sm:py-20 md:py-28 lg:py-40 px-4 sm:px-6 overflow-hidden transition-colors duration-500">
+    <section className="relative py-12 sm:py-16 md:py-24 lg:py-36 px-4 sm:px-6 overflow-hidden transition-colors duration-500">
       <div className="absolute inset-0 bg-zinc-50 dark:bg-[#0a0a0a]" />
 
       <div className="relative max-w-7xl mx-auto">
         {/* Header */}
         <ScrollReveal range={[0.05, 0.3]}>
-          <div className="mb-14 sm:mb-20 md:mb-28">
+          <div className="mb-10 sm:mb-14 md:mb-20 lg:mb-28">
             <motion.p
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-4 sm:mb-6"
+              className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-3 sm:mb-5"
             >
               Membership
             </motion.p>
@@ -95,7 +95,7 @@ export const MembershipSection = () => {
         </ScrollReveal>
 
         {/* Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-5 lg:gap-4">
           {PLANS.map((plan, index) => (
             <motion.div
               key={plan.name}
@@ -114,30 +114,30 @@ export const MembershipSection = () => {
               } bg-white dark:bg-zinc-900/80`}
             >
               {plan.highlight && (
-                <div className="bg-[#2DD4BF] text-[#0F172A] text-center py-2 text-xs font-bold uppercase tracking-wider">
+                <div className="bg-[#2DD4BF] text-[#0F172A] text-center py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
                   Most Popular
                 </div>
               )}
 
-              <div className="flex flex-col flex-1 p-5 sm:p-6 md:p-7">
-                <h3 className="text-lg sm:text-xl font-bold text-black dark:text-white mb-1">
+              <div className="flex flex-col flex-1 p-4 sm:p-6 md:p-7">
+                <h3 className="text-base sm:text-lg md:text-xl font-bold text-black dark:text-white mb-1">
                   {plan.name}
                 </h3>
-                <div className="flex items-center gap-2 text-zinc-400 dark:text-zinc-500 text-sm mb-6">
-                  <Clock className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2 text-zinc-400 dark:text-zinc-500 text-xs sm:text-sm mb-4 sm:mb-6">
+                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>{plan.hours} hrs/month</span>
                 </div>
 
-                <div className="mb-6">
-                  <span className="text-3xl font-bold text-black dark:text-white">
+                <div className="mb-4 sm:mb-6">
+                  <span className="text-2xl sm:text-3xl font-bold text-black dark:text-white">
                     PKR {plan.price.toLocaleString()}
                   </span>
-                  <span className="text-zinc-500 text-sm ml-1">/mo</span>
+                  <span className="text-zinc-500 text-xs sm:text-sm ml-1">/mo</span>
                 </div>
 
-                <Link href="/booking" className="block mb-6">
+                <Link href="/booking" className="block mb-4 sm:mb-6">
                   <Button
-                    className={`w-full rounded-xl h-11 font-semibold text-sm cursor-pointer transition-all ${
+                    className={`w-full rounded-xl h-10 sm:h-11 font-semibold text-xs sm:text-sm cursor-pointer transition-all ${
                       plan.highlight
                         ? "bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14b8a6] shadow-md"
                         : "bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700"
@@ -147,14 +147,14 @@ export const MembershipSection = () => {
                   </Button>
                 </Link>
 
-                <ul className="space-y-3 flex-1">
+                <ul className="space-y-2 sm:space-y-3 flex-1">
                   {plan.features.map((feature) => (
                     <li
                       key={feature}
-                      className="flex items-center gap-2.5 text-sm text-zinc-600 dark:text-zinc-400"
+                      className="flex items-center gap-2 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400"
                     >
                       <Check
-                        className={`w-4 h-4 shrink-0 ${
+                        className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${
                           plan.highlight
                             ? "text-[#2DD4BF]"
                             : "text-zinc-400 dark:text-zinc-500"
@@ -165,8 +165,8 @@ export const MembershipSection = () => {
                   ))}
                 </ul>
 
-                <p className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-xs text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
-                  <Zap className="w-3 h-3" />
+                <p className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-zinc-100 dark:border-zinc-800 text-[10px] sm:text-xs text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
+                  <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />
                   ~PKR {Math.round(plan.price / plan.hours).toLocaleString()}/hr
                 </p>
               </div>
@@ -180,7 +180,7 @@ export const MembershipSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.4 }}
-          className="mt-14 sm:mt-20 p-4 sm:p-6 md:p-8 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80"
+          className="mt-10 sm:mt-16 md:mt-20 p-4 sm:p-6 md:p-8 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80"
         >
           <h4 className="text-sm font-semibold text-black dark:text-white uppercase tracking-wider mb-4">
             Terms & conditions
