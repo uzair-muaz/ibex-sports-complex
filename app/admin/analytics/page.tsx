@@ -3,7 +3,14 @@
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { DollarSign, Users, TrendingUp, CreditCard, Banknote } from "lucide-react";
+import {
+  DollarSign,
+  Users,
+  TrendingUp,
+  CreditCard,
+  Banknote,
+  Calendar as CalendarIcon,
+} from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
   Card,
@@ -13,10 +20,28 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { getAllBookings } from "../../actions/bookings";
 import { getAllCourts } from "../../actions/courts";
 import type { Booking, Court } from "@/types";
 import { formatLocalDate } from "@/lib/utils";
+import {
+  getTodayRange,
+  getCurrentWeekRange,
+  getCurrentMonthRange,
+  getCurrentYearRange,
+  getRangeFromDates,
+  isDateInRange,
+} from "@/lib/date-range-utils";
 
 export default function AnalyticsPage() {
   const { data: session } = useSession();
@@ -24,6 +49,14 @@ export default function AnalyticsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [timeFilter, setTimeFilter] = useState<
+    "all" | "today" | "week" | "month" | "year" | "range"
+  >("month");
+  const [customRange, setCustomRange] = useState<{
+    from: Date | undefined;
+    to: Date | undefined;
+  }>({ from: undefined, to: undefined });
+  const [showRangeModal, setShowRangeModal] = useState(false);
 
   const userRole = (session?.user as any)?.role;
   const isSuperAdmin = userRole === "super_admin";
@@ -63,6 +96,30 @@ export default function AnalyticsPage() {
     return null;
   }
 
+  const getActiveDateRange = () => {
+    const now = new Date();
+    if (timeFilter === "all") {
+      return null;
+    }
+    if (timeFilter === "today") {
+      return getTodayRange(now);
+    }
+    if (timeFilter === "week") {
+      return getCurrentWeekRange(now);
+    }
+    if (timeFilter === "month") {
+      return getCurrentMonthRange(now);
+    }
+    if (timeFilter === "year") {
+      return getCurrentYearRange(now);
+    }
+    if (timeFilter === "range") {
+      const range = getRangeFromDates(customRange.from ?? null, customRange.to ?? null);
+      return range;
+    }
+    return null;
+  };
+
   const calculateStats = () => {
     // Use actual received amount (online + cash) so analytics match manual sheet
     const getReceivedAmount = (b: Booking) => {
@@ -71,8 +128,14 @@ export default function AnalyticsPage() {
       return online + cash > 0 ? online + cash : (b.amountPaid ?? 0);
     };
 
+    const activeRange = getActiveDateRange();
+    const inActiveRange = (b: Booking) =>
+      !activeRange || isDateInRange(b.date, activeRange);
+
     const revenueBookings = bookings.filter(
-      (b) => b.status === "completed" || b.status === "confirmed"
+      (b) =>
+        (b.status === "completed" || b.status === "confirmed") &&
+        inActiveRange(b)
     );
     const totalRevenue = revenueBookings.reduce(
       (sum, b) => sum + getReceivedAmount(b),
@@ -86,9 +149,13 @@ export default function AnalyticsPage() {
       (sum, b) => sum + (b.amountReceivedOnline ?? 0),
       0
     );
-    const confirmedBookings = bookings.filter((b) => b.status === "confirmed");
-    const todayBookings = bookings.filter(
-      (b) => b.date === formatLocalDate(new Date())
+    const confirmedBookings = bookings.filter(
+      (b) => b.status === "confirmed" && inActiveRange(b)
+    );
+
+    const todayRange = getTodayRange(new Date());
+    const todayBookings = bookings.filter((b) =>
+      isDateInRange(b.date, todayRange)
     );
 
     const userBookingCounts: {
@@ -101,6 +168,7 @@ export default function AnalyticsPage() {
     } = {};
     bookings.forEach((booking) => {
       if (booking.status !== "completed") return;
+      if (!inActiveRange(booking)) return;
       const key = booking.userEmail.toLowerCase();
       if (!userBookingCounts[key]) {
         userBookingCounts[key] = {
@@ -130,9 +198,15 @@ export default function AnalyticsPage() {
     });
 
     const bookingsByStatus = {
-      confirmed: bookings.filter((b) => b.status === "confirmed").length,
-      cancelled: bookings.filter((b) => b.status === "cancelled").length,
-      completed: bookings.filter((b) => b.status === "completed").length,
+      confirmed: bookings.filter(
+        (b) => b.status === "confirmed" && inActiveRange(b)
+      ).length,
+      cancelled: bookings.filter(
+        (b) => b.status === "cancelled" && inActiveRange(b)
+      ).length,
+      completed: bookings.filter(
+        (b) => b.status === "completed" && inActiveRange(b)
+      ).length,
     };
 
     const avgBookingValue =
@@ -140,6 +214,7 @@ export default function AnalyticsPage() {
 
     const courtTypeCounts: { [key: string]: number } = {};
     bookings.forEach((booking) => {
+      if (!inActiveRange(booking)) return;
       const courtType =
         typeof booking.courtId === "object" &&
         booking.courtId &&
@@ -152,16 +227,13 @@ export default function AnalyticsPage() {
       Object.entries(courtTypeCounts).sort(([, a], [, b]) => b - a)[0]?.[0] ||
       "N/A";
 
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    const thisMonthRevenue = revenueBookings
-      .filter((b) => {
-        const bookingDate = new Date(b.date);
-        return (
-          bookingDate.getMonth() === currentMonth &&
-          bookingDate.getFullYear() === currentYear
-        );
-      })
+    const monthRange = getCurrentMonthRange(new Date());
+    const thisMonthRevenue = bookings
+      .filter(
+        (b) =>
+          (b.status === "completed" || b.status === "confirmed") &&
+          isDateInRange(b.date, monthRange)
+      )
       .reduce((sum, b) => sum + getReceivedAmount(b), 0);
 
     return {
@@ -170,7 +242,7 @@ export default function AnalyticsPage() {
       totalOnlineReceived,
       confirmedBookings: confirmedBookings.length,
       todayBookings: todayBookings.length,
-      totalBookings: bookings.length,
+      totalBookings: bookings.filter(inActiveRange).length,
       activeCourts: courts.filter((c) => c.isActive).length,
       totalCourts: courts.length,
       topUsers,
@@ -183,6 +255,21 @@ export default function AnalyticsPage() {
   };
 
   const stats = calculateStats();
+  const activeRange = getActiveDateRange();
+
+  const handleTimeFilterChange = (
+    id: "all" | "today" | "week" | "month" | "year" | "range"
+  ) => {
+    if (id === "range") {
+      // Start fresh each time user chooses a custom range
+      setCustomRange({ from: undefined, to: undefined });
+      setTimeFilter("range");
+      setShowRangeModal(true);
+    } else {
+      setTimeFilter(id);
+      setShowRangeModal(false);
+    }
+  };
 
   return (
     <AdminLayout
@@ -191,6 +278,78 @@ export default function AnalyticsPage() {
       onRefresh={loadData}
       isLoading={isLoading}
     >
+      {/* Time Filters */}
+      <div className="mb-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-950 p-1 text-xs sm:text-sm">
+            {[
+              { id: "all", label: "All" },
+              { id: "today", label: "Today" },
+              { id: "week", label: "This Week" },
+              { id: "month", label: "This Month" },
+              { id: "year", label: "This Year" },
+              { id: "range", label: "Custom Range" },
+            ].map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() =>
+                  handleTimeFilterChange(option.id as typeof timeFilter)
+                }
+                className={`px-3 py-1.5 rounded-md transition-colors ${
+                  timeFilter === option.id
+                    ? "bg-[#2DD4BF] text-[#0F172A]"
+                    : "text-zinc-300 hover:bg-zinc-900"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {timeFilter === "range" && (
+              <Button
+                variant="outline"
+                className="h-9 px-3 text-xs sm:text-sm bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800 hover:border-zinc-700 flex items-center gap-2"
+                onClick={() => setShowRangeModal(true)}
+              >
+                <CalendarIcon className="h-4 w-4 text-zinc-400" />
+                <span>
+                  {customRange.from && customRange.to
+                    ? `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`
+                    : "Select date range"}
+                </span>
+              </Button>
+            )}
+            {(timeFilter !== "all" || activeRange) && (
+              <Button
+                variant="ghost"
+                className="h-9 px-3 text-xs sm:text-sm text-zinc-400 hover:text-white"
+                onClick={() => {
+                  setTimeFilter("all");
+                  setCustomRange({ from: undefined, to: undefined });
+                  setShowRangeModal(false);
+                }}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {timeFilter === "all" && (
+          <div className="text-xs sm:text-sm text-zinc-300">
+            Showing all time
+          </div>
+        )}
+        {timeFilter !== "all" && activeRange && (
+          <div className="text-xs sm:text-sm text-zinc-300">
+            Showing {activeRange.from} to {activeRange.to}
+          </div>
+        )}
+      </div>
+
       {/* Dashboard Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="border-zinc-800 bg-zinc-950">
@@ -473,6 +632,37 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Custom Range Modal */}
+      <Dialog open={showRangeModal} onOpenChange={setShowRangeModal}>
+        <DialogContent className="bg-zinc-950 border-zinc-800 max-w-xl text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">Select custom date range</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Choose a start and end date to filter analytics.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Calendar
+              mode="range"
+              selected={customRange}
+              onSelect={(range) =>
+                setCustomRange(range ?? { from: undefined, to: undefined })
+              }
+              numberOfMonths={2}
+              initialFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setShowRangeModal(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }
