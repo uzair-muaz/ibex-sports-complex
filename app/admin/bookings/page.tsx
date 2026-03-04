@@ -56,6 +56,12 @@ import {
 } from "../../actions/bookings";
 import type { Booking, Court } from "@/types";
 import { formatDisplayDate, formatTime12 } from "@/lib/utils";
+import {
+  getTodayRange,
+  getCurrentWeekRange,
+  getCurrentMonthRange,
+  isDateInRange,
+} from "@/lib/date-range-utils";
 
 export default function BookingsPage() {
   const { data: session } = useSession();
@@ -72,8 +78,9 @@ export default function BookingsPage() {
   const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [updatingStatusBookingId, setUpdatingStatusBookingId] = useState<string | null>(null);
-  const [sortColumn, setSortColumn] = useState<keyof Booking | "courtName" | null>("createdAt");
+  const [sortColumn, setSortColumn] = useState<keyof Booking | "courtName" | null>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("today");
 
   const userRole = (session?.user as any)?.role;
   const isSuperAdmin = userRole === "super_admin";
@@ -192,7 +199,22 @@ export default function BookingsPage() {
     router.push("/admin/bookings/new");
   };
 
-  const filteredBookings = bookings.filter(
+  const getActiveDateRange = () => {
+    const now = new Date();
+    if (dateFilter === "today") return getTodayRange(now);
+    if (dateFilter === "week") return getCurrentWeekRange(now);
+    if (dateFilter === "month") return getCurrentMonthRange(now);
+    return null;
+  };
+
+  const activeRange = getActiveDateRange();
+
+  const dateFilteredBookings = bookings.filter((b) => {
+    if (dateFilter === "all" || !activeRange) return true;
+    return isDateInRange(b.date, activeRange);
+  });
+
+  const filteredBookings = dateFilteredBookings.filter(
     (b) =>
       b.userName.toLowerCase().includes(filter.toLowerCase()) ||
       b.userEmail.toLowerCase().includes(filter.toLowerCase()) ||
@@ -227,6 +249,19 @@ export default function BookingsPage() {
       const bDate = new Date(b[sortColumn]);
       const diff = aDate.getTime() - bDate.getTime();
       return sortDirection === "asc" ? diff : -diff;
+    } else if (sortColumn === "date") {
+      // Sort by booking date, then by start time within the same day
+      const aDateStr = a.date;
+      const bDateStr = b.date;
+
+      if (aDateStr === bDateStr) {
+        const timeDiff = a.startTime - b.startTime;
+        return sortDirection === "asc" ? timeDiff : -timeDiff;
+      }
+
+      if (aDateStr < bDateStr) return sortDirection === "asc" ? -1 : 1;
+      if (aDateStr > bDateStr) return sortDirection === "asc" ? 1 : -1;
+      return 0;
     } else {
       aValue = a[sortColumn];
       bValue = b[sortColumn];
@@ -284,7 +319,7 @@ export default function BookingsPage() {
       }
     >
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+        <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-stretch lg:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
             <Input
@@ -295,7 +330,39 @@ export default function BookingsPage() {
               className="w-full pl-10 text-sm"
             />
           </div>
+          <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-950 p-1 text-xs sm:text-sm">
+              {[
+                { id: "all", label: "All" },
+                { id: "today", label: "Today" },
+                { id: "week", label: "This Week" },
+                { id: "month", label: "This Month" },
+              ].map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() =>
+                    setDateFilter(option.id as typeof dateFilter)
+                  }
+                  className={`px-2.5 py-1.5 rounded-md transition-colors ${
+                    dateFilter === option.id
+                      ? "bg-[#2DD4BF] text-[#0F172A]"
+                      : "text-zinc-300 hover:bg-zinc-900"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
+
+        {activeRange && (
+          <p className="text-xs text-zinc-400">
+            Showing bookings from <span className="font-mono">{activeRange.from}</span> to{" "}
+            <span className="font-mono">{activeRange.to}</span>
+          </p>
+        )}
 
         <Card className="border-zinc-800 bg-zinc-950">
           <CardContent className="p-0">
