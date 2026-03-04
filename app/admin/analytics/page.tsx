@@ -11,6 +11,7 @@ import {
   Banknote,
   Calendar as CalendarIcon,
 } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
   Card,
@@ -33,7 +34,6 @@ import {
 import { getAllBookings } from "../../actions/bookings";
 import { getAllCourts } from "../../actions/courts";
 import type { Booking, Court } from "@/types";
-import { formatLocalDate } from "@/lib/utils";
 import {
   getTodayRange,
   getCurrentWeekRange,
@@ -52,13 +52,12 @@ export default function AnalyticsPage() {
   const [timeFilter, setTimeFilter] = useState<
     "all" | "today" | "week" | "month" | "year" | "range"
   >("month");
-  const [customRange, setCustomRange] = useState<{
-    from: Date | undefined;
-    to: Date | undefined;
-  }>({ from: undefined, to: undefined });
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(
+    undefined
+  );
   const [showRangeModal, setShowRangeModal] = useState(false);
 
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as { role?: string })?.role;
   const isSuperAdmin = userRole === "super_admin";
 
   useEffect(() => {
@@ -114,7 +113,10 @@ export default function AnalyticsPage() {
       return getCurrentYearRange(now);
     }
     if (timeFilter === "range") {
-      const range = getRangeFromDates(customRange.from ?? null, customRange.to ?? null);
+      const range = getRangeFromDates(
+        customRange?.from ?? null,
+        customRange?.to ?? null
+      );
       return range;
     }
     return null;
@@ -262,7 +264,7 @@ export default function AnalyticsPage() {
   ) => {
     if (id === "range") {
       // Start fresh each time user chooses a custom range
-      setCustomRange({ from: undefined, to: undefined });
+      setCustomRange(undefined);
       setTimeFilter("range");
       setShowRangeModal(true);
     } else {
@@ -316,7 +318,7 @@ export default function AnalyticsPage() {
               >
                 <CalendarIcon className="h-4 w-4 text-zinc-400" />
                 <span>
-                  {customRange.from && customRange.to
+                  {customRange?.from && customRange?.to
                     ? `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`
                     : "Select date range"}
                 </span>
@@ -328,7 +330,7 @@ export default function AnalyticsPage() {
                 className="h-9 px-3 text-xs sm:text-sm text-zinc-400 hover:text-white"
                 onClick={() => {
                   setTimeFilter("all");
-                  setCustomRange({ from: undefined, to: undefined });
+                  setCustomRange(undefined);
                   setShowRangeModal(false);
                 }}
               >
@@ -646,9 +648,7 @@ export default function AnalyticsPage() {
             <Calendar
               mode="range"
               selected={customRange}
-              onSelect={(range) =>
-                setCustomRange(range ?? { from: undefined, to: undefined })
-              }
+              onSelect={(range) => setCustomRange(range ?? undefined)}
               numberOfMonths={2}
               initialFocus
             />
