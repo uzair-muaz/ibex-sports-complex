@@ -86,8 +86,11 @@ export function generateBookingConfirmationEmail(data: BookingEmailData): string
               <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #e4e4e7;">
                 Hello <strong style="color: #2DD4BF;">${data.userName}</strong>,
               </p>
-              <p style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #e4e4e7;">
+              <p style="margin: 0 0 10px 0; font-size: 16px; line-height: 1.6; color: #e4e4e7;">
                 Your booking has been confirmed! We're excited to have you at IBEX Sports Complex.
+              </p>
+              <p style="margin: 0 0 30px 0; font-size: 13px; line-height: 1.6; color: #7dd3fc;">
+                Please pay <strong>50% advance</strong> to confirm your slot. Bookings without advance may be cancelled.
               </p>
 
               <!-- Booking Details Card -->
@@ -154,53 +157,21 @@ export function generateBookingConfirmationEmail(data: BookingEmailData): string
                 </tr>
               </table>
 
-              <!-- QR Codes Section -->
+              <!-- Feedback Section -->
               <h2 style="margin: 0 0 20px 0; font-size: 20px; font-weight: 700; color: #ffffff;">
-                Your QR Codes
+                Share Your Feedback
               </h2>
-              <p style="margin: 0 0 30px 0; font-size: 14px; line-height: 1.6; color: #a1a1aa;">
-                Please save these QR codes. You'll need the Entry Verification QR code when you arrive at the venue, and the Feedback QR code to share your experience after your booking.
+              <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #a1a1aa;">
+                We’d love to hear about your experience at IBEX Sports Complex. Click the button below after your session to quickly share your feedback.
               </p>
 
-              <!-- QR Codes Grid -->
               <table role="presentation" style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
                 <tr>
-                  <!-- Entry Verification QR Code -->
-                  <td style="width: 50%; padding-right: 10px; vertical-align: top;">
-                    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #18181b; border-radius: 8px; padding: 20px; text-align: center;">
-                      <tr>
-                        <td>
-                          <h3 style="margin: 0 0 15px 0; font-size: 14px; font-weight: 600; color: #2DD4BF; text-transform: uppercase; letter-spacing: 0.05em;">
-                            Entry Verification
-                          </h3>
-                          <div style="display: inline-block; background-color: #ffffff; padding: 15px; border-radius: 8px;">
-                            <img src="${data.entryQRCode}" alt="Entry Verification QR Code" style="width: 180px; height: 180px; display: block; margin: 0 auto; border: 0;" />
-                          </div>
-                          <p style="margin: 15px 0 0 0; font-size: 12px; color: #a1a1aa; line-height: 1.4;">
-                            Show this QR code at the entrance
-                          </p>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                  
-                  <!-- Feedback QR Code -->
-                  <td style="width: 50%; padding-left: 10px; vertical-align: top;">
-                    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #18181b; border-radius: 8px; padding: 20px; text-align: center;">
-                      <tr>
-                        <td>
-                          <h3 style="margin: 0 0 15px 0; font-size: 14px; font-weight: 600; color: #2DD4BF; text-transform: uppercase; letter-spacing: 0.05em;">
-                            Feedback
-                          </h3>
-                          <div style="display: inline-block; background-color: #ffffff; padding: 15px; border-radius: 8px;">
-                            <img src="${data.feedbackQRCode}" alt="Feedback QR Code" style="width: 180px; height: 180px; display: block; margin: 0 auto; border: 0;" />
-                          </div>
-                          <p style="margin: 15px 0 0 0; font-size: 12px; color: #a1a1aa; line-height: 1.4;">
-                            Scan after your session to share feedback
-                          </p>
-                        </td>
-                      </tr>
-                    </table>
+                  <td align="center">
+                    <a href="${data.feedbackUrl}"
+                      style="display: inline-block; padding: 12px 28px; border-radius: 999px; background: linear-gradient(135deg, #2DD4BF, #14B8A6); color: #0F172A; text-decoration: none; font-size: 14px; font-weight: 600;">
+                      Leave Feedback
+                    </a>
                   </td>
                 </tr>
               </table>

@@ -4,7 +4,11 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tag, X } from "lucide-react";
 import { getActiveDiscounts } from "@/app/actions/discounts";
-import { formatDiscountValue, formatCourtTypes, isDiscountCurrentlyActive } from "@/lib/discount-utils";
+import {
+  formatDiscountValue,
+  formatCourtTypes,
+  isDiscountCurrentlyActive,
+} from "@/lib/discount-utils";
 import type { Discount } from "@/types";
 
 interface DiscountBannerProps {
@@ -23,11 +27,11 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
         const result = await getActiveDiscounts();
         if (result.success && result.discounts.length > 0) {
           // Filter to only currently active discounts
-          const activeOnes = result.discounts.filter((d: Discount) => 
+          const activeOnes = result.discounts.filter((d: Discount) =>
             isDiscountCurrentlyActive({
               ...d,
               _id: d._id,
-            })
+            }),
           );
           setDiscounts(activeOnes);
         }
@@ -70,14 +74,6 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
         >
           <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 relative">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 pr-8 sm:pr-0">
-              <motion.div
-                animate={{ rotate: [0, 15, -15, 0] }}
-                transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                className="hidden sm:block"
-              >
-                <Tag className="w-4 h-4 text-[#2DD4BF] shrink-0" />
-              </motion.div>
-              
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentIndex}
@@ -89,24 +85,36 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
                 >
                   {/* Mobile: Compact single line */}
                   <div className="sm:hidden flex items-center justify-center gap-1.5 flex-wrap">
-                    <motion.span 
+                    <motion.span
                       className="text-white font-bold text-xs"
                       animate={{ scale: [1, 1.05, 1] }}
-                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        repeatDelay: 1,
+                      }}
                     >
-                      {formatDiscountValue(currentDiscount.type, currentDiscount.value)} OFF
+                      {formatDiscountValue(
+                        currentDiscount.type,
+                        currentDiscount.value,
+                      )}{" "}
+                      OFF
                     </motion.span>
                     <span className="text-zinc-400 text-xs">on</span>
                     <span className="text-zinc-300 text-xs">
                       {formatCourtTypes(currentDiscount.courtTypes)}
                     </span>
                   </div>
-                  
+
                   {/* Desktop: Full details */}
                   <div className="hidden sm:flex items-center justify-center gap-2">
                     <motion.div
                       animate={{ rotate: [0, 15, -15, 0] }}
-                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        repeatDelay: 3,
+                      }}
                     >
                       <Tag className="w-4 h-4 text-[#2DD4BF] shrink-0" />
                     </motion.div>
@@ -114,12 +122,20 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
                       {currentDiscount.name}
                     </span>
                     <span className="text-white mx-1">•</span>
-                    <motion.span 
+                    <motion.span
                       className="text-white font-bold text-sm"
                       animate={{ scale: [1, 1.05, 1] }}
-                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        repeatDelay: 1,
+                      }}
                     >
-                      {formatDiscountValue(currentDiscount.type, currentDiscount.value)} OFF
+                      {formatDiscountValue(
+                        currentDiscount.type,
+                        currentDiscount.value,
+                      )}{" "}
+                      OFF
                     </motion.span>
                     <span className="text-zinc-400 mx-1 text-sm">on</span>
                     <span className="text-zinc-300 text-sm">
@@ -129,14 +145,15 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
                       <>
                         <span className="text-zinc-400 mx-1 text-sm">•</span>
                         <span className="text-zinc-400 text-xs">
-                          {currentDiscount.startHour}:00 - {currentDiscount.endHour}:00
+                          {currentDiscount.startHour}:00 -{" "}
+                          {currentDiscount.endHour}:00
                         </span>
                       </>
                     )}
                   </div>
                 </motion.div>
               </AnimatePresence>
-              
+
               {discounts.length > 1 && (
                 <div className="flex items-center gap-1 sm:ml-2">
                   {discounts.map((_, idx) => (
@@ -145,14 +162,16 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
                       className={`w-1.5 h-1.5 rounded-full ${
                         idx === currentIndex ? "bg-[#2DD4BF]" : "bg-zinc-600"
                       }`}
-                      animate={idx === currentIndex ? { scale: [1, 1.3, 1] } : {}}
+                      animate={
+                        idx === currentIndex ? { scale: [1, 1.3, 1] } : {}
+                      }
                       transition={{ duration: 0.3 }}
                     />
                   ))}
                 </div>
               )}
             </div>
-            
+
             <motion.button
               onClick={() => setIsVisible(false)}
               className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors p-1"

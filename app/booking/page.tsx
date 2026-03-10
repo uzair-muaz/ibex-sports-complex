@@ -675,10 +675,15 @@ export default function BookingPage() {
               </div>
 
               {/* Minimum Booking Info */}
-              <div className="bg-yellow-500/10 border border-yellow-500/50 rounded-lg px-3 py-1.5 text-xs md:text-sm text-yellow-400">
-                {selectedCourtType === "FUTSAL"
-                  ? "Minimum booking for Futsal is 90 minutes (3 consecutive slots)."
-                  : "Minimum booking is 1 hour (2 consecutive slots)."}
+              <div className="space-y-1">
+                <div className="bg-yellow-500/10 border border-yellow-500/50 rounded-lg px-3 py-1.5 text-xs md:text-sm text-yellow-400">
+                  {selectedCourtType === "FUTSAL"
+                    ? "Minimum booking for Futsal is 90 minutes (3 consecutive slots)."
+                    : "Minimum booking is 1 hour (2 consecutive slots)."}
+                </div>
+                <div className="bg-cyan-500/10 border border-cyan-500/50 rounded-lg px-3 py-1.5 text-[11px] md:text-xs text-cyan-300">
+                  Please pay <span className="font-semibold">50% advance</span> to confirm your slot. Bookings without advance may be cancelled.
+                </div>
               </div>
             </div>
 
@@ -1158,11 +1163,13 @@ export default function BookingPage() {
                   <p className="text-sm md:text-base text-zinc-400">
                     Your booking has been confirmed successfully.
                   </p>
+                  <p className="mt-2 text-xs md:text-sm text-cyan-300">
+                    Please pay <span className="font-semibold">50% advance</span> to confirm your slot. Bookings without advance may be cancelled.
+                  </p>
                 </div>
 
-                {/* Content Layout - Responsive */}
-                <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-                  {/* Left Column - Booking Details */}
+                {/* Content Layout - Booking Details Only */}
+                <div className="flex flex-col gap-6 lg:gap-8">
                   <div className="flex-1 space-y-6">
                     <div className="bg-zinc-900/50 rounded-xl p-4 md:p-6 space-y-3 text-left">
                       <h4 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-4">
@@ -1278,47 +1285,6 @@ export default function BookingPage() {
                               </span>
                             </div>
                           )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column - QR Codes */}
-                  <div className="flex-1 space-y-4 lg:space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-                      <div>
-                        <h4 className="text-sm font-semibold text-zinc-300 mb-3 text-center lg:text-left">
-                          Entry Verification QR Code
-                        </h4>
-                        <div className="flex justify-center lg:justify-start">
-                          <div className="bg-white p-3 md:p-4 rounded-xl inline-block">
-                            <QRCode
-                              value={`${
-                                typeof window !== "undefined"
-                                  ? window.location.origin
-                                  : ""
-                              }/booking/verify/${createdBooking._id}`}
-                              size={160}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="text-sm font-semibold text-zinc-300 mb-3 text-center lg:text-left">
-                          Feedback QR Code
-                        </h4>
-                        <div className="flex justify-center lg:justify-start">
-                          <div className="bg-white p-3 md:p-4 rounded-xl inline-block">
-                            <QRCode
-                              value={`${
-                                typeof window !== "undefined"
-                                  ? window.location.origin
-                                  : ""
-                              }/feedback/${createdBooking._id}`}
-                              size={160}
-                            />
-                          </div>
                         </div>
                       </div>
                     </div>
