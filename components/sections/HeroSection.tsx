@@ -70,7 +70,7 @@ export const HeroSection = () => {
           paddle, pickleball, and futsal in the heart of the capital.
         </motion.p>
 
-        {/* CTA — full-width on mobile for easier tap */}
+        {/* CTA */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -85,14 +85,28 @@ export const HeroSection = () => {
             >
               <Button
                 size="lg"
-                className="group relative w-full sm:w-auto min-h-12 h-12 sm:h-14 px-6 sm:px-10 text-base sm:text-lg rounded-full bg-[#2DD4BF] text-[#0F172A] font-bold border-0 overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-200 cursor-pointer"
+                className="group relative w-auto min-w-[220px] sm:min-w-[220px] mx-auto sm:mx-0 min-h-12 h-12 sm:h-14 px-6 sm:px-10 text-base sm:text-lg rounded-full bg-[#2DD4BF] text-[#0F172A] font-bold border-0 overflow-hidden shadow-2xl shadow-[#2DD4BF]/30 hover:shadow-[#2DD4BF]/50 transition-all duration-200 cursor-pointer"
               >
                 <span className="relative z-10 flex items-center gap-2">
                   Book Court
-                  <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                  <motion.div
+                    animate={{ x: [0, 4, 0] }}
+                    transition={{ repeat: Infinity, duration: 1.8 }}
+                  >
+                    <ArrowRight className="w-5 h-5 ml-1 sm:ml-2" />
+                  </motion.div>
                 </span>
                 <motion.div
                   className="absolute inset-0 bg-gradient-to-r from-[#14B8A6] to-[#2DD4BF] opacity-0 group-hover:opacity-100"
+                  transition={{ duration: 0.2 }}
+                />
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                  animate={{ x: ["-200%", "200%"] }}
+                  transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
+                />
+                <motion.div
+                  className="absolute -inset-1 bg-[#2DD4BF] rounded-full blur-xl opacity-0 group-hover:opacity-40"
                   transition={{ duration: 0.2 }}
                 />
               </Button>
