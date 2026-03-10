@@ -174,12 +174,12 @@ export function DiscountBanner({ className = "" }: DiscountBannerProps) {
 
             <motion.button
               onClick={() => setIsVisible(false)}
-              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors p-1"
+              className="absolute right-1 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors min-h-10 min-w-10 flex items-center justify-center sm:right-4"
               aria-label="Dismiss banner"
               whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+              whileTap={{ scale: 0.95 }}
             >
-              <X className="w-4 h-4 sm:w-4 sm:h-4" />
+              <X className="w-4 h-4" />
             </motion.button>
           </div>
         </motion.div>

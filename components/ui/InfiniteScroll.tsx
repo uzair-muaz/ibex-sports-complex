@@ -1,81 +1,96 @@
-'use client';
+"use client";
 
-import React, { useRef } from 'react';
-import {
-  motion,
-  useScroll,
-  useSpring,
-  useTransform,
-  useMotionValue,
-  useVelocity,
-  useAnimationFrame
-} from 'framer-motion';
-import { wrap } from '@motionone/utils';
+import React from "react";
+import Image from "next/image";
+import { motion } from "framer-motion";
 
-interface ParallaxTextProps {
-  children: React.ReactNode;
-  baseVelocity: number;
-}
-
-function ParallaxText({ children, baseVelocity = 100 }: ParallaxTextProps) {
-  const baseX = useMotionValue(0);
-  const { scrollY } = useScroll();
-  const scrollVelocity = useVelocity(scrollY);
-  const smoothVelocity = useSpring(scrollVelocity, {
-    damping: 50,
-    stiffness: 400
-  });
-  const velocityFactor = useTransform(smoothVelocity, [0, 1000], [0, 5], {
-    clamp: false
-  });
-
-  const x = useTransform(baseX, (v) => `${wrap(-20, -45, v)}%`);
-
-  const directionFactor = useRef<number>(1);
-  useAnimationFrame((t, delta) => {
-    let moveBy = directionFactor.current * baseVelocity * (delta / 1000);
-
-    if (velocityFactor.get() < 0) {
-      directionFactor.current = -1;
-    } else if (velocityFactor.get() > 0) {
-      directionFactor.current = 1;
-    }
-
-    moveBy += directionFactor.current * moveBy * velocityFactor.get();
-
-    baseX.set(baseX.get() + moveBy);
-  });
+export const InfiniteGallery = ({
+  images,
+}: {
+  images: { url: string; title: string }[];
+}) => {
+  const col1 = images.filter((_, i) => i % 3 === 0);
+  const col2 = images.filter((_, i) => i % 3 === 1);
+  const col3 = images.filter((_, i) => i % 3 === 2);
 
   return (
-    <div className="overflow-hidden m-0 whitespace-nowrap flex flex-nowrap">
-      <motion.div className="flex flex-nowrap whitespace-nowrap gap-8" style={{ x }}>
-        {children}
-        {children}
-        {children}
-        {children}
-      </motion.div>
-    </div>
-  );
-}
-
-export const InfiniteGallery = ({ images }: { images: { url: string; title: string }[] }) => {
-  return (
-    <div className="py-24 overflow-hidden relative z-10">
-      <ParallaxText baseVelocity={-2}>
-        {images.map((img, i) => (
-          <div key={i} className="relative w-[400px] h-[300px] md:w-[600px] md:h-[400px] flex-shrink-0 rounded-3xl overflow-hidden mx-4 group shadow-2xl">
-            <img 
-              src={img.url} 
-              alt={img.title}
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+    <div className="px-4 sm:px-6 max-w-7xl mx-auto">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+        {/* Column 1 */}
+        <div className="flex flex-col gap-2 sm:gap-3 md:gap-4">
+          {col1.map((img, i) => (
+            <CollageItem
+              key={img.url}
+              img={img}
+              tall={i % 2 === 0}
+              index={i}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-80 group-hover:opacity-60 transition-opacity" />
-            <div className="absolute bottom-6 left-6 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-y-4 group-hover:translate-y-0">
-                <span className="text-white text-2xl font-bold tracking-tighter">{img.title}</span>
-            </div>
-          </div>
-        ))}
-      </ParallaxText>
+          ))}
+        </div>
+        {/* Column 2 */}
+        <div className="flex flex-col gap-2 sm:gap-3 md:gap-4 md:mt-8">
+          {col2.map((img, i) => (
+            <CollageItem
+              key={img.url}
+              img={img}
+              tall={i % 2 !== 0}
+              index={i + col1.length}
+            />
+          ))}
+        </div>
+        {/* Column 3 — hidden on mobile, shown on md+ */}
+        <div className="hidden md:flex flex-col gap-2 sm:gap-3 md:gap-4 mt-16">
+          {col3.map((img, i) => (
+            <CollageItem
+              key={img.url}
+              img={img}
+              tall={i % 2 === 0}
+              index={i + col1.length + col2.length}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
+
+function CollageItem({
+  img,
+  tall,
+  index,
+}: {
+  img: { url: string; title: string };
+  tall: boolean;
+  index: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-10%" }}
+      transition={{
+        duration: 0.6,
+        delay: index * 0.05,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className={`relative overflow-hidden rounded-2xl group ring-1 ring-zinc-200 dark:ring-white/10 ${
+        tall ? "aspect-[3/4]" : "aspect-[4/3]"
+      }`}
+    >
+      <Image
+        src={img.url}
+        alt={img.title}
+        fill
+        sizes="(max-width: 768px) 50vw, 33vw"
+        className="object-cover transition-transform duration-700 group-hover:scale-105"
+        loading="lazy"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <div className="absolute bottom-4 left-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <span className="text-white text-sm md:text-base font-semibold">
+          {img.title}
+        </span>
+      </div>
+    </motion.div>
+  );
+}

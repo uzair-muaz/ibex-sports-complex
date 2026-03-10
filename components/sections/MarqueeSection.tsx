@@ -4,9 +4,9 @@ import { motion } from 'framer-motion';
 
 export const MarqueeSection = ({ text }: { text: string }) => {
   return (
-    <div className="relative py-4 bg-[#2DD4BF] border-y-4 border-black dark:border-white transform -skew-y-2 scale-105 z-20 shadow-xl overflow-hidden">
+    <div className="relative z-30 py-3 sm:py-4 min-h-[4rem] sm:min-h-[5rem] bg-[#2DD4BF] border-y-2 sm:border-y-4 border-black dark:border-white -skew-y-2 scale-105 shadow-xl overflow-hidden isolate">
       <motion.div 
-        className="animate-marquee whitespace-nowrap flex gap-12 items-center font-black text-6xl md:text-8xl tracking-tighter uppercase text-black"
+        className="animate-marquee whitespace-nowrap flex gap-8 sm:gap-12 items-center font-black text-4xl sm:text-6xl md:text-8xl tracking-tighter uppercase text-black"
         animate={{ x: [0, -1000] }}
         transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
       >

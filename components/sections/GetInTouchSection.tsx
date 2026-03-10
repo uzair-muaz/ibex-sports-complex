@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { TextReveal } from "@/components/ui/TextReveal";
+
 import {
   AnimatedPhoneIcon,
   AnimatedMapPinIcon,
@@ -25,18 +25,21 @@ export const GetInTouchSection = () => {
   const mapEmbedUrl = `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3323.7842767507145!2d73.1439709!3d33.5849499!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x38dfed0d4fd052a7%3A0x36114e312659cf3a!2sIbex%20Sports%20Complex!5e0!3m2!1sen!2s!4v1768089209428!5m2!1sen!2s`;
 
   return (
-    <section className="py-20 px-6 bg-white dark:bg-[#050505] border-t border-zinc-200 dark:border-white/5 transition-colors duration-200">
+    <section className="py-12 sm:py-16 md:py-24 lg:py-32 px-4 sm:px-6 bg-white dark:bg-[#050505] border-t border-zinc-200 dark:border-white/5 transition-colors duration-200">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-16">
-          <TextReveal className="text-[12vw] leading-[0.8] font-black tracking-tighter gradient-text uppercase">
+        <div className="mb-10 sm:mb-14 md:mb-20 lg:mb-28">
+          <p className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-3 sm:mb-5">
+            Contact
+          </p>
+          <h2 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight gradient-text">
             Get In Touch
-          </TextReveal>
+          </h2>
         </div>
 
         {/* Bento Grid Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           {/* Map Card */}
-          <div className="md:col-span-2 relative h-[400px] md:h-[500px] rounded-3xl overflow-hidden group">
+          <div className="md:col-span-2 relative h-[260px] sm:h-[360px] md:h-[500px] rounded-2xl sm:rounded-3xl overflow-hidden group">
             <iframe
               src={mapEmbedUrl}
               width="100%"
@@ -73,12 +76,12 @@ export const GetInTouchSection = () => {
           </div>
 
           {/* Contact Info Card */}
-          <div className="bg-zinc-100 dark:bg-zinc-900 p-6 md:p-8 rounded-3xl flex flex-col justify-between hover:shadow-xl transition-shadow border border-zinc-200 dark:border-white/5 group">
+          <div className="bg-zinc-100 dark:bg-zinc-900 p-5 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl flex flex-col justify-between hover:shadow-xl transition-shadow border border-zinc-200 dark:border-white/5 group">
             <div>
-              <div className="w-12 h-12 bg-[#2DD4BF] rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <AnimatedPhoneIcon className="w-6 h-6" color="#000" />
+              <div className="w-11 h-11 sm:w-12 sm:h-12 bg-[#2DD4BF] rounded-full flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
+                <AnimatedPhoneIcon className="w-5 h-5 sm:w-6 sm:h-6" color="#000" />
               </div>
-              <h3 className="text-xl md:text-2xl font-bold mb-2">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-2">
                 Book a Session
               </h3>
               <p className="text-sm md:text-base text-zinc-500 dark:text-zinc-400">
@@ -102,12 +105,12 @@ export const GetInTouchSection = () => {
           </div>
 
           {/* Opening Hours Card */}
-          <div className="group bg-zinc-900 dark:bg-zinc-900 text-white p-6 md:p-8 rounded-3xl flex flex-col justify-between border border-white/10 hover:border-[#2DD4BF]/50 transition-colors">
+          <div className="group bg-zinc-900 dark:bg-zinc-900 text-white p-5 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl flex flex-col justify-between border border-white/10 hover:border-[#2DD4BF]/50 transition-colors">
             <div>
-              <div className="mb-6">
-                <AnimatedClockIcon className="w-8 h-8" color="#2DD4BF" />
+              <div className="mb-4 sm:mb-6">
+                <AnimatedClockIcon className="w-7 h-7 sm:w-8 sm:h-8" color="#2DD4BF" />
               </div>
-              <h3 className="text-xl md:text-2xl font-bold mb-2">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-2">
                 Opening Hours
               </h3>
             </div>
@@ -128,10 +131,10 @@ export const GetInTouchSection = () => {
           </div>
 
           {/* Social Links Card */}
-          <div className="md:col-span-2 bg-[#2DD4BF] p-6 md:p-8 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0 text-[#0F172A] relative overflow-hidden group">
+          <div className="md:col-span-2 bg-[#2DD4BF] p-5 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0 text-[#0F172A] relative overflow-hidden group">
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
             <div className="relative z-10">
-              <h3 className="text-2xl md:text-3xl font-bold mb-2">
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
                 Follow the Action
               </h3>
               <p className="text-sm md:text-base text-[#0F172A]/70 font-medium">
