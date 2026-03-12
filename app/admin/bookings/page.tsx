@@ -11,6 +11,7 @@ import {
   Eye,
   Loader2,
   X,
+  CalendarIcon,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -56,10 +57,13 @@ import {
 } from "../../actions/bookings";
 import type { Booking, Court } from "@/types";
 import { formatDisplayDate, formatTime12 } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import type { DateRange as DayPickerDateRange } from "react-day-picker";
 import {
   getTodayRange,
   getCurrentWeekRange,
   getCurrentMonthRange,
+  getRangeFromDates,
   isDateInRange,
 } from "@/lib/date-range-utils";
 
@@ -80,7 +84,13 @@ export default function BookingsPage() {
   const [updatingStatusBookingId, setUpdatingStatusBookingId] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<keyof Booking | "courtName" | null>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("today");
+  const [dateFilter, setDateFilter] = useState<
+    "all" | "today" | "week" | "month" | "range"
+  >("today");
+  const [customRange, setCustomRange] = useState<DayPickerDateRange | undefined>(
+    undefined
+  );
+  const [showRangeModal, setShowRangeModal] = useState(false);
 
   const userRole = (session?.user as any)?.role;
   const isSuperAdmin = userRole === "super_admin";
@@ -204,6 +214,9 @@ export default function BookingsPage() {
     if (dateFilter === "today") return getTodayRange(now);
     if (dateFilter === "week") return getCurrentWeekRange(now);
     if (dateFilter === "month") return getCurrentMonthRange(now);
+    if (dateFilter === "range") {
+      return getRangeFromDates(customRange?.from ?? null, customRange?.to ?? null);
+    }
     return null;
   };
 
@@ -337,12 +350,22 @@ export default function BookingsPage() {
                 { id: "today", label: "Today" },
                 { id: "week", label: "This Week" },
                 { id: "month", label: "This Month" },
+                { id: "range", label: "Custom Range" },
               ].map((option) => (
                 <button
                   key={option.id}
                   type="button"
                   onClick={() =>
-                    setDateFilter(option.id as typeof dateFilter)
+                    option.id === "range"
+                      ? (() => {
+                          setCustomRange(undefined);
+                          setDateFilter("range");
+                          setShowRangeModal(true);
+                        })()
+                      : (() => {
+                          setShowRangeModal(false);
+                          setDateFilter(option.id as typeof dateFilter);
+                        })()
                   }
                   className={`px-2.5 py-1.5 rounded-md transition-colors ${
                     dateFilter === option.id
@@ -354,6 +377,36 @@ export default function BookingsPage() {
                 </button>
               ))}
             </div>
+            {dateFilter === "range" && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowRangeModal(true)}
+                className="h-9 px-3 text-zinc-200 hover:text-white hover:bg-zinc-900 border border-zinc-800"
+              >
+                <CalendarIcon className="h-4 w-4 text-zinc-400 mr-2" />
+                <span className="text-xs sm:text-sm">
+                  {customRange?.from && customRange?.to
+                    ? `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`
+                    : "Select date range"}
+                </span>
+              </Button>
+            )}
+            {(dateFilter !== "all" || activeRange) && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setDateFilter("all");
+                  setCustomRange(undefined);
+                  setShowRangeModal(false);
+                }}
+                className="h-9 w-9 p-0 border border-zinc-800 hover:bg-zinc-900"
+                title="Clear date filter"
+              >
+                <X className="w-4 h-4 text-zinc-300" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -997,6 +1050,32 @@ export default function BookingsPage() {
               ) : (
                 "Yes, Delete Booking"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Range Modal */}
+      <Dialog open={showRangeModal} onOpenChange={setShowRangeModal}>
+        <DialogContent className="bg-zinc-950 border-zinc-800 max-w-xl text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">Select custom date range</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Choose a start and end date to filter bookings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Calendar
+              mode="range"
+              selected={customRange}
+              onSelect={(range) => setCustomRange(range ?? undefined)}
+              numberOfMonths={2}
+              initialFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowRangeModal(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
