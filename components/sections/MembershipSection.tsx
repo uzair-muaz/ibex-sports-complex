@@ -1,10 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import Link from "next/link";
-import { ArrowRight, Check, Clock, Zap } from "lucide-react";
+import { Check, Clock, MessageCircle, Phone, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+const CONTACT_PHONE = "+923255429429";
+const WHATSAPP_URL = `https://wa.me/${CONTACT_PHONE.replace(/\D/g, "")}`;
 
 const PLANS = [
   {
@@ -56,8 +66,44 @@ const TERMS = [
 ];
 
 export const MembershipSection = () => {
+  const [getStartedOpen, setGetStartedOpen] = useState(false);
+
   return (
     <section className="relative py-12 sm:py-16 md:py-24 lg:py-36 px-4 sm:px-6 overflow-hidden transition-colors duration-500">
+      <Dialog open={getStartedOpen} onOpenChange={setGetStartedOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl text-center">
+          <DialogHeader className="text-center space-y-3">
+            <DialogTitle className="text-xl sm:text-2xl font-bold text-black dark:text-white">
+              Get Started
+            </DialogTitle>
+            <DialogDescription className="text-zinc-600 dark:text-zinc-400 text-base leading-relaxed">
+              Drop us a message on WhatsApp or give us a call. Our team will get
+              in touch with you shortly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-semibold py-3 px-4 transition-colors"
+            >
+              <MessageCircle className="w-5 h-5" />
+              WhatsApp
+            </a>
+            <a
+              href={`tel:${CONTACT_PHONE}`}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-black dark:text-white font-semibold py-3 px-4 transition-colors border border-zinc-200 dark:border-zinc-700"
+            >
+              <Phone className="w-5 h-5" />
+              {CONTACT_PHONE}
+            </a>
+          </div>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 pt-1">
+            We&apos;re here to help you choose the right plan.
+          </p>
+        </DialogContent>
+      </Dialog>
       <div className="absolute inset-0 bg-zinc-50 dark:bg-[#0a0a0a]" />
 
       <div className="relative max-w-7xl mx-auto">
@@ -135,8 +181,10 @@ export const MembershipSection = () => {
                   <span className="text-zinc-500 text-xs sm:text-sm ml-1">/mo</span>
                 </div>
 
-                <Link href="/booking" className="block mb-4 sm:mb-6">
+                <div className="mb-4 sm:mb-6">
                   <Button
+                    type="button"
+                    onClick={() => setGetStartedOpen(true)}
                     className={`w-full rounded-xl h-10 sm:h-11 font-semibold text-xs sm:text-sm cursor-pointer transition-all ${
                       plan.highlight
                         ? "bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14b8a6] shadow-md"
@@ -145,7 +193,7 @@ export const MembershipSection = () => {
                   >
                     Get Started
                   </Button>
-                </Link>
+                </div>
 
                 <ul className="space-y-2 sm:space-y-3 flex-1">
                   {plan.features.map((feature) => (
