@@ -41,12 +41,9 @@ export function getPricePerHourForTime(
 ): { pricePerHour: number; label?: PricingLabel } {
   const hasPeriods =
     Array.isArray(court.pricingPeriods) && court.pricingPeriods.length > 0;
-  const basePrice =
-    !court.timeBasedPricingEnabled || !hasPeriods
-      ? typeof court.pricePerHour === "number"
-        ? court.pricePerHour
-        : 0
-      : 0;
+  // Always keep a fallback base price for hours not covered by peak/off-peak periods.
+  // This matters now that bookings are available for the full 24 hours.
+  const basePrice = typeof court.pricePerHour === "number" ? court.pricePerHour : 0;
 
   // For FUTSAL courts, prices are stored as "per 90 minutes", convert to "per hour"
   const isFutsal = court.type === "FUTSAL";

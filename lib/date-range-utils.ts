@@ -1,4 +1,10 @@
 import { formatLocalDate } from "./utils";
+import {
+  getBusinessDateKey,
+  parseDateKeyUTC,
+  shiftDateKey,
+  formatDateKeyUTC,
+} from "./date-time";
 
 export type DateRange = {
   from: string;
@@ -6,43 +12,48 @@ export type DateRange = {
 };
 
 export function getTodayRange(referenceDate: Date = new Date()): DateRange {
-  const day = formatLocalDate(referenceDate);
+  const day = getBusinessDateKey(referenceDate);
   return { from: day, to: day };
 }
 
 export function getCurrentWeekRange(referenceDate: Date = new Date()): DateRange {
-  const start = new Date(referenceDate);
-  // Treat Monday as the first day of the week
-  const day = start.getDay(); // 0 (Sun) - 6 (Sat)
-  const diffToMonday = (day + 6) % 7; // 0 if Monday, 1 if Tuesday, ..., 6 if Sunday
-  start.setDate(start.getDate() - diffToMonday);
-
+  const todayKey = getBusinessDateKey(referenceDate);
+  const today = parseDateKeyUTC(todayKey);
+  // Monday-first week using UTC date-only math
+  const day = today.getUTCDay(); // 0 (Sun) - 6 (Sat)
+  const diffToMonday = (day + 6) % 7;
+  const start = new Date(today);
+  start.setUTCDate(start.getUTCDate() - diffToMonday);
   const end = new Date(start);
-  end.setDate(start.getDate() + 6);
+  end.setUTCDate(start.getUTCDate() + 6);
 
   return {
-    from: formatLocalDate(start),
-    to: formatLocalDate(end),
+    from: formatDateKeyUTC(start),
+    to: formatDateKeyUTC(end),
   };
 }
 
 export function getCurrentMonthRange(referenceDate: Date = new Date()): DateRange {
-  const start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
-  const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
+  const todayKey = getBusinessDateKey(referenceDate);
+  const today = parseDateKeyUTC(todayKey);
+  const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
 
   return {
-    from: formatLocalDate(start),
-    to: formatLocalDate(end),
+    from: formatDateKeyUTC(start),
+    to: formatDateKeyUTC(end),
   };
 }
 
 export function getCurrentYearRange(referenceDate: Date = new Date()): DateRange {
-  const start = new Date(referenceDate.getFullYear(), 0, 1);
-  const end = new Date(referenceDate.getFullYear(), 11, 31);
+  const todayKey = getBusinessDateKey(referenceDate);
+  const today = parseDateKeyUTC(todayKey);
+  const start = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
+  const end = new Date(Date.UTC(today.getUTCFullYear(), 11, 31));
 
   return {
-    from: formatLocalDate(start),
-    to: formatLocalDate(end),
+    from: formatDateKeyUTC(start),
+    to: formatDateKeyUTC(end),
   };
 }
 

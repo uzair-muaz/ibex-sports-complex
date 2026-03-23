@@ -1,5 +1,6 @@
 import { CourtType } from '@/models/Court';
 import { AppliedDiscount } from '@/types';
+import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from './date-time';
 
 export interface DiscountInput {
   _id: string;
@@ -24,22 +25,23 @@ export function getApplicableDiscounts(
   startTime: number,
   date: string // YYYY-MM-DD format
 ): DiscountInput[] {
-  const bookingDate = new Date(date);
+  // Booking date is already a date-only YYYY-MM-DD string from the picker.
+  const bookingDateKey = date;
   
   return discounts.filter((discount) => {
     // Check if discount is active
     if (!discount.isActive) return false;
 
     // Check date validity
-    const validFrom = new Date(discount.validFrom);
-    const validUntil = new Date(discount.validUntil);
-    
-    // Set times to start/end of day for comparison
-    validFrom.setHours(0, 0, 0, 0);
-    validUntil.setHours(23, 59, 59, 999);
-    bookingDate.setHours(12, 0, 0, 0); // Noon to avoid timezone issues
-
-    if (bookingDate < validFrom || bookingDate > validUntil) {
+    const validFromKey = toDateKeyInTimezone(
+      new Date(discount.validFrom),
+      BUSINESS_TIMEZONE,
+    );
+    const validUntilKey = toDateKeyInTimezone(
+      new Date(discount.validUntil),
+      BUSINESS_TIMEZONE,
+    );
+    if (bookingDateKey < validFromKey || bookingDateKey > validUntilKey) {
       return false;
     }
 
@@ -174,12 +176,14 @@ export function formatCourtTypes(courtTypes: CourtType[]): string {
 export function isDiscountCurrentlyActive(discount: DiscountInput): boolean {
   if (!discount.isActive) return false;
 
-  const now = new Date();
-  const validFrom = new Date(discount.validFrom);
-  const validUntil = new Date(discount.validUntil);
-
-  validFrom.setHours(0, 0, 0, 0);
-  validUntil.setHours(23, 59, 59, 999);
-
-  return now >= validFrom && now <= validUntil;
+  const nowKey = toDateKeyInTimezone(new Date(), BUSINESS_TIMEZONE);
+  const validFromKey = toDateKeyInTimezone(
+    new Date(discount.validFrom),
+    BUSINESS_TIMEZONE,
+  );
+  const validUntilKey = toDateKeyInTimezone(
+    new Date(discount.validUntil),
+    BUSINESS_TIMEZONE,
+  );
+  return validFromKey <= nowKey && nowKey <= validUntilKey;
 }

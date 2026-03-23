@@ -54,6 +54,8 @@ import {
   getAllBookings,
   deleteBooking,
   updateBooking,
+  extendBooking,
+  checkBookingExtensionAvailability,
 } from "../../actions/bookings";
 import type { Booking, Court } from "@/types";
 import { formatDisplayDate, formatTime12 } from "@/lib/utils";
@@ -82,6 +84,15 @@ export default function BookingsPage() {
   const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [updatingStatusBookingId, setUpdatingStatusBookingId] = useState<string | null>(null);
+  const [extendingBookingId, setExtendingBookingId] = useState<string | null>(null);
+  const [extendingOption, setExtendingOption] = useState<0.5 | 1 | null>(null);
+  const [checkingExtensionBookingId, setCheckingExtensionBookingId] = useState<string | null>(null);
+  const [extensionAvailability, setExtensionAvailability] = useState<{
+    bookingId: string;
+    checked: boolean;
+    canExtend30: boolean;
+    canExtend60: boolean;
+  } | null>(null);
   const [sortColumn, setSortColumn] = useState<keyof Booking | "courtName" | null>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [dateFilter, setDateFilter] = useState<
@@ -198,11 +209,62 @@ export default function BookingsPage() {
 
   const handleViewBooking = (booking: Booking) => {
     setViewingBooking(booking);
+    setExtensionAvailability(null);
     setShowBookingDetailsModal(true);
   };
 
   const handleEditBooking = (booking: Booking) => {
     router.push(`/admin/bookings/${booking._id}/edit`);
+  };
+
+  const handleExtendBooking = async (
+    bookingId: string,
+    extraDuration: 0.5 | 1,
+  ) => {
+    setExtendingBookingId(bookingId);
+    setExtendingOption(extraDuration);
+    try {
+      const result = await extendBooking({ bookingId, extraDuration });
+      if (result.success) {
+        // Refresh list + modal data
+        loadData();
+        setViewingBooking(result.booking as Booking);
+        setExtensionAvailability(null);
+      } else {
+        alert(result.error || "Failed to extend booking");
+      }
+    } catch (error: any) {
+      alert(error?.message || "Failed to extend booking");
+    } finally {
+      setExtendingBookingId(null);
+      setExtendingOption(null);
+    }
+  };
+
+  const handleCheckExtensionAvailability = async (bookingId: string) => {
+    setCheckingExtensionBookingId(bookingId);
+    try {
+      const result = await checkBookingExtensionAvailability(bookingId);
+      if (!result.success) {
+        alert(result.error || "Failed to check extension availability");
+        setExtensionAvailability(null);
+        return;
+      }
+      setExtensionAvailability({
+        bookingId,
+        checked: true,
+        canExtend30: result.canExtend30,
+        canExtend60: result.canExtend60,
+      });
+      if (!result.hasAnyOption) {
+        alert("This booking cannot be extended right now.");
+      }
+    } catch (error: any) {
+      alert(error?.message || "Failed to check extension availability");
+      setExtensionAvailability(null);
+    } finally {
+      setCheckingExtensionBookingId(null);
+    }
   };
 
   const handleCreateBooking = () => {
@@ -557,7 +619,13 @@ export default function BookingsPage() {
                           <TableCell className="text-zinc-200 text-sm">
                             <div>{formatDisplayDate(booking.date)}</div>
                             <div className="text-xs text-zinc-400">
-                              {formatTime12(booking.startTime)} – {formatTime12(booking.startTime + booking.duration)}
+                              {formatTime12(booking.startTime)} –{" "}
+                              {formatTime12(
+                                ((booking.startTime + booking.duration) % 24 + 24) % 24,
+                              )}
+                              {booking.startTime + booking.duration > 24
+                                ? " (+1 day)"
+                                : ""}
                             </div>
                           </TableCell>
                           <TableCell className="text-zinc-200 text-sm">
@@ -753,13 +821,92 @@ export default function BookingsPage() {
                 <div className="space-y-1">
                   <Label className="text-zinc-400 text-xs">Time</Label>
                   <p className="text-white">
-                    {formatTime12(viewingBooking.startTime)} – {formatTime12(viewingBooking.startTime + viewingBooking.duration)}
+                    {formatTime12(viewingBooking.startTime)} –{" "}
+                    {formatTime12(
+                      ((viewingBooking.startTime + viewingBooking.duration) % 24 + 24) % 24,
+                    )}
+                    {viewingBooking.startTime + viewingBooking.duration > 24
+                      ? " (+1 day)"
+                      : ""}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-zinc-400 text-xs">Duration</Label>
                   <p className="text-white">{viewingBooking.duration} hour{viewingBooking.duration !== 1 ? "s" : ""}</p>
                 </div>
+
+                {(viewingBooking.status === "confirmed" ||
+                  viewingBooking.status === "pending_payment") && (
+                  <div className="space-y-2 pt-1">
+                    <Label className="text-zinc-400 text-xs">Extend Booking</Label>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          handleCheckExtensionAvailability(viewingBooking._id)
+                        }
+                        disabled={checkingExtensionBookingId === viewingBooking._id}
+                        className="border-zinc-700 text-zinc-200 hover:bg-zinc-800/50"
+                      >
+                        {checkingExtensionBookingId === viewingBooking._id ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                        ) : null}
+                        Check availability
+                      </Button>
+
+                      {extensionAvailability?.bookingId === viewingBooking._id &&
+                        extensionAvailability.checked && (
+                          <>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleExtendBooking(viewingBooking._id, 0.5)
+                              }
+                              disabled={
+                                !extensionAvailability.canExtend30 ||
+                                (extendingBookingId === viewingBooking._id &&
+                                  extendingOption === 0.5)
+                              }
+                              className="border-zinc-700 text-zinc-200 hover:bg-zinc-800/50"
+                            >
+                              {extendingBookingId === viewingBooking._id &&
+                              extendingOption === 0.5 ? (
+                                <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                              ) : null}
+                              +30 mins
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleExtendBooking(viewingBooking._id, 1)
+                              }
+                              disabled={
+                                !extensionAvailability.canExtend60 ||
+                                (extendingBookingId === viewingBooking._id &&
+                                  extendingOption === 1)
+                              }
+                              className="border-zinc-700 text-zinc-200 hover:bg-zinc-800/50"
+                            >
+                              {extendingBookingId === viewingBooking._id &&
+                              extendingOption === 1 ? (
+                                <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                              ) : null}
+                              +60 mins
+                            </Button>
+                          </>
+                        )}
+                    </div>
+                    <p className="text-zinc-500 text-[11px]">
+                      Click check first. Only valid extension options will be enabled.
+                    </p>
+                  </div>
+                )}
                 {/* Price Breakdown */}
                 {viewingBooking.discountAmount && viewingBooking.discountAmount > 0 ? (
                   <div className="col-span-2 space-y-2 bg-zinc-900/50 rounded-lg p-4">
@@ -880,6 +1027,7 @@ export default function BookingsPage() {
               onClick={() => {
                 setShowBookingDetailsModal(false);
                 setViewingBooking(null);
+                setExtensionAvailability(null);
               }}
             >
               Close
@@ -917,7 +1065,13 @@ export default function BookingsPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Time:</span>
                   <span className="text-white text-sm">
-                    {formatTime12(cancellingBooking.startTime)} – {formatTime12(cancellingBooking.startTime + cancellingBooking.duration)}
+                    {formatTime12(cancellingBooking.startTime)} –{" "}
+                    {formatTime12(
+                      ((cancellingBooking.startTime + cancellingBooking.duration) % 24 + 24) % 24,
+                    )}
+                    {cancellingBooking.startTime + cancellingBooking.duration > 24
+                      ? " (+1 day)"
+                      : ""}
                   </span>
                 </div>
               </div>
@@ -988,7 +1142,15 @@ export default function BookingsPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Time:</span>
                   <span className="text-white text-sm">
-                    {formatTime12(deletingBooking.startTime)} – {formatTime12(deletingBooking.startTime + deletingBooking.duration)}
+                    {formatTime12(deletingBooking.startTime)} –{" "}
+                    {formatTime12(
+                      ((deletingBooking.startTime + deletingBooking.duration) % 24 +
+                        24) %
+                        24,
+                    )}
+                    {deletingBooking.startTime + deletingBooking.duration > 24
+                      ? " (+1 day)"
+                      : ""}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

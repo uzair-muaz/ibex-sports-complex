@@ -11,33 +11,68 @@ import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
 import { getApplicableDiscounts, calculateDiscountedPrice, DiscountInput } from '@/lib/discount-utils';
 import { calculateOriginalPrice } from '@/lib/pricing-utils';
+import type { AppliedDiscount } from '@/types';
+import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from '@/lib/date-time';
 
-function getTimeSegments(start: number, duration: number): [number, number][] {
-  const end = start + duration;
-
-  if (end <= 24) {
-    return [[start, end]];
-  }
-
-  // Wrap past midnight: [start, 24) U [0, end - 24)
-  return [
-    [start, 24],
-    [0, end - 24],
-  ];
+async function getActiveDiscountsForBusinessDate() {
+  const todayKey = toDateKeyInTimezone(new Date(), BUSINESS_TIMEZONE);
+  const discountsRaw = await Discount.find({ isActive: true });
+  return discountsRaw.filter((d: any) => {
+    const fromKey = toDateKeyInTimezone(new Date(d.validFrom), BUSINESS_TIMEZONE);
+    const untilKey = toDateKeyInTimezone(new Date(d.validUntil), BUSINESS_TIMEZONE);
+    return fromKey <= todayKey && todayKey <= untilKey;
+  });
 }
 
-function doTimeRangesOverlap(
-  startA: number,
-  durationA: number,
-  startB: number,
-  durationB: number,
-): boolean {
-  const segmentsA = getTimeSegments(startA, durationA);
-  const segmentsB = getTimeSegments(startB, durationB);
+function toDayIndexUTC(dateStr: string): number {
+  // dateStr is YYYY-MM-DD in LOCAL storage (no timezone).
+  // Use UTC midnight to get a stable day index without DST surprises.
+  const [y, m, d] = dateStr.split("-").map((x) => Number(x));
+  const utcMs = Date.UTC(y, m - 1, d);
+  return Math.floor(utcMs / 86400000);
+}
 
-  // Two ranges overlap if any of their non-wrapping segments intersect
-  return segmentsA.some(([aStart, aEnd]) =>
-    segmentsB.some(([bStart, bEnd]) => aStart < bEnd && bStart < aEnd),
+function shiftDateUTC(dateStr: string, deltaDays: number): string {
+  const [y, m, d] = dateStr.split("-").map((x) => Number(x));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + deltaDays);
+  const y2 = dt.getUTCFullYear();
+  const m2 = dt.getUTCMonth() + 1;
+  const d2 = dt.getUTCDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${y2}-${pad(m2)}-${pad(d2)}`;
+}
+
+function rangesOverlapHalfOpen(
+  startA: number,
+  endA: number,
+  startB: number,
+  endB: number,
+): boolean {
+  // Half-open overlap: [start, end)
+  return startA < endB && startB < endA;
+}
+
+function bookingOverlapsCandidate(
+  referenceDateStr: string,
+  candidateStartTime: number,
+  candidateDuration: number,
+  booking: { date: string; startTime: number; duration: number },
+): boolean {
+  const referenceDay = toDayIndexUTC(referenceDateStr);
+  const bookingDay = toDayIndexUTC(booking.date);
+
+  const candidateStartAbs = candidateStartTime;
+  const candidateEndAbs = candidateStartTime + candidateDuration;
+
+  const bookingStartAbs = (bookingDay - referenceDay) * 24 + booking.startTime;
+  const bookingEndAbs = bookingStartAbs + booking.duration;
+
+  return rangesOverlapHalfOpen(
+    candidateStartAbs,
+    candidateEndAbs,
+    bookingStartAbs,
+    bookingEndAbs,
   );
 }
 
@@ -83,9 +118,13 @@ export async function createBooking(input: CreateBookingInput) {
       throw new Error(`No ${input.courtType} courts available`);
     }
 
-    // Get existing bookings for the date
+    // Get existing bookings around the date we are trying to book.
+    // Because bookings can span midnight, conflicts may involve bookings
+    // from the day before or the day after.
+    const dateMinus = shiftDateUTC(input.date, -1);
+    const datePlus = shiftDateUTC(input.date, 1);
     const existingBookings = await Booking.find({
-      date: input.date,
+      date: { $in: [dateMinus, input.date, datePlus] },
       status: { $ne: 'cancelled' },
     });
 
@@ -93,19 +132,19 @@ export async function createBooking(input: CreateBookingInput) {
     let assignedCourt = null;
 
     for (const court of availableCourts) {
-      // Check if this court has any conflicts
+        // Check if this court has any conflicts
       const hasConflict = existingBookings.some((booking) => {
         if (booking.courtId.toString() !== court._id.toString()) {
           return false;
         }
 
-        // Check for overlap, including bookings that span past midnight
-        return doTimeRangesOverlap(
-          input.startTime,
-          input.duration,
-          booking.startTime,
-          booking.duration,
-        );
+          // Check for overlap on an absolute calendar timeline
+          return bookingOverlapsCandidate(
+            input.date,
+            input.startTime,
+            input.duration,
+            booking,
+          );
       });
 
       if (!hasConflict) {
@@ -125,13 +164,8 @@ export async function createBooking(input: CreateBookingInput) {
       input.duration
     );
 
-    // Fetch active discounts
-    const now = new Date();
-    const activeDiscounts = await Discount.find({
-      isActive: true,
-      validFrom: { $lte: now },
-      validUntil: { $gte: now },
-    });
+    // Fetch active discounts using business timezone date boundary
+    const activeDiscounts = await getActiveDiscountsForBusinessDate();
 
     // Get applicable discounts for this booking (empty courtTypes = all court types)
     const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
@@ -230,6 +264,120 @@ export async function createBooking(input: CreateBookingInput) {
       success: false,
       error: error.message || 'Failed to create booking',
     };
+  }
+}
+
+export interface GetAvailableStartTimesInput {
+  courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
+  date: string; // YYYY-MM-DD (calendar day semantics)
+  duration: number; // hours in 0.5 increments
+}
+
+export interface AvailableStartTimeQuote {
+  startTime: number; // decimal hour: 0, 0.5, ..., 23.5
+  assignedCourtId: string;
+  assignedCourtName: string;
+  originalPrice: number;
+  totalPrice: number; // finalPrice after discounts
+  discountAmount: number;
+  appliedDiscounts: AppliedDiscount[];
+}
+
+export async function getAvailableStartTimes(
+  input: GetAvailableStartTimesInput,
+): Promise<{ success: true; startTimes: AvailableStartTimeQuote[] } | { success: false; error: string; startTimes: [] }> {
+  try {
+    await connectDB();
+
+    if (input.duration <= 0) {
+      return { success: false, error: 'Duration must be greater than 0', startTimes: [] };
+    }
+
+    const minDuration = input.courtType === 'FUTSAL' ? 1.5 : 1;
+    if (input.duration < minDuration) {
+      return {
+        success: false,
+        error:
+          input.courtType === 'FUTSAL'
+            ? 'Minimum booking time for Futsal is 90 minutes'
+            : 'Minimum booking time is 1 hour',
+        startTimes: [],
+      };
+    }
+
+    if (input.duration % 0.5 !== 0) {
+      return { success: false, error: 'Duration must be in 30-minute increments', startTimes: [] };
+    }
+
+    const courts = await Court.find({ type: input.courtType, isActive: true }).sort({ createdAt: 1 });
+    if (courts.length === 0) {
+      return { success: false, error: `No ${input.courtType} courts available`, startTimes: [] };
+    }
+
+    const dateMinus = shiftDateUTC(input.date, -1);
+    const datePlus = shiftDateUTC(input.date, 1);
+    const existingBookings = await Booking.find({
+      date: { $in: [dateMinus, input.date, datePlus] },
+      status: { $ne: 'cancelled' },
+    });
+
+    // Fetch active discounts once (pricing varies per startTime due to time restrictions).
+    const activeDiscounts = await getActiveDiscountsForBusinessDate();
+
+    const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
+      _id: d._id.toString(),
+      name: d.name,
+      type: d.type,
+      value: d.value,
+      courtTypes: Array.isArray(d.courtTypes) ? d.courtTypes : [],
+      allDay: d.allDay,
+      startHour: d.startHour,
+      endHour: d.endHour,
+      validFrom: d.validFrom,
+      validUntil: d.validUntil,
+      isActive: d.isActive,
+    }));
+
+    const results: AvailableStartTimeQuote[] = [];
+    const slotCount = 48; // 0..23.5 in 0.5 increments
+
+    for (let i = 0; i < slotCount; i++) {
+      const startTime = Number((i * 0.5).toFixed(1));
+      let assignedCourt: typeof courts[number] | null = null;
+
+      for (const court of courts) {
+        const hasConflict = existingBookings.some((booking) => {
+          if (booking.courtId.toString() !== court._id.toString()) return false;
+          return bookingOverlapsCandidate(input.date, startTime, input.duration, booking);
+        });
+
+        if (!hasConflict) {
+          assignedCourt = court;
+          break; // deterministic: first available court (same as createBooking)
+        }
+      }
+
+      if (!assignedCourt) continue;
+
+      const { originalPrice } = calculateOriginalPrice(assignedCourt, startTime, input.duration);
+      const applicable = getApplicableDiscounts(discountsData, input.courtType, startTime, input.date);
+      const { finalPrice, discountAmount, appliedDiscounts } = calculateDiscountedPrice(originalPrice, applicable);
+
+      results.push({
+        startTime,
+        assignedCourtId: assignedCourt._id.toString(),
+        assignedCourtName: assignedCourt.name,
+        originalPrice,
+        totalPrice: finalPrice,
+        discountAmount,
+        appliedDiscounts,
+      });
+    }
+
+    return { success: true, startTimes: results };
+  } catch (error: any) {
+    console.error('getAvailableStartTimes error:', error);
+    return { success: false, error: error.message || 'Failed to fetch availability', startTimes: [] };
   }
 }
 
@@ -365,8 +513,10 @@ export async function updateBooking(input: UpdateBookingInput) {
 
       // Check for conflicts if time changed
       if (updateData.date || updateData.startTime || updateData.duration) {
+        const dateMinus = shiftDateUTC(finalDate, -1);
+        const datePlus = shiftDateUTC(finalDate, 1);
         const existingBookings = await Booking.find({
-          date: finalDate,
+          date: { $in: [dateMinus, finalDate, datePlus] },
           status: { $ne: 'cancelled' },
           _id: { $ne: bookingId },
         });
@@ -376,11 +526,11 @@ export async function updateBooking(input: UpdateBookingInput) {
             return false;
           }
 
-          return doTimeRangesOverlap(
+          return bookingOverlapsCandidate(
+            finalDate,
             finalStartTime,
             finalDuration,
-            b.startTime,
-            b.duration,
+            b,
           );
         });
 
@@ -396,13 +546,8 @@ export async function updateBooking(input: UpdateBookingInput) {
         finalDuration
       );
 
-      // Fetch active discounts
-      const now = new Date();
-      const activeDiscounts = await Discount.find({
-        isActive: true,
-        validFrom: { $lte: now },
-        validUntil: { $gte: now },
-      });
+      // Fetch active discounts using business timezone date boundary
+      const activeDiscounts = await getActiveDiscountsForBusinessDate();
 
       // Get applicable discounts (empty courtTypes = all court types)
       const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
@@ -460,6 +605,88 @@ export async function updateBooking(input: UpdateBookingInput) {
       success: false,
       error: error.message || 'Failed to update booking',
     };
+  }
+}
+
+export interface ExtendBookingInput {
+  bookingId: string;
+  extraDuration: 0.5 | 1;
+}
+
+export async function checkBookingExtensionAvailability(bookingId: string) {
+  try {
+    await connectDB();
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return { success: false, error: "Booking not found" };
+    }
+    if (booking.status === "cancelled" || booking.status === "completed") {
+      return { success: false, error: "This booking cannot be extended" };
+    }
+
+    const dateMinus = shiftDateUTC(booking.date, -1);
+    const datePlus = shiftDateUTC(booking.date, 1);
+    const existingBookings = await Booking.find({
+      date: { $in: [dateMinus, booking.date, datePlus] },
+      status: { $ne: "cancelled" },
+      _id: { $ne: bookingId },
+      courtId: booking.courtId,
+    });
+
+    const canExtendBy = (extraDuration: 0.5 | 1): boolean => {
+      const candidateDuration = booking.duration + extraDuration;
+      if (candidateDuration > 12) return false;
+      return !existingBookings.some((b) =>
+        bookingOverlapsCandidate(booking.date, booking.startTime, candidateDuration, b),
+      );
+    };
+
+    const canExtend30 = canExtendBy(0.5);
+    const canExtend60 = canExtendBy(1);
+
+    return {
+      success: true,
+      canExtend30,
+      canExtend60,
+      hasAnyOption: canExtend30 || canExtend60,
+    };
+  } catch (error: any) {
+    console.error("checkBookingExtensionAvailability error:", error);
+    return { success: false, error: error.message || "Failed to check extension availability" };
+  }
+}
+
+export async function extendBooking(input: ExtendBookingInput) {
+  try {
+    await connectDB();
+
+    if (input.extraDuration % 0.5 !== 0) {
+      return { success: false, error: "Extra duration must be in 30-minute increments" };
+    }
+
+    const booking = await Booking.findById(input.bookingId);
+    if (!booking) {
+      return { success: false, error: "Booking not found" };
+    }
+
+    if (booking.status === "cancelled" || booking.status === "completed") {
+      return { success: false, error: "This booking cannot be extended" };
+    }
+
+    const nextDuration = booking.duration + input.extraDuration;
+    if (nextDuration > 12) {
+      return { success: false, error: "Cannot extend beyond 12 hours" };
+    }
+
+    // Delegate to updateBooking so pricing + conflict validation stays consistent.
+    return await updateBooking({
+      bookingId: input.bookingId,
+      duration: nextDuration,
+    });
+  } catch (error: any) {
+    console.error("Extend booking error:", error);
+    return { success: false, error: error.message || "Failed to extend booking" };
   }
 }
 

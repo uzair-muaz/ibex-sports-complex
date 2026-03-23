@@ -4,6 +4,22 @@ import connectDB from '@/lib/mongodb';
 import Discount, { IDiscount } from '@/models/Discount';
 import { CourtType } from '@/models/Court';
 import { revalidatePath } from 'next/cache';
+import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from '@/lib/date-time';
+
+function dateBoundaryUTC(input: string, boundary: "start" | "end"): Date {
+  const parsed = new Date(input);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error("Invalid date value");
+  }
+
+  const y = parsed.getUTCFullYear();
+  const m = parsed.getUTCMonth();
+  const d = parsed.getUTCDate();
+  if (boundary === "start") {
+    return new Date(Date.UTC(y, m, d, 0, 0, 0, 0));
+  }
+  return new Date(Date.UTC(y, m, d, 23, 59, 59, 999));
+}
 
 export async function getDiscounts() {
   try {
@@ -29,12 +45,14 @@ export async function getActiveDiscounts() {
   try {
     await connectDB();
 
-    const now = new Date();
-    const discounts = await Discount.find({
-      isActive: true,
-      validFrom: { $lte: now },
-      validUntil: { $gte: now },
-    }).sort({ createdAt: -1 });
+    // Date-only check to avoid timezone edge cases on boundary days.
+    const todayKey = toDateKeyInTimezone(new Date(), BUSINESS_TIMEZONE);
+    const discountsRaw = await Discount.find({ isActive: true }).sort({ createdAt: -1 });
+    const discounts = discountsRaw.filter((d: any) => {
+      const fromKey = toDateKeyInTimezone(new Date(d.validFrom), BUSINESS_TIMEZONE);
+      const untilKey = toDateKeyInTimezone(new Date(d.validUntil), BUSINESS_TIMEZONE);
+      return fromKey <= todayKey && todayKey <= untilKey;
+    });
 
     return {
       success: true,
@@ -95,8 +113,8 @@ export async function createDiscount(input: CreateDiscountInput) {
       allDay: input.allDay,
       startHour: input.allDay ? 0 : input.startHour,
       endHour: input.allDay ? 23 : input.endHour,
-      validFrom: new Date(input.validFrom),
-      validUntil: new Date(input.validUntil),
+      validFrom: dateBoundaryUTC(input.validFrom, "start"),
+      validUntil: dateBoundaryUTC(input.validUntil, "end"),
       isActive: input.isActive ?? true,
     });
 
@@ -169,10 +187,10 @@ export async function updateDiscount(input: UpdateDiscountInput) {
     // Convert date strings to Date objects if provided
     const finalUpdateData: any = { ...updateData };
     if (updateData.validFrom) {
-      finalUpdateData.validFrom = new Date(updateData.validFrom);
+      finalUpdateData.validFrom = dateBoundaryUTC(updateData.validFrom, "start");
     }
     if (updateData.validUntil) {
-      finalUpdateData.validUntil = new Date(updateData.validUntil);
+      finalUpdateData.validUntil = dateBoundaryUTC(updateData.validUntil, "end");
     }
 
     const discount = await Discount.findByIdAndUpdate(

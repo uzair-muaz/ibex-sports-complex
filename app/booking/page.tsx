@@ -20,6 +20,7 @@ import { getBookingsByDate, createBooking } from "../actions/bookings";
 import { getActiveDiscounts } from "../actions/discounts";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import BookingClient from "./BookingClient";
 import { formatLocalDate } from "@/lib/utils";
 import {
   getApplicableDiscounts,
@@ -30,7 +31,7 @@ import { calculateOriginalPrice } from "@/lib/pricing-utils";
 import { PriceBreakdown } from "@/components/PriceBreakdown";
 import { DiscountBanner } from "@/components/DiscountBanner";
 
-export default function BookingPage() {
+function BookingPageLegacy() {
   // Default to opening date if today is before it
   const getInitialDate = () => {
     const today = new Date();
@@ -571,7 +572,7 @@ export default function BookingPage() {
       <Navbar />
       <DiscountBanner className="fixed top-16 md:top-20 left-0 right-0 z-40" />
 
-      <div className="fixed top-0 left-0 w-full h-[50vh] bg-gradient-to-b from-[#2DD4BF]/10 to-transparent pointer-events-none" />
+      <div className="fixed top-0 left-0 w-full h-[50vh] bg-linear-to-b from-[#2DD4BF]/10 to-transparent pointer-events-none" />
 
       <div
         className={`pt-20 md:pt-24 lg:pt-32 px-4 md:px-6 transition-all duration-300 ${
@@ -1069,7 +1070,7 @@ export default function BookingPage() {
                   <h3 className="text-sm md:text-base lg:text-lg font-semibold text-white mb-1">
                     {selectedDuration === 1 ? "Hour" : "Hours"} Selected
                   </h3>
-                  <p className="text-zinc-400 text-xs md:text-sm break-words">
+                  <p className="text-zinc-400 text-xs md:text-sm wrap-break-word">
                     {selectedCourt ? `${selectedCourt.name} • ` : ""}
                     {selectedSlots.length > 0 &&
                       (() => {
@@ -1131,7 +1132,7 @@ export default function BookingPage() {
 
       {/* Confirmation Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 py-4 md:py-8">
+        <div className="fixed inset-0 z-60 flex items-center justify-center px-4 py-4 md:py-8">
           <div
             className="absolute inset-0 bg-black/90 backdrop-blur-md"
             onClick={() => {
@@ -1460,4 +1461,8 @@ export default function BookingPage() {
       <Footer />
     </div>
   );
+}
+
+export default function BookingPage() {
+  return <BookingClient />;
 }
