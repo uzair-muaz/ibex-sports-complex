@@ -57,7 +57,9 @@ export function PriceBreakdown({
       {/* Subtotal */}
       <div className="flex items-center justify-between text-sm">
         <span className="text-zinc-400">Subtotal</span>
-        <span className="text-zinc-300">PKR {originalPrice.toLocaleString()}</span>
+        <span className="text-zinc-300">
+          PKR {originalPrice.toLocaleString()}
+        </span>
       </div>
 
       {/* Individual discounts */}
@@ -69,7 +71,11 @@ export function PriceBreakdown({
           <span className="text-green-400">
             {discount.name}{" "}
             <span className="text-zinc-500">
-              ({discount.type === "percentage" ? `${discount.value}%` : `PKR ${discount.value}`})
+              (
+              {discount.type === "percentage"
+                ? `${discount.value}%`
+                : `PKR ${discount.value}`}
+              )
             </span>
           </span>
           <span className="text-green-400">

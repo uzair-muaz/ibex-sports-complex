@@ -42,14 +42,12 @@ async function generateQRCodeDataUrl(value: string): Promise<string> {
     if (!QRCode) {
       throw new Error('QRCode package not available');
     }
+    const qrColor = { ["dark"]: "#000000", ["light"]: "#FFFFFF" };
     const dataUrl = await QRCode.toDataURL(value, {
       width: 300,
       margin: 3,
       errorCorrectionLevel: 'M',
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF',
-      },
+      color: qrColor,
     });
     return dataUrl;
   } catch (error) {
@@ -67,14 +65,12 @@ async function generateQRCodeBuffer(value: string): Promise<Buffer> {
     if (!QRCode) {
       throw new Error('QRCode package not available');
     }
+    const qrColor = { ["dark"]: "#000000", ["light"]: "#FFFFFF" };
     const buffer = await QRCode.toBuffer(value, {
       width: 300,
       margin: 3,
       errorCorrectionLevel: 'M',
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF',
-      },
+      color: qrColor,
       type: 'image/png',
     });
     return buffer;

@@ -11,7 +11,7 @@ export type SectionId =
   | "membership"
   | "contact";
 
-export type SectionTheme = "light" | "dark";
+export type SectionTheme = "dark";
 
 export interface Chapter {
   id: SectionId;
@@ -34,38 +34,38 @@ export const LANDING_CHAPTERS: Chapter[] = [
     headline: "Choose Your Arena",
     subline:
       "Whether you're a seasoned pro or picking up a racket for the first time, our world-class facilities are designed to elevate your game.",
-    theme: "light",
-    bgClass: "bg-white dark:bg-[#050505]",
+    theme: "dark",
+    bgClass: "bg-[#050505]",
   },
   {
     id: "amenities",
     headline: "Hive Cafe",
     subline:
       "More than just a coffee shop. Hive is where the community gathers post-match.",
-    theme: "light",
-    bgClass: "bg-zinc-50 dark:bg-[#080808]",
+    theme: "dark",
+    bgClass: "bg-[#080808]",
   },
   {
     id: "lifestyle",
     headline: "Lifestyle",
     subline: "Life at IBEX — beyond the court.",
     theme: "dark",
-    bgClass: "bg-black dark:bg-black",
+    bgClass: "bg-black",
   },
   {
     id: "membership",
     headline: "Join the Ibex Community",
     subline:
       "Choose the way you play. From flexible hourly bookings to comprehensive monthly memberships.",
-    theme: "light",
-    bgClass: "bg-white dark:bg-[#050505]",
+    theme: "dark",
+    bgClass: "bg-[#050505]",
   },
   {
     id: "contact",
     headline: "Get in touch",
     subline: "Find us. Book your court.",
-    theme: "light",
-    bgClass: "bg-white dark:bg-[#050505]",
+    theme: "dark",
+    bgClass: "bg-[#050505]",
   },
 ];
 

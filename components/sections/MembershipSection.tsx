@@ -71,12 +71,12 @@ export const MembershipSection = () => {
   return (
     <section className="relative py-12 sm:py-16 md:py-24 lg:py-36 px-4 sm:px-6 overflow-hidden transition-colors duration-500">
       <Dialog open={getStartedOpen} onOpenChange={setGetStartedOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl text-center">
+        <DialogContent className="sm:max-w-md rounded-2xl border-zinc-800 bg-zinc-900 shadow-xl text-center">
           <DialogHeader className="text-center space-y-3">
-            <DialogTitle className="text-xl sm:text-2xl font-bold text-black dark:text-white">
+            <DialogTitle className="text-xl sm:text-2xl font-bold text-white">
               Get Started
             </DialogTitle>
-            <DialogDescription className="text-zinc-600 dark:text-zinc-400 text-base leading-relaxed">
+            <DialogDescription className="text-zinc-400 text-base leading-relaxed">
               Drop us a message on WhatsApp or give us a call. Our team will get
               in touch with you shortly.
             </DialogDescription>
@@ -93,18 +93,18 @@ export const MembershipSection = () => {
             </a>
             <a
               href={`tel:${CONTACT_PHONE}`}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-black dark:text-white font-semibold py-3 px-4 transition-colors border border-zinc-200 dark:border-zinc-700"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-4 transition-colors border border-zinc-700"
             >
               <Phone className="w-5 h-5" />
               {CONTACT_PHONE}
             </a>
           </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 pt-1">
+          <p className="text-sm text-zinc-400 pt-1">
             We&apos;re here to help you choose the right plan.
           </p>
         </DialogContent>
       </Dialog>
-      <div className="absolute inset-0 bg-zinc-50 dark:bg-[#0a0a0a]" />
+      <div className="absolute inset-0 bg-[#0a0a0a]" />
 
       <div className="relative max-w-7xl mx-auto">
         {/* Header */}
@@ -132,7 +132,7 @@ export const MembershipSection = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.25 }}
-              className="mt-4 sm:mt-6 text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-2xl"
+              className="mt-4 sm:mt-6 text-base sm:text-lg md:text-xl text-zinc-400 leading-relaxed max-w-2xl"
             >
               Choose the way you play. From flexible hourly bookings to
               comprehensive monthly memberships.
@@ -156,8 +156,8 @@ export const MembershipSection = () => {
               className={`relative flex flex-col rounded-2xl border overflow-hidden transition-shadow duration-300 ${
                 plan.highlight
                   ? "border-[#2DD4BF] shadow-lg shadow-[#2DD4BF]/10 lg:scale-105 z-10"
-                  : "border-zinc-200 dark:border-zinc-800 hover:shadow-md"
-              } bg-white dark:bg-zinc-900/80`}
+                  : "border-zinc-800 hover:shadow-md"
+              } bg-zinc-900/80`}
             >
               {plan.highlight && (
                 <div className="bg-[#2DD4BF] text-[#0F172A] text-center py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
@@ -166,16 +166,16 @@ export const MembershipSection = () => {
               )}
 
               <div className="flex flex-col flex-1 p-4 sm:p-6 md:p-7">
-                <h3 className="text-base sm:text-lg md:text-xl font-bold text-black dark:text-white mb-1">
+                <h3 className="text-base sm:text-lg md:text-xl font-bold text-white mb-1">
                   {plan.name}
                 </h3>
-                <div className="flex items-center gap-2 text-zinc-400 dark:text-zinc-500 text-xs sm:text-sm mb-4 sm:mb-6">
+                <div className="flex items-center gap-2 text-zinc-500 text-xs sm:text-sm mb-4 sm:mb-6">
                   <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>{plan.hours} hrs/month</span>
                 </div>
 
                 <div className="mb-4 sm:mb-6">
-                  <span className="text-2xl sm:text-3xl font-bold text-black dark:text-white">
+                  <span className="text-2xl sm:text-3xl font-bold text-white">
                     PKR {plan.price.toLocaleString()}
                   </span>
                   <span className="text-zinc-500 text-xs sm:text-sm ml-1">/mo</span>
@@ -188,7 +188,7 @@ export const MembershipSection = () => {
                     className={`w-full rounded-xl h-10 sm:h-11 font-semibold text-xs sm:text-sm cursor-pointer transition-all ${
                       plan.highlight
                         ? "bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14b8a6] shadow-md"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                        : "bg-zinc-800 text-white hover:bg-zinc-700"
                     }`}
                   >
                     Get Started
@@ -199,13 +199,13 @@ export const MembershipSection = () => {
                   {plan.features.map((feature) => (
                     <li
                       key={feature}
-                      className="flex items-center gap-2 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400"
+                      className="flex items-center gap-2 text-xs sm:text-sm text-zinc-400"
                     >
                       <Check
                         className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${
                           plan.highlight
                             ? "text-[#2DD4BF]"
-                            : "text-zinc-400 dark:text-zinc-500"
+                            : "text-zinc-500"
                         }`}
                       />
                       <span>{feature}</span>
@@ -213,7 +213,7 @@ export const MembershipSection = () => {
                   ))}
                 </ul>
 
-                <p className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-zinc-100 dark:border-zinc-800 text-[10px] sm:text-xs text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
+                <p className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-zinc-800 text-[10px] sm:text-xs text-zinc-500 flex items-center gap-1.5">
                   <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />
                   ~PKR {Math.round(plan.price / plan.hours).toLocaleString()}/hr
                 </p>
@@ -228,16 +228,16 @@ export const MembershipSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.4 }}
-          className="mt-10 sm:mt-16 md:mt-20 p-4 sm:p-6 md:p-8 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80"
+          className="mt-10 sm:mt-16 md:mt-20 p-4 sm:p-6 md:p-8 rounded-2xl bg-zinc-900/60 border border-zinc-800/80"
         >
-          <h4 className="text-sm font-semibold text-black dark:text-white uppercase tracking-wider mb-4">
+          <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
             Terms & conditions
           </h4>
           <ul className="space-y-3">
             {TERMS.map((term, i) => (
               <li
                 key={i}
-                className="flex items-start gap-3 text-zinc-600 dark:text-zinc-400 text-sm"
+                className="flex items-start gap-3 text-zinc-400 text-sm"
               >
                 <Check className="w-4 h-4 text-[#2DD4BF] shrink-0 mt-0.5" />
                 <span>{term}</span>

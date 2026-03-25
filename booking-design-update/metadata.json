@@ -1,7 +1,0 @@
-{
-  "name": "IBEX Sports Complex Booking",
-  "description": "A premium sports complex booking system with real-time slot availability for Padel, Pickleball, and Futsal.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
-}

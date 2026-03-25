@@ -8,10 +8,10 @@ import { ScrollReveal } from "@/components/ui/ScrollReveal";
 
 export const AmenitiesSection = () => {
   return (
-    <section className="py-12 sm:py-16 md:py-24 lg:py-36 px-4 sm:px-6 bg-white dark:bg-[#050505] transition-colors duration-500 relative overflow-hidden">
+    <section className="py-12 sm:py-16 md:py-24 lg:py-36 px-4 sm:px-6 bg-[#050505] transition-colors duration-500 relative overflow-hidden">
       {/* Subtle background glow */}
       <div
-        className="absolute top-1/3 left-1/4 w-[50vw] h-[50vw] max-w-[600px] max-h-[600px] rounded-full bg-zinc-200/30 dark:bg-white/[0.02] blur-[100px]"
+        className="absolute top-1/3 left-1/4 w-[50vw] h-[50vw] max-w-[600px] max-h-[600px] rounded-full bg-white/[0.02] blur-[100px]"
         aria-hidden
       />
 
@@ -42,7 +42,7 @@ export const AmenitiesSection = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="mt-4 sm:mt-6 text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl leading-relaxed"
+              className="mt-4 sm:mt-6 text-base sm:text-lg md:text-xl text-zinc-400 max-w-2xl leading-relaxed"
             >
               More than just a coffee shop. Hive is where the community gathers
               post-match. We serve specialist grade coffee, roasted to
@@ -68,10 +68,10 @@ export const AmenitiesSection = () => {
                   <Coffee className="w-6 h-6 text-[#2DD4BF]" />
                 </div>
                 <div>
-                  <h4 className="text-xl font-bold text-black dark:text-white mb-2">
+                  <h4 className="text-xl font-bold text-white mb-2">
                     Specialist Grade
                   </h4>
-                  <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  <p className="text-zinc-400 leading-relaxed">
                     Ethically sourced beans, expertly brewed by our master
                     baristas.
                   </p>
@@ -91,10 +91,10 @@ export const AmenitiesSection = () => {
                   <Zap className="w-6 h-6 text-[#2DD4BF]" />
                 </div>
                 <div>
-                  <h4 className="text-xl font-bold text-black dark:text-white mb-2">
+                  <h4 className="text-xl font-bold text-white mb-2">
                     Post-Match Recovery
                   </h4>
-                  <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  <p className="text-zinc-400 leading-relaxed">
                     Fresh juices and protein shakes to refuel your body after a
                     session.
                   </p>
