@@ -253,8 +253,8 @@ export default function BookingsPage() {
       setExtensionAvailability({
         bookingId,
         checked: true,
-        canExtend30: result.canExtend30,
-        canExtend60: result.canExtend60,
+        canExtend30: result.canExtend30 ?? false,
+        canExtend60: result.canExtend60 ?? false,
       });
       if (!result.hasAnyOption) {
         alert("This booking cannot be extended right now.");
