@@ -1,10 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, CheckCircle } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
+
+import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminAvailableSlotGrid } from "@/components/admin/AdminAvailableSlotGrid";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,54 +19,54 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AdminLayout } from "@/components/admin/AdminLayout";
-import { DatePicker } from "@/components/ui/date-picker";
-import { getCourts } from "../../../actions/courts";
-import { getBookingsByDate, createBooking } from "../../../actions/bookings";
-import { getActiveDiscounts } from "../../../actions/discounts";
-import { COMPLEX_OPENING_DATE } from "@/types";
-import type { Court, AppliedDiscount, CourtPricingPeriod } from "@/types";
-import type { Discount } from "@/types";
-import { formatLocalDate } from "@/lib/utils";
+import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
+import { formatAdminBookingEndLabel } from "@/lib/admin-booking-slots";
+import { formatLocalDate, formatTime12 } from "@/lib/utils";
 import {
-  getApplicableDiscounts,
-  calculateDiscountedPrice,
-  type DiscountInput,
-} from "@/lib/discount-utils";
-import { calculateOriginalPrice } from "@/lib/pricing-utils";
-import { PriceBreakdown } from "@/components/PriceBreakdown";
+  createBooking,
+  getAvailableStartTimes,
+  type AvailableStartTimeQuote,
+} from "@/app/actions/bookings";
+import { getCourts } from "@/app/actions/courts";
+import { COMPLEX_OPENING_DATE, type Court, type CourtType } from "@/types";
+import { toast } from "sonner";
 
-export default function NewBookingPage() {
+const COURT_TYPES: CourtType[] = ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"];
+
+function dateKeyToLocalDate(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export default function AdminNewBookingPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { todayBusinessKey, minSelectableDateKey, nowBusinessHourDecimal } =
+    useBusinessTime(COMPLEX_OPENING_DATE);
 
-  // Slot selection state
-  const [courts, setCourts] = useState<Court[]>([]);
-  const [dateBookings, setDateBookings] = useState<any[]>([]);
-  const [selectedSlots, setSelectedSlots] = useState<
-    { courtId: string; slotTime: number }[]
-  >([]);
-  const [isLoadingCourts, setIsLoadingCourts] = useState(false);
-  const [isLoadingDateBookings, setIsLoadingDateBookings] = useState(false);
-  const [activeDiscounts, setActiveDiscounts] = useState<Discount[]>([]);
+  const minPickDate = useMemo(() => {
+    const biz = dateKeyToLocalDate(minSelectableDateKey);
+    return COMPLEX_OPENING_DATE > biz ? COMPLEX_OPENING_DATE : biz;
+  }, [minSelectableDateKey]);
 
-  // Default to opening date if today is before it
-  const getInitialDate = () => {
-    const today = new Date();
-    return today < COMPLEX_OPENING_DATE ? COMPLEX_OPENING_DATE : today;
-  };
-
-  const [formData, setFormData] = useState({
-    date: getInitialDate(),
-    courtType: "PADEL" as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
-    userName: "",
-    userEmail: "",
-    userPhone: "",
-  });
-
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as { role?: string })?.role;
   const isAdmin = userRole === "admin" || userRole === "super_admin";
+
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+
+  useEffect(() => {
+    if (!selectedDate && minSelectableDateKey) {
+      setSelectedDate(minPickDate);
+    }
+  }, [selectedDate, minSelectableDateKey, minPickDate]);
+
+  useEffect(() => {
+    if (selectedDate && selectedDate < minPickDate) {
+      setSelectedDate(minPickDate);
+    }
+  }, [selectedDate, minPickDate]);
+
+  const dateStr = selectedDate ? formatLocalDate(selectedDate) : "";
 
   useEffect(() => {
     if (session && !isAdmin) {
@@ -69,289 +74,148 @@ export default function NewBookingPage() {
     }
   }, [session, isAdmin, router]);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingQuotes, setIsLoadingQuotes] = useState(false);
+  const [quotableQuotes, setQuotableQuotes] = useState<
+    AvailableStartTimeQuote[]
+  >([]);
+  const [courts, setCourts] = useState<Court[]>([]);
+
+  const [formData, setFormData] = useState({
+    courtType: "PADEL" as CourtType,
+    durationHours: 1,
+    userName: "",
+    userEmail: "",
+    userPhone: "",
+  });
+
+  const [selectedQuote, setSelectedQuote] =
+    useState<AvailableStartTimeQuote | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const durationPresets = useMemo(() => {
+    if (formData.courtType === "FUTSAL") {
+      return [
+        { hours: 1.5, label: "1h 30m" },
+        { hours: 2, label: "2h" },
+        { hours: 2.5, label: "2h 30m" },
+        { hours: 3, label: "3h" },
+      ];
+    }
+    return [
+      { hours: 1, label: "1 hour" },
+      { hours: 1.5, label: "1h 30m" },
+      { hours: 2, label: "2 hours" },
+    ];
+  }, [formData.courtType]);
+
   useEffect(() => {
-    if (session && isAdmin) {
-      loadCourts();
-      loadBookingsForDate();
-    }
-  }, [session, isAdmin, formData.date, formData.courtType]);
+    const first = durationPresets[0]?.hours ?? 1;
+    setFormData((prev) =>
+      prev.durationHours === first ? prev : { ...prev, durationHours: first },
+    );
+  }, [formData.courtType, durationPresets]);
 
   useEffect(() => {
-    if (session && isAdmin) {
-      const loadDiscounts = async () => {
-        try {
-          const result = await getActiveDiscounts();
-          if (result.success) setActiveDiscounts(result.discounts);
-        } catch (e) {
-          console.error("Failed to load discounts:", e);
-        }
-      };
-      loadDiscounts();
-    }
-  }, [session, isAdmin]);
+    if (!session || !isAdmin || !formData.courtType) return;
+    (async () => {
+      try {
+        const result = await getCourts(formData.courtType);
+        if (result.success) setCourts(result.courts as Court[]);
+        else setCourts([]);
+      } catch {
+        setCourts([]);
+      }
+    })();
+  }, [session, isAdmin, formData.courtType]);
 
-  const loadCourts = async () => {
-    setIsLoadingCourts(true);
+  const fetchQuotes = useCallback(async () => {
+    if (!formData.courtType || !dateStr) {
+      setQuotableQuotes([]);
+      return;
+    }
+    setIsLoadingQuotes(true);
+    setSelectedQuote(null);
+    setErrorMessage(null);
     try {
-      const result = await getCourts(formData.courtType);
-      if (result.success) {
-        setCourts(result.courts);
+      const result = await getAvailableStartTimes({
+        courtType: formData.courtType,
+        date: dateStr,
+        duration: formData.durationHours,
+      });
+      if (!result.success) {
+        setQuotableQuotes([]);
+        setErrorMessage(result.error ?? "Could not load available times.");
+        return;
       }
-    } catch (error) {
-      console.error(error);
+      let list = result.startTimes ?? [];
+      if (dateStr === todayBusinessKey) {
+        list = list.filter((q) => q.startTime >= nowBusinessHourDecimal);
+      }
+      setQuotableQuotes(list);
+    } catch (e) {
+      setQuotableQuotes([]);
+      setErrorMessage(e instanceof Error ? e.message : "Failed to load slots.");
     } finally {
-      setIsLoadingCourts(false);
+      setIsLoadingQuotes(false);
     }
-  };
-
-  const loadBookingsForDate = async () => {
-    setIsLoadingDateBookings(true);
-    try {
-      const dateString =
-        formData.date instanceof Date
-          ? formatLocalDate(formData.date)
-          : formData.date;
-      const result = await getBookingsByDate(dateString);
-      if (result.success) {
-        const filtered = result.bookings.filter(
-          (b: any) =>
-            b.courtId?.type === formData.courtType && b.status !== "cancelled",
-        );
-        setDateBookings(filtered);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoadingDateBookings(false);
-    }
-  };
-
-  // Generate time slots for business hours: 12:00 PM - 4:00 AM
-  const timeSlots: number[] = [];
-  for (let hour = 12; hour < 24; hour++) {
-    timeSlots.push(hour);
-    timeSlots.push(hour + 0.5);
-  }
-  for (let hour = 0; hour < 4; hour++) {
-    timeSlots.push(hour);
-    timeSlots.push(hour + 0.5);
-  }
-  const getSlotIndex = (slotTime: number) => timeSlots.indexOf(slotTime);
-
-  const formatTime12 = (time: number) => {
-    const totalMinutes = Math.round(time * 60);
-    let h = Math.floor(totalMinutes / 60) % 24;
-    const m = totalMinutes % 60;
-    const suffix = h >= 12 ? "PM" : "AM";
-    const displayHour = h % 12 === 0 ? 12 : h % 12;
-    const minuteStr = m.toString().padStart(2, "0");
-    return `${displayHour}:${minuteStr} ${suffix}`;
-  };
-
-  const formatPeriodTime = (period: CourtPricingPeriod) => {
-    if (period.allDay) return "All day";
-    return `${formatTime12(period.startHour)} - ${formatTime12(period.endHour)}`;
-  };
-
-  const isSlotBooked = (courtId: string, slotTime: number) => {
-    return dateBookings.some((b) => {
-      const bookingCourtId =
-        typeof b.courtId === "object" ? (b.courtId as any)._id : b.courtId;
-      if (bookingCourtId !== courtId) return false;
-
-      const bookingStart = b.startTime;
-      const bookingEnd = b.startTime + b.duration;
-
-      if (bookingEnd <= 24) {
-        return slotTime >= bookingStart && slotTime < bookingEnd;
-      }
-
-      const inLateSegment = slotTime >= bookingStart && slotTime < 24;
-      const inEarlySegment = slotTime >= 0 && slotTime < bookingEnd - 24;
-      return inLateSegment || inEarlySegment;
-    });
-  };
-
-  const isSlotSelected = (courtId: string, slotTime: number) => {
-    return selectedSlots.some(
-      (s) => s.courtId === courtId && s.slotTime === slotTime,
-    );
-  };
-
-  const isSlotConsecutive = (courtId: string, slotTime: number) => {
-    if (selectedSlots.length === 0) return true;
-    if (selectedSlots[0].courtId !== courtId) return false;
-
-    const indices = selectedSlots
-      .map((s) => getSlotIndex(s.slotTime))
-      .filter((i) => i >= 0)
-      .sort((a, b) => a - b);
-    const newIndex = getSlotIndex(slotTime);
-    if (newIndex === -1 || indices.length === 0) return false;
-
-    const minIndex = indices[0];
-    const maxIndex = indices[indices.length - 1];
-    return newIndex === minIndex - 1 || newIndex === maxIndex + 1;
-  };
-
-  const selectedCourt = courts.find(
-    (c) => c._id === selectedSlots[0]?.courtId,
-  );
-
-  const adminPricingResult = useMemo(() => {
-    if (
-      !formData.courtType ||
-      selectedSlots.length === 0 ||
-      !selectedCourt ||
-      !formData.date
-    ) {
-      return {
-        originalPrice: 0,
-        finalPrice: 0,
-        discountAmount: 0,
-        appliedDiscounts: [] as AppliedDiscount[],
-      };
-    }
-    const sortedByIndex = [...selectedSlots].sort(
-      (a, b) => getSlotIndex(a.slotTime) - getSlotIndex(b.slotTime),
-    );
-    const sortedTimes = sortedByIndex.map((s) => s.slotTime);
-    const startTime = sortedTimes[0];
-    const duration = selectedSlots.length * 0.5;
-    const dateString =
-      formData.date instanceof Date
-        ? formatLocalDate(formData.date)
-        : formData.date;
-
-    const { originalPrice } = calculateOriginalPrice(
-      selectedCourt,
-      startTime,
-      duration,
-    );
-
-    const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
-      _id: d._id,
-      name: d.name,
-      type: d.type,
-      value: d.value,
-      courtTypes: Array.isArray(d.courtTypes) ? d.courtTypes : [],
-      allDay: d.allDay,
-      startHour: d.startHour,
-      endHour: d.endHour,
-      validFrom: d.validFrom,
-      validUntil: d.validUntil,
-      isActive: d.isActive,
-    }));
-
-    const applicable = getApplicableDiscounts(
-      discountsData,
-      formData.courtType,
-      startTime,
-      dateString,
-    );
-    const { finalPrice, discountAmount, appliedDiscounts } =
-      calculateDiscountedPrice(originalPrice, applicable);
-
-    return {
-      originalPrice,
-      finalPrice,
-      discountAmount,
-      appliedDiscounts,
-    };
   }, [
     formData.courtType,
-    formData.date,
-    selectedSlots,
-    selectedCourt,
-    activeDiscounts,
+    formData.durationHours,
+    dateStr,
+    todayBusinessKey,
+    nowBusinessHourDecimal,
   ]);
 
-  const toggleSlot = (courtId: string, slotTime: number) => {
-    if (isSlotBooked(courtId, slotTime)) return;
-
-    const existingIndex = selectedSlots.findIndex(
-      (s) => s.courtId === courtId && s.slotTime === slotTime,
-    );
-
-    if (existingIndex >= 0) {
-      const newSlots = [...selectedSlots];
-      newSlots.splice(existingIndex, 1);
-      setSelectedSlots(newSlots);
-    } else {
-      if (selectedSlots.length === 0) {
-        setSelectedSlots([{ courtId, slotTime }]);
-      } else {
-        const firstCourt = selectedSlots[0].courtId;
-        if (firstCourt !== courtId) {
-          setSelectedSlots([{ courtId, slotTime }]);
-        } else if (isSlotConsecutive(courtId, slotTime)) {
-          const sortedTimes = [
-            ...selectedSlots.map((s) => s.slotTime),
-            slotTime,
-          ].sort((a, b) => getSlotIndex(a) - getSlotIndex(b));
-          const newSlots = sortedTimes.map((t) => ({ courtId, slotTime: t }));
-          setSelectedSlots(newSlots);
-        }
-      }
-    }
-  };
+  useEffect(() => {
+    fetchQuotes();
+  }, [fetchQuotes]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
 
-    if (selectedSlots.length === 0) {
-      alert("Please select at least one time slot");
+    if (!selectedQuote) {
+      setErrorMessage("Please select a start time");
       return;
     }
-
-    // Minimum booking: 90 mins (3 slots) for Futsal, 1 hour (2 slots) for others
-    const minSlots = formData.courtType === "FUTSAL" ? 3 : 2;
-    if (selectedSlots.length < minSlots) {
-      alert(
-        formData.courtType === "FUTSAL"
-          ? "Minimum booking time for Futsal is 90 minutes (3 consecutive slots)"
-          : "Minimum booking time is 1 hour (2 consecutive slots)",
-      );
+    if (!formData.userName.trim()) {
+      setErrorMessage("Please enter the customer name");
       return;
     }
-
-    if (!formData.userName || !formData.userEmail || !formData.userPhone) {
-      alert("Please fill in all user details");
+    if (!formData.userEmail.trim()) {
+      setErrorMessage("Please enter the customer email");
+      return;
+    }
+    if (!formData.userPhone.trim()) {
+      setErrorMessage("Please enter the customer phone");
       return;
     }
 
     setIsSubmitting(true);
-
     try {
-      const sortedByIndex = [...selectedSlots].sort(
-        (a, b) => getSlotIndex(a.slotTime) - getSlotIndex(b.slotTime),
-      );
-      const sortedTimes = sortedByIndex.map((s) => s.slotTime);
-      const startTime = sortedTimes[0];
-      const duration = selectedSlots.length * 0.5;
-      const dateString =
-        formData.date instanceof Date
-          ? formatLocalDate(formData.date)
-          : formData.date;
-
       const result = await createBooking({
         courtType: formData.courtType,
-        date: dateString,
-        startTime,
-        duration,
-        userName: formData.userName,
-        userEmail: formData.userEmail,
-        userPhone: formData.userPhone,
+        date: dateStr,
+        startTime: selectedQuote.startTime,
+        duration: formData.durationHours,
+        userName: formData.userName.trim(),
+        userEmail: formData.userEmail.trim(),
+        userPhone: formData.userPhone.trim(),
       });
 
-      if (result.success) {
-        router.replace("/admin/bookings");
-      } else {
-        alert(result.error || "Failed to create booking");
-        setIsSubmitting(false);
+      if (!result.success || !result.booking) {
+        throw new Error(result.error || "Failed to create booking");
       }
-    } catch (error: any) {
-      alert(error.message || "An error occurred");
+
+      toast.success("Booking created successfully");
+      const raw = result.booking as { _id?: string; id?: string };
+      const id = raw._id ?? raw.id;
+      router.push(`/admin/bookings/${id ?? ""}`);
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : "Failed to create booking",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -362,295 +226,189 @@ export default function NewBookingPage() {
   }
 
   return (
-    <AdminLayout title="Create Booking" description="Add a new booking">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <AdminLayout
+      title="Create Booking"
+      description="Pick date, duration, and an available start time. Court is assigned automatically."
+    >
+      <div className="space-y-8 p-6">
         <Button
           variant="ghost"
           onClick={() => router.push("/admin/bookings")}
-          className="mb-4"
+          className="mb-6"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Bookings
         </Button>
 
+        {errorMessage && (
+          <div
+            role="alert"
+            className="flex gap-2 rounded-lg border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-200"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <p>{errorMessage}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Court Type and Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="court-type" className="text-zinc-200 text-sm">
+              <Label htmlFor="courtType" className="text-zinc-300">
                 Court Type
               </Label>
               <Select
                 value={formData.courtType}
-                onValueChange={(v) => {
+                onValueChange={(v) =>
                   setFormData({
                     ...formData,
-                    courtType: v as any,
-                  });
-                  setSelectedSlots([]);
-                }}
+                    courtType: v as CourtType,
+                  })
+                }
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
+                <SelectTrigger
+                  id="courtType"
+                  className="bg-zinc-900 border-zinc-700 text-white"
+                >
+                  <SelectValue placeholder="Select court type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PADEL">Padel</SelectItem>
-                  <SelectItem value="CRICKET">Cricket</SelectItem>
-                  <SelectItem value="PICKLEBALL">Pickleball</SelectItem>
-                  <SelectItem value="FUTSAL">Futsal</SelectItem>
+                  {COURT_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date" className="text-zinc-200 text-sm">
+              <Label htmlFor="date" className="text-zinc-300">
                 Date
               </Label>
               <DatePicker
-                date={formData.date}
+                date={selectedDate}
                 onDateChange={(date) => {
-                  if (date) {
-                    setFormData({ ...formData, date });
-                    setSelectedSlots([]);
-                  }
+                  if (date) setSelectedDate(date);
                 }}
                 variant="admin"
-                minDate={COMPLEX_OPENING_DATE}
+                minDate={minPickDate}
               />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label className="text-zinc-300">Duration</Label>
+              <div className="flex flex-wrap gap-2">
+                {durationPresets.map((preset) => (
+                  <button
+                    key={preset.hours}
+                    type="button"
+                    onClick={() =>
+                      setFormData({ ...formData, durationHours: preset.hours })
+                    }
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                      formData.durationHours === preset.hours
+                        ? "border-teal-400 bg-teal-500/20 text-teal-200"
+                        : "border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:border-zinc-500"
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Slot Selection */}
-          <div className="space-y-4">
-            <Label className="text-zinc-200 text-sm">
-              Select Time Slots
-              {selectedSlots.length > 0 && (
-                <span className="ml-2 text-[#2DD4BF]">
-                  ({selectedSlots.length * 0.5} hour
-                  {selectedSlots.length * 0.5 !== 1 ? "s" : ""})
-                </span>
-              )}
-            </Label>
-
-            {isLoadingCourts || isLoadingDateBookings ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
-              </div>
-            ) : courts.length === 0 ? (
-              <p className="text-zinc-400 text-sm py-8 text-center">
-                No courts available for this court type.
+          {formData.courtType && dateStr && (
+            <div className="space-y-3">
+              <p className="text-sm text-zinc-400">
+                Available start times (past times today are hidden)
               </p>
-            ) : (
-              <div className="border border-zinc-800 rounded-lg overflow-hidden bg-zinc-900/50">
-                <div className="overflow-x-auto">
-                  <div className="min-w-[600px] grid grid-cols-[130px_1fr]">
-                    {/* Time Slots Column */}
-                    <div className="border-r border-zinc-800 bg-zinc-950">
-                      <div className="h-12 flex items-center justify-center border-b border-zinc-800 text-zinc-400 text-xs font-mono uppercase">
-                        Time
-                      </div>
-                      {timeSlots.map((slotTime) => {
-                        const startHour = Math.floor(slotTime);
-                        const startMin = slotTime % 1 === 0 ? "00" : "30";
-                        const endTime = slotTime + 0.5;
-                        const endHour = Math.floor(endTime);
-                        const endMin = endTime % 1 === 0 ? "00" : "30";
-                        return (
-                          <div
-                            key={slotTime}
-                            className="h-6 flex items-center justify-center text-xs text-zinc-500 font-mono border-b border-zinc-800"
-                          >
-                            {startHour}:{startMin}-{endHour}:{endMin}
-                          </div>
-                        );
-                      })}
-                    </div>
+              <AdminAvailableSlotGrid
+                quotes={quotableQuotes}
+                selectedQuote={selectedQuote}
+                durationHours={formData.durationHours}
+                courts={courts}
+                onSelect={(q) => setSelectedQuote(q)}
+                isLoading={isLoadingQuotes}
+                emptyMessage="No available slots for this date and duration."
+                formatTime12={formatTime12}
+                formatEndLabel={(start, dur) =>
+                  formatAdminBookingEndLabel(start, dur)
+                }
+              />
+            </div>
+          )}
 
-                    {/* Courts Columns */}
-                    <div className="flex">
-                      {courts.map((court) => (
-                        <div
-                          key={court._id}
-                          className="flex-1 min-w-[150px] border-r border-zinc-800 last:border-0"
-                        >
-                          <div className="h-auto min-h-12 p-2 border-b border-zinc-800 flex flex-col justify-center bg-zinc-950">
-                            <h3 className="font-medium text-white text-xs truncate">
-                              {court.name}
-                            </h3>
-                            {court.timeBasedPricingEnabled &&
-                            Array.isArray(court.pricingPeriods) &&
-                            court.pricingPeriods.length > 0 ? (
-                              <div className="mt-0.5 space-y-0.5">
-                                {court.pricingPeriods.map(
-                                  (period: CourtPricingPeriod, idx: number) => (
-                                    <p
-                                      key={idx}
-                                      className="text-[10px] text-zinc-400"
-                                    >
-                                      {period.label === "peak"
-                                        ? "Peak"
-                                        : "Off-peak"}
-                                      : PKR{" "}
-                                      {period.pricePerHour.toLocaleString()}
-                                      /hr{" "}
-                                      <span className="text-zinc-500">
-                                        ({formatPeriodTime(period)})
-                                      </span>
-                                    </p>
-                                  ),
-                                )}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-[#2DD4BF]">
-                                PKR {court.pricePerHour}/hr
-                              </p>
-                            )}
-                          </div>
-
-                          <div>
-                            {timeSlots.map((slotTime) => {
-                              const isBooked = isSlotBooked(
-                                court._id,
-                                slotTime,
-                              );
-                              const isSelected = isSlotSelected(
-                                court._id,
-                                slotTime,
-                              );
-                              const isConsecutive = isSlotConsecutive(
-                                court._id,
-                                slotTime,
-                              );
-                              const canSelect =
-                                selectedSlots.length === 0 || isConsecutive;
-
-                              return (
-                                <div
-                                  key={slotTime}
-                                  className="h-6 p-0.5 border-b border-zinc-800"
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      toggleSlot(court._id, slotTime)
-                                    }
-                                    disabled={
-                                      isBooked || (!canSelect && !isSelected)
-                                    }
-                                    className={`
-                                      w-full h-full rounded transition-all duration-200 relative flex items-center justify-center
-                                      ${
-                                        isBooked
-                                          ? "bg-red-500/20 border border-red-500/50 cursor-not-allowed opacity-50"
-                                          : isSelected
-                                            ? "bg-[#2DD4BF] border border-[#2DD4BF]"
-                                            : !canSelect
-                                              ? "bg-zinc-800/50 border border-zinc-700 cursor-not-allowed opacity-50"
-                                              : "bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 hover:border-green-500/50 cursor-pointer"
-                                      }
-                                    `}
-                                  >
-                                    <span className="text-[9px] md:text-[10px] font-mono text-white/90 leading-tight text-center">
-                                      {formatTime12(slotTime)} -{" "}
-                                      {formatTime12(slotTime + 0.5)}
-                                    </span>
-                                    {isSelected && (
-                                      <div className="absolute inset-0 flex items-center justify-center">
-                                        <CheckCircle className="w-3 h-3 text-[#0F172A]" />
-                                      </div>
-                                    )}
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+          {selectedQuote && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-300 space-y-2">
+              <p className="font-medium text-white">Price preview</p>
+              <div className="flex flex-wrap gap-x-6 gap-y-1">
+                <span>
+                  Original: Rs. {selectedQuote.originalPrice.toLocaleString()}
+                </span>
+                {selectedQuote.totalPrice !== selectedQuote.originalPrice ? (
+                  <span className="text-teal-300">
+                    After discounts: Rs.{" "}
+                    {selectedQuote.totalPrice.toLocaleString()}
+                  </span>
+                ) : (
+                  <span>
+                    Total: Rs. {selectedQuote.totalPrice.toLocaleString()}
+                  </span>
+                )}
               </div>
-            )}
+            </div>
+          )}
 
-            {selectedSlots.length > 0 && (
-              <div className="text-xs text-zinc-400">
-                Selected: {selectedSlots.length} slot
-                {selectedSlots.length !== 1 ? "s" : ""}(
-                {selectedSlots.length * 0.5} hour
-                {selectedSlots.length * 0.5 !== 1 ? "s" : ""})
-              </div>
-            )}
-
-            {selectedSlots.length > 0 && adminPricingResult.finalPrice > 0 && (
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 mt-4">
-                <p className="text-zinc-400 text-sm mb-2">Price (discounts applied)</p>
-                <PriceBreakdown
-                  originalPrice={adminPricingResult.originalPrice}
-                  totalPrice={adminPricingResult.finalPrice}
-                  discounts={adminPricingResult.appliedDiscounts}
-                  discountAmount={adminPricingResult.discountAmount}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* User Details */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">User Details</h3>
-
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="user-name" className="text-zinc-200 text-sm">
-                User Name
+              <Label htmlFor="userName" className="text-zinc-300">
+                Customer Name
               </Label>
               <Input
-                id="user-name"
-                type="text"
-                required
+                id="userName"
                 value={formData.userName}
                 onChange={(e) =>
                   setFormData({ ...formData, userName: e.target.value })
                 }
-                className="text-sm"
+                className="bg-zinc-900 border-zinc-700 text-white"
+                placeholder="Full name"
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="user-email" className="text-zinc-200 text-sm">
-                  Email
-                </Label>
-                <Input
-                  id="user-email"
-                  type="email"
-                  required
-                  value={formData.userEmail}
-                  onChange={(e) =>
-                    setFormData({ ...formData, userEmail: e.target.value })
-                  }
-                  className="text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="user-phone" className="text-zinc-200 text-sm">
-                  Phone <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="user-phone"
-                  type="tel"
-                  required
-                  value={formData.userPhone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, userPhone: e.target.value })
-                  }
-                  placeholder="+92 300 1234567"
-                  pattern="[+]?[0-9\s\-()]{10,}"
-                  className="text-sm"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="userEmail" className="text-zinc-300">
+                Email
+              </Label>
+              <Input
+                id="userEmail"
+                type="email"
+                value={formData.userEmail}
+                onChange={(e) =>
+                  setFormData({ ...formData, userEmail: e.target.value })
+                }
+                className="bg-zinc-900 border-zinc-700 text-white"
+                placeholder="email@example.com"
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="userPhone" className="text-zinc-300">
+                Phone
+              </Label>
+              <Input
+                id="userPhone"
+                type="tel"
+                value={formData.userPhone}
+                onChange={(e) =>
+                  setFormData({ ...formData, userPhone: e.target.value })
+                }
+                className="bg-zinc-900 border-zinc-700 text-white"
+                placeholder="+92 300 1234567"
+              />
             </div>
           </div>
 
-          {/* Submit Buttons */}
           <div className="flex items-center justify-end gap-4 pt-4 border-t border-zinc-800">
             <Button
               type="button"
@@ -662,10 +420,7 @@ export default function NewBookingPage() {
             <Button
               type="submit"
               className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-              disabled={
-                isSubmitting ||
-                selectedSlots.length < (formData.courtType === "FUTSAL" ? 3 : 2)
-              }
+              disabled={isSubmitting || !selectedQuote}
             >
               {isSubmitting ? (
                 <>

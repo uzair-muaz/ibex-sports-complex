@@ -304,10 +304,13 @@ export default function BookingClient() {
     if (dateString !== todayBusinessKey) {
       return { upcoming: slotsForDesign, past: [] as typeof slotsForDesign };
     }
-    return {
-      upcoming: slotsForDesign.filter((slot) => !slot.isPastSlot),
-      past: slotsForDesign.filter((slot) => slot.isPastSlot),
-    };
+    const upcoming = slotsForDesign.filter((slot) => !slot.isPastSlot);
+    // Latest passed times first (e.g. 11 PM right under the divider), so evening
+    // slots are not buried below early-morning times from the same calendar day.
+    const past = slotsForDesign
+      .filter((slot) => slot.isPastSlot)
+      .sort((a, b) => b.quote.startTime - a.quote.startTime);
+    return { upcoming, past };
   }, [slotsForDesign, dateString, todayBusinessKey]);
 
   useEffect(() => {
@@ -600,13 +603,13 @@ export default function BookingClient() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
             {/* legend */}
             <BookingSlotsLegend />
 
             {/* Duration selector (same logic, style-matched) */}
             <BookingChipSelector
-              className=""
+              className="sm:max-w-[min(100%,28rem)] sm:justify-end"
               items={visibleDurationPresets.map((d) => ({
                 key: d.hours.toString(),
                 label: d.label.toUpperCase(),
@@ -618,6 +621,7 @@ export default function BookingClient() {
 
           <BookingSlotsGrid
             isLoadingAvailability={isLoadingAvailability}
+            isSelectedDateToday={dateString === todayBusinessKey}
             slotsForDesign={slotsForDesign}
             orderedSlots={orderedSlots}
             onSelectQuote={(quote) => setSelectedQuote(quote)}
@@ -645,6 +649,7 @@ export default function BookingClient() {
         open={showCheckoutModal}
         selectedQuote={selectedQuote}
         dateString={dateString}
+        durationHours={selectedDurationHours}
         selectedTimeRangeLabel={selectedTimeRangeLabel}
         errorMessage={checkoutError}
         formStatus={formStatus}

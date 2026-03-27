@@ -62,11 +62,12 @@ function bookingOverlapsCandidate(
   const referenceDay = toDayIndexUTC(referenceDateStr);
   const bookingDay = toDayIndexUTC(booking.date);
 
-  const candidateStartAbs = candidateStartTime;
-  const candidateEndAbs = candidateStartTime + candidateDuration;
+  const candidateStartAbs = Number(candidateStartTime);
+  const candidateEndAbs = candidateStartAbs + Number(candidateDuration);
 
-  const bookingStartAbs = (bookingDay - referenceDay) * 24 + booking.startTime;
-  const bookingEndAbs = bookingStartAbs + booking.duration;
+  const bookingStartAbs =
+    (bookingDay - referenceDay) * 24 + Number(booking.startTime);
+  const bookingEndAbs = bookingStartAbs + Number(booking.duration);
 
   return rangesOverlapHalfOpen(
     candidateStartAbs,
@@ -271,6 +272,8 @@ export interface GetAvailableStartTimesInput {
   courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
   date: string; // YYYY-MM-DD (calendar day semantics)
   duration: number; // hours in 0.5 increments
+  /** When editing a booking, omit it from conflict checks so its time stays bookable */
+  excludeBookingId?: string;
 }
 
 export interface AvailableStartTimeQuote {
@@ -347,6 +350,12 @@ export async function getAvailableStartTimes(
 
       for (const court of courts) {
         const hasConflict = existingBookings.some((booking) => {
+          if (
+            input.excludeBookingId &&
+            booking._id.toString() === input.excludeBookingId
+          ) {
+            return false;
+          }
           if (booking.courtId.toString() !== court._id.toString()) return false;
           return bookingOverlapsCandidate(input.date, startTime, input.duration, booking);
         });
@@ -461,6 +470,8 @@ export async function cancelBooking(bookingId: string) {
 
 export interface UpdateBookingInput {
   bookingId: string;
+  /** When rescheduling, set to the court from availability (first free court for that slot). */
+  courtId?: string;
   date?: string;
   startTime?: number;
   duration?: number;
@@ -506,10 +517,23 @@ export async function updateBooking(input: UpdateBookingInput) {
         throw new Error('Booking not found');
       }
 
-      const court = booking.courtId as any;
+      const originalCourt = booking.courtId as any;
       const finalDate = updateData.date || booking.date;
       const finalStartTime = updateData.startTime !== undefined ? updateData.startTime : booking.startTime;
       const finalDuration = updateData.duration || booking.duration;
+
+      let courtForSlot = originalCourt;
+      const requestedCourtId = (updateData as { courtId?: string }).courtId;
+      if (requestedCourtId) {
+        const switched = await Court.findById(requestedCourtId);
+        if (!switched || !switched.isActive) {
+          throw new Error('Selected court is not available');
+        }
+        if (switched.type !== originalCourt.type) {
+          throw new Error('Selected court does not match this booking type');
+        }
+        courtForSlot = switched;
+      }
 
       // Check for conflicts if time changed
       if (updateData.date || updateData.startTime || updateData.duration) {
@@ -522,7 +546,7 @@ export async function updateBooking(input: UpdateBookingInput) {
         });
 
         const hasConflict = existingBookings.some((b) => {
-          if (b.courtId.toString() !== court._id.toString()) {
+          if (b.courtId.toString() !== courtForSlot._id.toString()) {
             return false;
           }
 
@@ -541,7 +565,7 @@ export async function updateBooking(input: UpdateBookingInput) {
 
       // Recalculate price with discounts using peak/off-peak logic
       const { originalPrice } = calculateOriginalPrice(
-        court,
+        courtForSlot,
         finalStartTime,
         finalDuration
       );
@@ -566,7 +590,7 @@ export async function updateBooking(input: UpdateBookingInput) {
 
       const applicableDiscounts = getApplicableDiscounts(
         discountsData,
-        court.type,
+        courtForSlot.type,
         finalStartTime,
         finalDate
       );

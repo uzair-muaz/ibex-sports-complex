@@ -68,6 +68,7 @@ import {
   getRangeFromDates,
   isDateInRange,
 } from "@/lib/date-range-utils";
+import { toast } from "sonner";
 
 export default function BookingsPage() {
   const { data: session } = useSession();
@@ -130,7 +131,7 @@ export default function BookingsPage() {
 
   const handleCancelBooking = (booking: Booking) => {
     if (booking.status === "completed") {
-      alert("Completed bookings cannot be cancelled.");
+      toast.warning("Completed bookings cannot be cancelled.");
       return;
     }
     setCancellingBooking(booking);
@@ -152,10 +153,10 @@ export default function BookingsPage() {
         setCancellingBooking(null);
         loadData();
       } else {
-        alert(result.error || "Failed to cancel booking");
+        toast.error(result.error || "Failed to cancel booking");
       }
     } catch (error: any) {
-      alert(error.message || "An error occurred");
+      toast.error(error.message || "An error occurred");
     } finally {
       setIsCancelling(false);
     }
@@ -177,10 +178,10 @@ export default function BookingsPage() {
         setDeletingBooking(null);
         loadData();
       } else {
-        alert(result.error || "Failed to delete booking");
+        toast.error(result.error || "Failed to delete booking");
       }
     } catch (error: any) {
-      alert(error.message || "An error occurred");
+      toast.error(error.message || "An error occurred");
     } finally {
       setIsDeleting(false);
     }
@@ -198,10 +199,12 @@ export default function BookingsPage() {
           setViewingBooking((prev) => (prev ? { ...prev, status: newStatus } : null));
         }
       } else {
-        alert(result.error || "Failed to update status");
+        toast.error(result.error || "Failed to update status");
       }
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to update status");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update status",
+      );
     } finally {
       setUpdatingStatusBookingId(null);
     }
@@ -231,10 +234,10 @@ export default function BookingsPage() {
         setViewingBooking(result.booking as Booking);
         setExtensionAvailability(null);
       } else {
-        alert(result.error || "Failed to extend booking");
+        toast.error(result.error || "Failed to extend booking");
       }
     } catch (error: any) {
-      alert(error?.message || "Failed to extend booking");
+      toast.error(error?.message || "Failed to extend booking");
     } finally {
       setExtendingBookingId(null);
       setExtendingOption(null);
@@ -246,7 +249,7 @@ export default function BookingsPage() {
     try {
       const result = await checkBookingExtensionAvailability(bookingId);
       if (!result.success) {
-        alert(result.error || "Failed to check extension availability");
+        toast.error(result.error || "Failed to check extension availability");
         setExtensionAvailability(null);
         return;
       }
@@ -257,10 +260,10 @@ export default function BookingsPage() {
         canExtend60: result.canExtend60 ?? false,
       });
       if (!result.hasAnyOption) {
-        alert("This booking cannot be extended right now.");
+        toast.warning("This booking cannot be extended right now.");
       }
     } catch (error: any) {
-      alert(error?.message || "Failed to check extension availability");
+      toast.error(error?.message || "Failed to check extension availability");
       setExtensionAvailability(null);
     } finally {
       setCheckingExtensionBookingId(null);

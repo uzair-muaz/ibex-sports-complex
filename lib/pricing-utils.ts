@@ -8,6 +8,15 @@ export interface CourtLike {
   type?: CourtType;
 }
 
+function plainCourt(court: CourtLike | (CourtLike & { toObject?: (o?: object) => CourtLike })): CourtLike {
+  if (court && typeof court === "object" && typeof (court as { toObject?: () => CourtLike }).toObject === "function") {
+    return (court as { toObject: (o?: object) => CourtLike }).toObject({
+      flattenMaps: true,
+    });
+  }
+  return court as CourtLike;
+}
+
 function isHourInPeriod(hour: number, period: CourtPricingPeriod): boolean {
   if (period.allDay) {
     return true;
@@ -35,40 +44,98 @@ function isHourInPeriod(hour: number, period: CourtPricingPeriod): boolean {
   return hour >= start || hour < end;
 }
 
+/** Peak [start,24)∪[0,end); afternoon off-peak [oStart,oEnd) with end<oStart → hours [end,oStart) have no period; price at off-peak. */
+function afternoonOffPeakBlock(
+  pricingPeriods: CourtPricingPeriod[] | undefined,
+): CourtPricingPeriod | null {
+  if (!Array.isArray(pricingPeriods)) return null;
+  return (
+    pricingPeriods.find(
+      (p) =>
+        p.label === "off_peak" &&
+        typeof p.startHour === "number" &&
+        typeof p.endHour === "number" &&
+        p.startHour < p.endHour &&
+        Number.isFinite(Number(p.pricePerHour)),
+    ) ?? null
+  );
+}
+
+function wrapPeakMorningBound(
+  pricingPeriods: CourtPricingPeriod[] | undefined,
+): number | null {
+  if (!Array.isArray(pricingPeriods)) return null;
+  const wrapPeak = pricingPeriods.find(
+    (p) =>
+      p.label === "peak" &&
+      typeof p.startHour === "number" &&
+      typeof p.endHour === "number" &&
+      p.startHour > p.endHour,
+  );
+  return wrapPeak ? wrapPeak.endHour : null;
+}
+
+function isHourInMorningGapBeforeOffPeak(
+  hour: number,
+  morningPeakEnd: number,
+  afternoonOffPeakStart: number,
+): boolean {
+  return hour >= morningPeakEnd && hour < afternoonOffPeakStart;
+}
+
 export function getPricePerHourForTime(
   court: CourtLike,
   hour: number,
 ): { pricePerHour: number; label?: PricingLabel } {
+  const c = plainCourt(court);
   const hasPeriods =
-    Array.isArray(court.pricingPeriods) && court.pricingPeriods.length > 0;
+    Array.isArray(c.pricingPeriods) && c.pricingPeriods.length > 0;
   // Always keep a fallback base price for hours not covered by peak/off-peak periods.
   // This matters now that bookings are available for the full 24 hours.
-  const basePrice = typeof court.pricePerHour === "number" ? court.pricePerHour : 0;
+  const basePrice = Number(c.pricePerHour);
+  const basePriceN = Number.isFinite(basePrice) ? basePrice : 0;
 
   // For FUTSAL courts, prices are stored as "per 90 minutes", convert to "per hour"
-  const isFutsal = court.type === "FUTSAL";
+  const isFutsal = c.type === "FUTSAL";
   const futsalMultiplier = isFutsal ? 60 / 90 : 1; // Convert 90-min price to hourly rate
 
-  if (!court.timeBasedPricingEnabled || !hasPeriods) {
-    return { pricePerHour: basePrice * futsalMultiplier };
+  if (!c.timeBasedPricingEnabled || !hasPeriods) {
+    return { pricePerHour: basePriceN * futsalMultiplier };
   }
 
-  const matching = (court.pricingPeriods || []).filter((period) => {
-    if (typeof period.pricePerHour !== "number") return false;
+  const matching = (c.pricingPeriods || []).filter((period) => {
+    const pph = Number(period.pricePerHour);
+    if (!Number.isFinite(pph)) return false;
     return isHourInPeriod(hour, period);
   });
 
   if (matching.length === 0) {
-    return { pricePerHour: basePrice * futsalMultiplier };
+    const afternoonOff = afternoonOffPeakBlock(c.pricingPeriods);
+    const morningEnd = wrapPeakMorningBound(c.pricingPeriods);
+    if (
+      afternoonOff &&
+      typeof morningEnd === "number" &&
+      isHourInMorningGapBeforeOffPeak(hour, morningEnd, afternoonOff.startHour)
+    ) {
+      const pph = Number(afternoonOff.pricePerHour);
+      if (Number.isFinite(pph)) {
+        return {
+          pricePerHour: pph * futsalMultiplier,
+          label: "off_peak",
+        };
+      }
+    }
+    return { pricePerHour: basePriceN * futsalMultiplier };
   }
 
   // If multiple match, prefer the highest priced one (treat as peak)
   const chosen = matching.reduce((prev, curr) =>
-    curr.pricePerHour > prev.pricePerHour ? curr : prev,
+    Number(curr.pricePerHour) > Number(prev.pricePerHour) ? curr : prev,
   );
 
+  const chosenRate = Number(chosen.pricePerHour);
   return {
-    pricePerHour: chosen.pricePerHour * futsalMultiplier,
+    pricePerHour: (Number.isFinite(chosenRate) ? chosenRate : 0) * futsalMultiplier,
     label: chosen.label,
   };
 }
@@ -78,7 +145,8 @@ export function calculateOriginalPrice(
   startTime: number,
   duration: number,
 ): { originalPrice: number } {
-  if (!court || typeof startTime !== "number" || typeof duration !== "number") {
+  const c = plainCourt(court);
+  if (!c || typeof startTime !== "number" || typeof duration !== "number") {
     return { originalPrice: 0 };
   }
 
@@ -94,7 +162,7 @@ export function calculateOriginalPrice(
     // Allow bookings that span past midnight by wrapping into 0–24 range
     const rawSlotStart = startTime + i * 0.5;
     const slotStart = ((rawSlotStart % 24) + 24) % 24;
-    const { pricePerHour } = getPricePerHourForTime(court, slotStart);
+    const { pricePerHour } = getPricePerHourForTime(c, slotStart);
     total += pricePerHour * 0.5;
   }
 

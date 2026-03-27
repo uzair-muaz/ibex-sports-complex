@@ -40,6 +40,13 @@ export function formatTime12(decimalTime: number): string {
   return `${displayHour}:${minuteStr} ${suffix}`;
 }
 
+/** e.g. 1 → "1 Hour", 1.5 → "1.5 Hours" */
+export function formatDurationHoursLabel(hours: number): string {
+  if (!Number.isFinite(hours) || hours <= 0) return "";
+  if (hours === 1) return "1 Hour";
+  return `${hours} Hours`;
+}
+
 /**
  * Format date from YYYY-MM-DD to DD-MM-YYYY for display
  */

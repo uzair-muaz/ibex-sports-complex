@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { PriceBreakdown } from "@/components/PriceBreakdown";
 import type { AvailableStartTimeQuote } from "@/app/actions/bookings";
+import { formatDurationHoursLabel } from "@/lib/utils";
 
 type FormData = {
   name: string;
@@ -19,6 +20,7 @@ type BookingCheckoutModalProps = {
   open: boolean;
   selectedQuote: AvailableStartTimeQuote | null;
   dateString: string;
+  durationHours: number;
   selectedTimeRangeLabel: string;
   errorMessage: string;
   formStatus: "idle" | "loading" | "success" | "error";
@@ -33,6 +35,7 @@ export function BookingCheckoutModal({
   open,
   selectedQuote,
   dateString,
+  durationHours,
   selectedTimeRangeLabel,
   errorMessage,
   formStatus,
@@ -69,7 +72,7 @@ export function BookingCheckoutModal({
               </span>
               <span>{selectedTimeRangeLabel}</span>
               <span className="text-zinc-500">•</span>
-              <span>1 Hour</span>
+              <span>{formatDurationHoursLabel(durationHours)}</span>
             </div>
             {errorMessage ? (
               <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
@@ -130,15 +133,13 @@ export function BookingCheckoutModal({
                   <p className="text-xs text-red-400">{formErrors.phone}</p>
                 ) : null}
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-[#2DD4BF] font-semibold">Total - </span>
-                <PriceBreakdown
-                  originalPrice={selectedQuote.originalPrice}
-                  discounts={selectedQuote.appliedDiscounts}
-                  discountAmount={selectedQuote.discountAmount}
-                  totalPrice={selectedQuote.totalPrice}
-                />
-              </div>
+              <PriceBreakdown
+                originalPrice={selectedQuote.originalPrice}
+                discounts={selectedQuote.appliedDiscounts}
+                discountAmount={selectedQuote.discountAmount}
+                totalPrice={selectedQuote.totalPrice}
+                className="w-full"
+              />
               <div className="pt-1 grid grid-cols-2 gap-3">
                 <button
                   type="button"

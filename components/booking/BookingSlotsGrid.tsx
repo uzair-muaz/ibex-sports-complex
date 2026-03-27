@@ -14,6 +14,7 @@ type SlotView = {
 
 type BookingSlotsGridProps = {
   isLoadingAvailability: boolean;
+  isSelectedDateToday: boolean;
   slotsForDesign: SlotView[];
   orderedSlots: {
     upcoming: SlotView[];
@@ -21,6 +22,30 @@ type BookingSlotsGridProps = {
   };
   onSelectQuote: (quote: AvailableStartTimeQuote) => void;
 };
+
+function SelectableSlotsEmptyCallout({
+  isSelectedDateToday,
+}: {
+  isSelectedDateToday: boolean;
+}) {
+  return isSelectedDateToday ? (
+    <>
+      <p className="text-zinc-200 text-sm font-medium tracking-tight">
+        Today&apos;s courts are fully booked.
+      </p>
+      <p className="text-zinc-500 text-sm mt-2 max-w-md mx-auto leading-relaxed">
+        There are no time slots left that you can book for today. Please choose
+        another day from the calendar to see open times. Times shown under
+        &quot;Passed Slots&quot; are for reference only.
+      </p>
+    </>
+  ) : (
+    <p className="text-zinc-500 text-sm max-w-md mx-auto leading-relaxed">
+      No bookable slots remain for this date and duration. Try another date or
+      length of play, or review past times below for reference.
+    </p>
+  );
+}
 
 function SlotCard({
   slot,
@@ -75,6 +100,7 @@ function SlotCard({
 
 export function BookingSlotsGrid({
   isLoadingAvailability,
+  isSelectedDateToday,
   slotsForDesign,
   orderedSlots,
   onSelectQuote,
@@ -104,11 +130,18 @@ export function BookingSlotsGrid({
           ))}
         </>
       ) : slotsForDesign.length === 0 ? (
-        <div className="col-span-2 text-zinc-500 text-center py-12 bg-zinc-900/20 border border-white/10 rounded-3xl">
-          No available slots for selected date and duration.
+        <div className="col-span-2 text-center py-10 px-6 bg-zinc-900/20 border border-white/10 rounded-3xl">
+          <SelectableSlotsEmptyCallout isSelectedDateToday={isSelectedDateToday} />
         </div>
       ) : (
         <>
+          {orderedSlots.upcoming.length === 0 ? (
+            <div className="col-span-2 text-center py-8 px-6 bg-zinc-900/20 border border-white/10 rounded-3xl">
+              <SelectableSlotsEmptyCallout
+                isSelectedDateToday={isSelectedDateToday}
+              />
+            </div>
+          ) : null}
           {orderedSlots.upcoming.map((slot) => (
             <SlotCard key={slot.id} slot={slot} onSelectQuote={onSelectQuote} />
           ))}
