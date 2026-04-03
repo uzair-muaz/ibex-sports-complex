@@ -141,6 +141,7 @@ export default function BookingClient() {
   const [isLoadingTypes, setIsLoadingTypes] = useState(true);
 
   const [activeCourtTypes, setActiveCourtTypes] = useState<CourtType[]>([]);
+  const [allCourts, setAllCourts] = useState<CourtRecord[]>([]);
   const [selectedTypeCourts, setSelectedTypeCourts] = useState<CourtRecord[]>(
     [],
   );
@@ -173,12 +174,19 @@ export default function BookingClient() {
       try {
         const result = await getCourts();
         if (result.success && result.courts.length > 0) {
-          const types = [
-            ...new Set(result.courts.map((c: CourtRecord) => c.type)),
-          ] as CourtType[];
+          const courts = result.courts as CourtRecord[];
+          setAllCourts(courts);
+
+          const types = [...new Set(courts.map((c: CourtRecord) => c.type))] as CourtType[];
           setActiveCourtTypes(types);
-          if (!selectedCourtType && types.length > 0)
-            setSelectedCourtType(types[0]);
+
+          // Default to the first court type, and derive courts locally from the
+          // already-fetched list to avoid a second network call.
+          if (!selectedCourtType && types.length > 0) {
+            const firstType = types[0];
+            setSelectedCourtType(firstType);
+            setSelectedTypeCourts(courts.filter((c) => c.type === firstType));
+          }
         }
       } catch (e) {
         console.error(e);
@@ -191,21 +199,16 @@ export default function BookingClient() {
   }, []);
 
   useEffect(() => {
-    const loadSelectedTypeCourts = async () => {
-      if (!selectedCourtType) return;
-      try {
-        const result = await getCourts(selectedCourtType);
-        if (result.success) {
-          setSelectedTypeCourts(result.courts);
-        } else {
-          setSelectedTypeCourts([]);
-        }
-      } catch {
-        setSelectedTypeCourts([]);
-      }
-    };
-    loadSelectedTypeCourts();
-  }, [selectedCourtType]);
+    if (!selectedCourtType) {
+      setSelectedTypeCourts([]);
+      return;
+    }
+
+    // If we don't have courts cached yet, keep current state until `loadTypes` finishes.
+    if (allCourts.length === 0) return;
+
+    setSelectedTypeCourts(allCourts.filter((c) => c.type === selectedCourtType));
+  }, [selectedCourtType, allCourts]);
 
   const { availableStartTimes, isLoadingAvailability, refreshAvailability } =
     useBookingAvailability({
@@ -550,41 +553,57 @@ export default function BookingClient() {
                     : "Premium Surface"}
                 </p>
               </div>
-              {courtPricing.hasSplitPricing ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {selectedTypeCourts.length > 0 ? (
+                courtPricing.hasSplitPricing ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
+                        <Clock size={20} />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">
+                          Off-Peak
+                        </div>
+                        <div className="text-lg font-semibold text-white tracking-tight leading-none mb-1">
+                          PKR {courtPricing.offPeak.toLocaleString()}/HR
+                        </div>
+                        <div className="text-[9px] font-black text-zinc-500 uppercase tracking-wider">
+                          {courtPricing.offPeakHours}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4 border-l border-white/5 pl-0 sm:pl-6">
+                      <div className="w-10 h-10 rounded-2xl bg-[#2DD4BF]/10 flex items-center justify-center text-[#2DD4BF] shrink-0">
+                        <Zap size={20} />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-black text-[#2DD4BF] uppercase tracking-widest mb-1">
+                          Peak Hours
+                        </div>
+                        <div className="text-lg font-semibold text-white tracking-tight leading-none mb-1">
+                          PKR {courtPricing.peak.toLocaleString()}/HR
+                        </div>
+                        <div className="text-[9px] font-black text-zinc-500 uppercase tracking-wider">
+                          {courtPricing.peakHours}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
+                    <div className="w-10 h-10 rounded-2xl bg-[#2DD4BF]/10 flex items-center justify-center text-[#2DD4BF] shrink-0">
                       <Clock size={20} />
                     </div>
                     <div>
                       <div className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">
-                        Off-Peak
+                        Price per Hour
                       </div>
-                      <div className="text-lg font-semibold text-white tracking-tight leading-none mb-1">
-                        PKR {courtPricing.offPeak.toLocaleString()}/HR
-                      </div>
-                      <div className="text-[9px] font-black text-zinc-500 uppercase tracking-wider">
-                        {courtPricing.offPeakHours}
+                      <div className="text-lg font-semibold text-white tracking-tight leading-none">
+                        PKR {courtPricing.basePrice.toLocaleString()}/HR
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-start gap-4 border-l border-white/5 pl-0 sm:pl-6">
-                    <div className="w-10 h-10 rounded-2xl bg-[#2DD4BF]/10 flex items-center justify-center text-[#2DD4BF] shrink-0">
-                      <Zap size={20} />
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-black text-[#2DD4BF] uppercase tracking-widest mb-1">
-                        Peak Hours
-                      </div>
-                      <div className="text-lg font-semibold text-white tracking-tight leading-none mb-1">
-                        PKR {courtPricing.peak.toLocaleString()}/HR
-                      </div>
-                      <div className="text-[9px] font-black text-zinc-500 uppercase tracking-wider">
-                        {courtPricing.peakHours}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                )
               ) : (
                 <div className="flex items-start gap-4">
                   <div className="w-10 h-10 rounded-2xl bg-[#2DD4BF]/10 flex items-center justify-center text-[#2DD4BF] shrink-0">
@@ -595,7 +614,7 @@ export default function BookingClient() {
                       Price per Hour
                     </div>
                     <div className="text-lg font-semibold text-white tracking-tight leading-none">
-                      PKR {courtPricing.basePrice.toLocaleString()}/HR
+                      Loading...
                     </div>
                   </div>
                 </div>

@@ -327,6 +327,17 @@ export async function getAvailableStartTimes(
     // Fetch active discounts once (pricing varies per startTime due to time restrictions).
     const activeDiscounts = await getActiveDiscountsForBusinessDate();
 
+    // Performance: group bookings by courtId once so we don't scan every booking
+    // for every court/time slot. This reduces the inner-loop work substantially.
+    const bookingsByCourtId = new Map<string, any[]>();
+    for (const b of existingBookings) {
+      const key = b?.courtId?.toString?.();
+      if (!key) continue;
+      const arr = bookingsByCourtId.get(key);
+      if (arr) arr.push(b);
+      else bookingsByCourtId.set(key, [b]);
+    }
+
     const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
       _id: d._id.toString(),
       name: d.name,
@@ -349,15 +360,20 @@ export async function getAvailableStartTimes(
       let assignedCourt: typeof courts[number] | null = null;
 
       for (const court of courts) {
-        const hasConflict = existingBookings.some((booking) => {
+        const courtBookings = bookingsByCourtId.get(court._id.toString()) ?? [];
+        const hasConflict = courtBookings.some((booking) => {
           if (
             input.excludeBookingId &&
             booking._id.toString() === input.excludeBookingId
           ) {
             return false;
           }
-          if (booking.courtId.toString() !== court._id.toString()) return false;
-          return bookingOverlapsCandidate(input.date, startTime, input.duration, booking);
+          return bookingOverlapsCandidate(
+            input.date,
+            startTime,
+            input.duration,
+            booking,
+          );
         });
 
         if (!hasConflict) {
