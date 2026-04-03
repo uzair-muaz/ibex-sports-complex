@@ -94,6 +94,12 @@ const CourtSchema: Schema = new Schema(
   }
 );
 
+// Indexes for common court lookups
+// - getCourts: { isActive: true, type?: ... } sorted by createdAt
+CourtSchema.index({ type: 1, isActive: 1, createdAt: 1 });
+CourtSchema.index({ isActive: 1, createdAt: 1 });
+CourtSchema.index({ createdAt: 1 });
+
 const Court: Model<ICourt> =
   mongoose.models.Court || mongoose.model<ICourt>("Court", CourtSchema);
 

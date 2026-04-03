@@ -96,6 +96,9 @@ DiscountSchema.pre("save", function (this: IDiscount, next) {
 
 // Index for efficient queries
 DiscountSchema.index({ isActive: 1, validFrom: 1, validUntil: 1 });
+// Helps admin listing + active discount fetch sorted by createdAt
+DiscountSchema.index({ isActive: 1, createdAt: -1 });
+DiscountSchema.index({ createdAt: -1 });
 DiscountSchema.index({ courtTypes: 1 });
 
 const Discount: Model<IDiscount> =

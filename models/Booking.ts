@@ -151,6 +151,10 @@ const BookingSchema: Schema = new Schema(
 // Index for efficient queries
 BookingSchema.index({ courtId: 1, date: 1, startTime: 1 });
 BookingSchema.index({ date: 1, status: 1 });
+BookingSchema.index({ date: 1, status: 1, startTime: 1 });
+BookingSchema.index({ createdAt: -1 });
+// Helps the "latest serial" lookup pattern used when creating bookings.
+BookingSchema.index({ serialNumber: -1, createdAt: -1 });
 
 // Delete the model if it exists to force recompilation with new schema
 if (mongoose.models.Booking) {

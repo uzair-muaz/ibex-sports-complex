@@ -39,6 +39,9 @@ const UserSchema: Schema = new Schema(
   }
 );
 
+// Admin screens list newest users first
+UserSchema.index({ createdAt: -1 });
+
 const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>("User", UserSchema);
 
