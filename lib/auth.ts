@@ -29,19 +29,17 @@ export const authOptions = {
         }
 
         try {
-          const email = typeof credentials.email === 'string' ? credentials.email : String(credentials.email);
+          const email = (typeof credentials.email === 'string' ? credentials.email : String(credentials.email)).trim().toLowerCase();
           const password = typeof credentials.password === 'string' ? credentials.password : String(credentials.password);
-          const user = await User.findOne({ email: email.toLowerCase() });
 
-          if (!user) {
-            throw new Error('No user found with this email');
-          }
+          // Important: for invalid credentials return null (so NextAuth reports a credentials error,
+          // rather than surfacing a misleading "Configuration" page on the client).
+          const user = await User.findOne({ email });
+          if (!user) return null;
 
           const isPasswordValid = await bcrypt.compare(password, user.password);
 
-          if (!isPasswordValid) {
-            throw new Error('Invalid password');
-          }
+          if (!isPasswordValid) return null;
 
           return {
             id: user._id.toString(),
@@ -50,11 +48,6 @@ export const authOptions = {
             role: user.role,
           };
         } catch (error: any) {
-          // Re-throw authentication errors as-is
-          if (error.message.includes('No user found') || error.message.includes('Invalid password')) {
-            throw error;
-          }
-          // Wrap other errors
           console.error('Authentication error:', error);
           throw new Error('Authentication failed. Please try again.');
         }

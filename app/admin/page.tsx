@@ -74,10 +74,14 @@ export default function AdminPage() {
       });
 
       if (result?.error) {
+        // NextAuth will surface invalid credentials as "CredentialsSignin".
+        const friendlyMessage =
+          result.error === "CredentialsSignin" ? "Invalid email or password" : result.error;
+
         // Set form-level error
         form.setError("root", {
           type: "manual",
-          message: result.error,
+          message: friendlyMessage,
         });
       } else if (result?.ok) {
         // Session will be updated by useSession hook
