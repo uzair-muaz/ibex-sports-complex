@@ -454,6 +454,74 @@ export async function getAllBookings() {
   }
 }
 
+export interface GetBookingsPaginatedInput {
+  page: number; // 1-based
+  limit: number;
+  dateRange?: { from: string; to: string } | null; // YYYY-MM-DD
+  search?: string; // matches userName/userEmail and (if valid ObjectId) booking _id
+}
+
+export async function getBookingsPaginated(input: GetBookingsPaginatedInput) {
+  try {
+    await connectDB();
+
+    const page = Math.max(1, Number(input.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(input.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const query: any = {};
+
+    if (input.dateRange && input.dateRange.from && input.dateRange.to) {
+      query.date = {
+        $gte: input.dateRange.from,
+        $lte: input.dateRange.to,
+      };
+    }
+
+    const search = (input.search ?? "").trim();
+    if (search) {
+      // Escape regex special chars in the search term.
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(escaped, "i");
+
+      const or: any[] = [{ userName: regex }, { userEmail: regex }];
+      if (mongoose.Types.ObjectId.isValid(search)) {
+        or.push({ _id: new mongoose.Types.ObjectId(search) });
+      }
+
+      query.$or = or;
+    }
+
+    // Sort newest first for the admin list.
+    const [totalCount, bookings] = await Promise.all([
+      Booking.countDocuments(query),
+      Booking.find(query)
+        .populate("courtId")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+    ]);
+
+    return {
+      success: true,
+      bookings: JSON.parse(JSON.stringify(bookings)),
+      totalCount,
+      page,
+      limit,
+    };
+  } catch (error: any) {
+    console.error("Get bookings paginated error:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to fetch bookings",
+      bookings: [],
+      totalCount: 0,
+      page: input.page,
+      limit: input.limit,
+    };
+  }
+}
+
 export async function cancelBooking(bookingId: string) {
   try {
     await connectDB();

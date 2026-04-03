@@ -18,10 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -31,6 +28,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+  PaginationLink,
+} from "@/components/ui/pagination";
 import {
   Dialog,
   DialogContent,
@@ -51,7 +57,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { QRCode } from "@/components/ui/qr-code";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  getAllBookings,
+  getBookingsPaginated,
   deleteBooking,
   updateBooking,
   extendBooking,
@@ -66,7 +72,6 @@ import {
   getCurrentWeekRange,
   getCurrentMonthRange,
   getRangeFromDates,
-  isDateInRange,
 } from "@/lib/date-range-utils";
 import { toast } from "sonner";
 
@@ -76,50 +81,86 @@ export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState("");
+  const [debouncedFilter, setDebouncedFilter] = useState("");
+  const [page, setPage] = useState(1); // 1-based
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
   const [showBookingDetailsModal, setShowBookingDetailsModal] = useState(false);
   const [viewingBooking, setViewingBooking] = useState<Booking | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null);
+  const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(
+    null,
+  );
   const [isCancelling, setIsCancelling] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [updatingStatusBookingId, setUpdatingStatusBookingId] = useState<string | null>(null);
-  const [extendingBookingId, setExtendingBookingId] = useState<string | null>(null);
+  const [updatingStatusBookingId, setUpdatingStatusBookingId] = useState<
+    string | null
+  >(null);
+  const [extendingBookingId, setExtendingBookingId] = useState<string | null>(
+    null,
+  );
   const [extendingOption, setExtendingOption] = useState<0.5 | 1 | null>(null);
-  const [checkingExtensionBookingId, setCheckingExtensionBookingId] = useState<string | null>(null);
+  const [checkingExtensionBookingId, setCheckingExtensionBookingId] = useState<
+    string | null
+  >(null);
   const [extensionAvailability, setExtensionAvailability] = useState<{
     bookingId: string;
     checked: boolean;
     canExtend30: boolean;
     canExtend60: boolean;
   } | null>(null);
-  const [sortColumn, setSortColumn] = useState<keyof Booking | "courtName" | null>("date");
+  const [sortColumn, setSortColumn] = useState<
+    keyof Booking | "courtName" | null
+  >("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [dateFilter, setDateFilter] = useState<
     "all" | "today" | "week" | "month" | "range"
   >("today");
-  const [customRange, setCustomRange] = useState<DayPickerDateRange | undefined>(
-    undefined
-  );
+  const [customRange, setCustomRange] = useState<
+    DayPickerDateRange | undefined
+  >(undefined);
   const [showRangeModal, setShowRangeModal] = useState(false);
 
-  const userRole = (session?.user as any)?.role;
+  const userRole = session?.user.role;
   const isSuperAdmin = userRole === "super_admin";
   const isAdmin = userRole === "admin" || isSuperAdmin;
 
   useEffect(() => {
-    if (session) {
-      loadData();
-    }
-  }, [session]);
+    if (!session) return;
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, page, pageSize, dateFilter, customRange, debouncedFilter]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedFilter(filter), 400);
+    return () => clearTimeout(t);
+  }, [filter]);
+
+  useEffect(() => {
+    // Reset to first page whenever filters change.
+    setPage(1);
+  }, [dateFilter, customRange, debouncedFilter]);
+
+  useEffect(() => {
+    // Reset to first page whenever rows-per-page changes.
+    setPage(1);
+  }, [pageSize]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const result = await getAllBookings();
+      const activeRange = getActiveDateRange();
+      const result = await getBookingsPaginated({
+        page,
+        limit: pageSize,
+        dateRange: dateFilter === "all" ? null : activeRange,
+        search: debouncedFilter,
+      });
       if (result.success) {
         setBookings(result.bookings);
+        setTotalCount(result.totalCount ?? 0);
       }
     } catch (error) {
       console.error(error);
@@ -127,7 +168,6 @@ export default function BookingsPage() {
       setIsLoading(false);
     }
   };
-
 
   const handleCancelBooking = (booking: Booking) => {
     if (booking.status === "completed") {
@@ -155,8 +195,8 @@ export default function BookingsPage() {
       } else {
         toast.error(result.error || "Failed to cancel booking");
       }
-    } catch (error: any) {
-      toast.error(error.message || "An error occurred");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsCancelling(false);
     }
@@ -180,23 +220,30 @@ export default function BookingsPage() {
       } else {
         toast.error(result.error || "Failed to delete booking");
       }
-    } catch (error: any) {
-      toast.error(error.message || "An error occurred");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handleStatusChange = async (bookingId: string, newStatus: Booking["status"]) => {
+  const handleStatusChange = async (
+    bookingId: string,
+    newStatus: Booking["status"],
+  ) => {
     setUpdatingStatusBookingId(bookingId);
     try {
       const result = await updateBooking({ bookingId, status: newStatus });
       if (result.success) {
         setBookings((prev) =>
-          prev.map((b) => (b._id === bookingId ? { ...b, status: newStatus } : b))
+          prev.map((b) =>
+            b._id === bookingId ? { ...b, status: newStatus } : b,
+          ),
         );
         if (viewingBooking?._id === bookingId) {
-          setViewingBooking((prev) => (prev ? { ...prev, status: newStatus } : null));
+          setViewingBooking((prev) =>
+            prev ? { ...prev, status: newStatus } : null,
+          );
         }
       } else {
         toast.error(result.error || "Failed to update status");
@@ -236,8 +283,10 @@ export default function BookingsPage() {
       } else {
         toast.error(result.error || "Failed to extend booking");
       }
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to extend booking");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to extend booking",
+      );
     } finally {
       setExtendingBookingId(null);
       setExtendingOption(null);
@@ -262,8 +311,12 @@ export default function BookingsPage() {
       if (!result.hasAnyOption) {
         toast.warning("This booking cannot be extended right now.");
       }
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to check extension availability");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to check extension availability",
+      );
       setExtensionAvailability(null);
     } finally {
       setCheckingExtensionBookingId(null);
@@ -280,24 +333,43 @@ export default function BookingsPage() {
     if (dateFilter === "week") return getCurrentWeekRange(now);
     if (dateFilter === "month") return getCurrentMonthRange(now);
     if (dateFilter === "range") {
-      return getRangeFromDates(customRange?.from ?? null, customRange?.to ?? null);
+      return getRangeFromDates(
+        customRange?.from ?? null,
+        customRange?.to ?? null,
+      );
     }
     return null;
   };
 
   const activeRange = getActiveDateRange();
+  // Date range + search filtering is now applied on the server to keep the admin fast.
+  const filteredBookings = bookings;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const paginationPages = React.useMemo(() => {
+    const pages: Array<number | "ellipsis"> = [];
 
-  const dateFilteredBookings = bookings.filter((b) => {
-    if (dateFilter === "all" || !activeRange) return true;
-    return isDateInRange(b.date, activeRange);
-  });
+    if (totalPages <= 7) {
+      for (let p = 1; p <= totalPages; p++) pages.push(p);
+      return pages;
+    }
 
-  const filteredBookings = dateFilteredBookings.filter(
-    (b) =>
-      b.userName.toLowerCase().includes(filter.toLowerCase()) ||
-      b.userEmail.toLowerCase().includes(filter.toLowerCase()) ||
-      b._id.includes(filter)
-  );
+    const current = page;
+    const windowSize = 2; // show current +/-2
+
+    pages.push(1);
+
+    const start = Math.max(2, current - windowSize);
+    const end = Math.min(totalPages - 1, current + windowSize);
+
+    if (start > 2) pages.push("ellipsis");
+
+    for (let p = start; p <= end; p++) pages.push(p);
+
+    if (end < totalPages - 1) pages.push("ellipsis");
+
+    pages.push(totalPages);
+    return pages;
+  }, [page, totalPages]);
 
   const handleSort = (column: keyof Booking | "courtName") => {
     if (sortColumn === column) {
@@ -311,16 +383,18 @@ export default function BookingsPage() {
   const sortedBookings = [...filteredBookings].sort((a, b) => {
     if (!sortColumn) return 0;
 
-    let aValue: any;
-    let bValue: any;
+    let aValue: unknown;
+    let bValue: unknown;
 
     if (sortColumn === "courtName") {
-      aValue = typeof a.courtId === "object" && a.courtId && "name" in a.courtId
-        ? (a.courtId as Court).name || "Unknown Court"
-        : "Unknown Court";
-      bValue = typeof b.courtId === "object" && b.courtId && "name" in b.courtId
-        ? (b.courtId as Court).name || "Unknown Court"
-        : "Unknown Court";
+      aValue =
+        typeof a.courtId === "object" && a.courtId && "name" in a.courtId
+          ? (a.courtId as Court).name || "Unknown Court"
+          : "Unknown Court";
+      bValue =
+        typeof b.courtId === "object" && b.courtId && "name" in b.courtId
+          ? (b.courtId as Court).name || "Unknown Court"
+          : "Unknown Court";
     } else if (sortColumn === "createdAt" || sortColumn === "updatedAt") {
       // Sort by date fields using actual Date comparison
       const aDate = new Date(a[sortColumn]);
@@ -341,8 +415,9 @@ export default function BookingsPage() {
       if (aDateStr > bDateStr) return sortDirection === "asc" ? 1 : -1;
       return 0;
     } else {
-      aValue = a[sortColumn];
-      bValue = b[sortColumn];
+      const key = sortColumn as keyof Booking;
+      aValue = a[key];
+      bValue = b[key];
     }
 
     // Handle string comparison
@@ -356,9 +431,6 @@ export default function BookingsPage() {
       return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
     }
 
-    // String comparison
-    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
     return 0;
   });
 
@@ -477,7 +549,8 @@ export default function BookingsPage() {
 
         {activeRange && (
           <p className="text-xs text-zinc-400">
-            Showing bookings from <span className="font-mono">{activeRange.from}</span> to{" "}
+            Showing bookings from{" "}
+            <span className="font-mono">{activeRange.from}</span> to{" "}
             <span className="font-mono">{activeRange.to}</span>
           </p>
         )}
@@ -489,11 +562,9 @@ export default function BookingsPage() {
                 <TableHeader>
                   <TableRow className="border-zinc-800">
                     <TableHead className="w-[70px]">
-                      <div className="flex items-center">
-                        No.
-                      </div>
+                      <div className="flex items-center">No.</div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="min-w-[160px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("userName")}
                     >
@@ -502,7 +573,7 @@ export default function BookingsPage() {
                         <SortIcon column="userName" />
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("courtName")}
                     >
@@ -511,7 +582,7 @@ export default function BookingsPage() {
                         <SortIcon column="courtName" />
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="min-w-[140px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("date")}
                     >
@@ -520,7 +591,7 @@ export default function BookingsPage() {
                         <SortIcon column="date" />
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("totalPrice")}
                     >
@@ -532,7 +603,7 @@ export default function BookingsPage() {
                     <TableHead className="min-w-[160px]">
                       Received & discount
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
                       onClick={() => handleSort("status")}
                     >
@@ -541,7 +612,9 @@ export default function BookingsPage() {
                         <SortIcon column="status" />
                       </div>
                     </TableHead>
-                    <TableHead className="text-right min-w-[140px]">Actions</TableHead>
+                    <TableHead className="text-right min-w-[140px]">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -549,19 +622,29 @@ export default function BookingsPage() {
                     <>
                       {[...Array(5)].map((_, i) => (
                         <TableRow key={i} className="border-zinc-800">
-                          <TableCell><Skeleton className="h-4 w-10" /></TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-10" />
+                          </TableCell>
                           <TableCell>
                             <Skeleton className="h-4 w-32 mb-2" />
                             <Skeleton className="h-3 w-40" />
                           </TableCell>
-                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-24" />
+                          </TableCell>
                           <TableCell>
                             <Skeleton className="h-4 w-24 mb-2" />
                             <Skeleton className="h-3 w-32" />
                           </TableCell>
-                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                          <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-20" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-24" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-6 w-16" />
+                          </TableCell>
                           <TableCell>
                             <div className="flex gap-2 justify-end">
                               <Skeleton className="h-8 w-8 rounded" />
@@ -591,10 +674,7 @@ export default function BookingsPage() {
                           : "Unknown Court";
 
                       return (
-                        <TableRow
-                          key={booking._id}
-                          className="border-zinc-800"
-                        >
+                        <TableRow key={booking._id} className="border-zinc-800">
                           <TableCell className="font-mono text-zinc-400 text-xs">
                             {typeof booking.serialNumber === "number"
                               ? booking.serialNumber.toString().padStart(3, "0")
@@ -604,7 +684,10 @@ export default function BookingsPage() {
                             <div className="font-medium text-white">
                               {booking.userName}
                             </div>
-                            <div className="text-zinc-400 text-xs truncate max-w-[180px]" title={booking.userEmail}>
+                            <div
+                              className="text-zinc-400 text-xs truncate max-w-[180px]"
+                              title={booking.userEmail}
+                            >
                               {booking.userEmail}
                             </div>
                             <div className="text-zinc-500 text-xs">
@@ -624,7 +707,9 @@ export default function BookingsPage() {
                             <div className="text-xs text-zinc-400">
                               {formatTime12(booking.startTime)} –{" "}
                               {formatTime12(
-                                ((booking.startTime + booking.duration) % 24 + 24) % 24,
+                                (((booking.startTime + booking.duration) % 24) +
+                                  24) %
+                                  24,
                               )}
                               {booking.startTime + booking.duration > 24
                                 ? " (+1 day)"
@@ -640,16 +725,22 @@ export default function BookingsPage() {
                             {(() => {
                               const online = booking.amountReceivedOnline ?? 0;
                               const cash = booking.amountReceivedCash ?? 0;
-                              const received = online + cash > 0 ? online + cash : (booking.amountPaid ?? 0);
-                              const discount = booking.status === "completed" && booking.totalPrice - received > 0
-                                ? booking.totalPrice - received
-                                : 0;
+                              const received =
+                                online + cash > 0
+                                  ? online + cash
+                                  : (booking.amountPaid ?? 0);
+                              const discount =
+                                booking.status === "completed" &&
+                                booking.totalPrice - received > 0
+                                  ? booking.totalPrice - received
+                                  : 0;
                               const hasBreakdown = online > 0 || cash > 0;
                               return (
                                 <div className="space-y-1 text-xs">
                                   {hasBreakdown ? (
                                     <div className="text-zinc-400">
-                                      Online {online.toLocaleString()} + Cash {cash.toLocaleString()}
+                                      Online {online.toLocaleString()} + Cash{" "}
+                                      {cash.toLocaleString()}
                                     </div>
                                   ) : null}
                                   <div className="text-white font-medium">
@@ -667,7 +758,12 @@ export default function BookingsPage() {
                           <TableCell>
                             <Select
                               value={booking.status}
-                              onValueChange={(value) => handleStatusChange(booking._id, value as Booking["status"])}
+                              onValueChange={(value) =>
+                                handleStatusChange(
+                                  booking._id,
+                                  value as Booking["status"],
+                                )
+                              }
                               disabled={updatingStatusBookingId === booking._id}
                             >
                               <SelectTrigger
@@ -689,10 +785,18 @@ export default function BookingsPage() {
                                 )}
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                                <SelectItem value="confirmed">Confirmed</SelectItem>
-                                <SelectItem value="completed">Completed</SelectItem>
-                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                                <SelectItem value="pending_payment">
+                                  Pending Payment
+                                </SelectItem>
+                                <SelectItem value="confirmed">
+                                  Confirmed
+                                </SelectItem>
+                                <SelectItem value="completed">
+                                  Completed
+                                </SelectItem>
+                                <SelectItem value="cancelled">
+                                  Cancelled
+                                </SelectItem>
                               </SelectContent>
                             </Select>
                           </TableCell>
@@ -716,7 +820,8 @@ export default function BookingsPage() {
                               >
                                 <Edit2 className="w-4 h-4" />
                               </Button>
-                              {(booking.status === "confirmed" || booking.status === "pending_payment") && (
+                              {(booking.status === "confirmed" ||
+                                booking.status === "pending_payment") && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -747,12 +852,99 @@ export default function BookingsPage() {
                 </TableBody>
               </Table>
             </div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-t border-zinc-800">
+              <div className="text-xs text-zinc-400">
+                Page <span className="font-mono text-zinc-200">{page}</span> of{" "}
+                <span className="font-mono text-zinc-200">{totalPages}</span>{" "}
+                <span className="ml-2">({totalCount} total)</span>
+              </div>
+              <div className="flex items-center gap-0 justify-end">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-400">Rows per page</span>
+                  <Select
+                    value={String(pageSize)}
+                    onValueChange={(v) => setPageSize(Number(v))}
+                  >
+                    <SelectTrigger className="h-8 w-[120px] border-zinc-800 bg-zinc-950 text-zinc-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-950">
+                      {[10, 20, 50, 100].map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Pagination className="justify-end">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        aria-disabled={isLoading || page <= 1}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (isLoading || page <= 1) return;
+                          setPage((p) => Math.max(1, p - 1));
+                        }}
+                      />
+                    </PaginationItem>
+
+                    {paginationPages.map((p, idx) => {
+                      if (p === "ellipsis") {
+                        return (
+                          <PaginationItem key={`ellipsis-${idx}`}>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        );
+                      }
+
+                      const pageNum = p;
+                      const isActive = pageNum === page;
+
+                      return (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink
+                            href="#"
+                            isActive={isActive}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (isLoading || isActive) return;
+                              setPage(pageNum);
+                            }}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    })}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        aria-disabled={isLoading || page >= totalPages}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (isLoading || page >= totalPages) return;
+                          setPage((p) => Math.min(totalPages, p + 1));
+                        }}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Booking Details Modal */}
-      <Dialog open={showBookingDetailsModal} onOpenChange={setShowBookingDetailsModal}>
+      <Dialog
+        open={showBookingDetailsModal}
+        onOpenChange={setShowBookingDetailsModal}
+      >
         <DialogContent className="bg-zinc-950 border-zinc-800 max-w-[95vw] sm:max-w-2xl text-white max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">Booking Details</DialogTitle>
@@ -765,7 +957,9 @@ export default function BookingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-zinc-400 text-xs">Booking ID</Label>
-                  <p className="text-white font-mono text-sm">#{viewingBooking._id.slice(-8)}</p>
+                  <p className="text-white font-mono text-sm">
+                    #{viewingBooking._id.slice(-8)}
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-zinc-400 text-xs">Status</Label>
@@ -783,9 +977,10 @@ export default function BookingsPage() {
                               : "bg-zinc-800 border-zinc-700 text-zinc-300"
                     }
                   >
-                    {viewingBooking.status === "pending_payment" 
+                    {viewingBooking.status === "pending_payment"
                       ? "Pending Payment"
-                      : viewingBooking.status.charAt(0).toUpperCase() + viewingBooking.status.slice(1).replace(/_/g, " ")}
+                      : viewingBooking.status.charAt(0).toUpperCase() +
+                        viewingBooking.status.slice(1).replace(/_/g, " ")}
                   </Badge>
                 </div>
                 <div className="space-y-1">
@@ -794,11 +989,15 @@ export default function BookingsPage() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-zinc-400 text-xs">Email</Label>
-                  <p className="text-white text-sm">{viewingBooking.userEmail}</p>
+                  <p className="text-white text-sm">
+                    {viewingBooking.userEmail}
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-zinc-400 text-xs">Phone</Label>
-                  <p className="text-white">{viewingBooking.userPhone || "N/A"}</p>
+                  <p className="text-white">
+                    {viewingBooking.userPhone || "N/A"}
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-zinc-400 text-xs">Court</Label>
@@ -806,7 +1005,8 @@ export default function BookingsPage() {
                     {typeof viewingBooking.courtId === "object" &&
                     viewingBooking.courtId &&
                     "name" in viewingBooking.courtId
-                      ? (viewingBooking.courtId as Court).name || "Unknown Court"
+                      ? (viewingBooking.courtId as Court).name ||
+                        "Unknown Court"
                       : "Unknown Court"}
                   </p>
                 </div>
@@ -826,7 +1026,10 @@ export default function BookingsPage() {
                   <p className="text-white">
                     {formatTime12(viewingBooking.startTime)} –{" "}
                     {formatTime12(
-                      ((viewingBooking.startTime + viewingBooking.duration) % 24 + 24) % 24,
+                      (((viewingBooking.startTime + viewingBooking.duration) %
+                        24) +
+                        24) %
+                        24,
                     )}
                     {viewingBooking.startTime + viewingBooking.duration > 24
                       ? " (+1 day)"
@@ -835,13 +1038,18 @@ export default function BookingsPage() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-zinc-400 text-xs">Duration</Label>
-                  <p className="text-white">{viewingBooking.duration} hour{viewingBooking.duration !== 1 ? "s" : ""}</p>
+                  <p className="text-white">
+                    {viewingBooking.duration} hour
+                    {viewingBooking.duration !== 1 ? "s" : ""}
+                  </p>
                 </div>
 
                 {(viewingBooking.status === "confirmed" ||
                   viewingBooking.status === "pending_payment") && (
                   <div className="space-y-2 pt-1">
-                    <Label className="text-zinc-400 text-xs">Extend Booking</Label>
+                    <Label className="text-zinc-400 text-xs">
+                      Extend Booking
+                    </Label>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
@@ -850,7 +1058,9 @@ export default function BookingsPage() {
                         onClick={() =>
                           handleCheckExtensionAvailability(viewingBooking._id)
                         }
-                        disabled={checkingExtensionBookingId === viewingBooking._id}
+                        disabled={
+                          checkingExtensionBookingId === viewingBooking._id
+                        }
                         className="border-zinc-700 text-zinc-200 hover:bg-zinc-800/50"
                       >
                         {checkingExtensionBookingId === viewingBooking._id ? (
@@ -859,7 +1069,8 @@ export default function BookingsPage() {
                         Check availability
                       </Button>
 
-                      {extensionAvailability?.bookingId === viewingBooking._id &&
+                      {extensionAvailability?.bookingId ===
+                        viewingBooking._id &&
                         extensionAvailability.checked && (
                           <>
                             <Button
@@ -906,82 +1117,131 @@ export default function BookingsPage() {
                         )}
                     </div>
                     <p className="text-zinc-500 text-[11px]">
-                      Click check first. Only valid extension options will be enabled.
+                      Click check first. Only valid extension options will be
+                      enabled.
                     </p>
                   </div>
                 )}
                 {/* Price Breakdown */}
-                {viewingBooking.discountAmount && viewingBooking.discountAmount > 0 ? (
+                {viewingBooking.discountAmount &&
+                viewingBooking.discountAmount > 0 ? (
                   <div className="col-span-2 space-y-2 bg-zinc-900/50 rounded-lg p-4">
-                    <Label className="text-zinc-400 text-xs">Price Breakdown</Label>
+                    <Label className="text-zinc-400 text-xs">
+                      Price Breakdown
+                    </Label>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-zinc-400 text-sm">Subtotal</span>
-                        <span className="text-zinc-300">PKR {(viewingBooking.originalPrice || viewingBooking.totalPrice + viewingBooking.discountAmount).toLocaleString()}</span>
+                        <span className="text-zinc-300">
+                          PKR{" "}
+                          {(
+                            viewingBooking.originalPrice ||
+                            viewingBooking.totalPrice +
+                              viewingBooking.discountAmount
+                          ).toLocaleString()}
+                        </span>
                       </div>
-                      {viewingBooking.discounts?.map((d: any, idx: number) => (
-                        <div key={idx} className="flex justify-between items-center">
-                          <span className="text-green-400 text-sm">{d.name} ({d.type === 'percentage' ? `${d.value}%` : `PKR ${d.value}`})</span>
-                          <span className="text-green-400">-PKR {d.amountSaved.toLocaleString()}</span>
+                      {viewingBooking.discounts?.map((d, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex justify-between items-center"
+                        >
+                          <span className="text-green-400 text-sm">
+                            {d.name} (
+                            {d.type === "percentage"
+                              ? `${d.value}%`
+                              : `PKR ${d.value}`}
+                            )
+                          </span>
+                          <span className="text-green-400">
+                            -PKR {d.amountSaved.toLocaleString()}
+                          </span>
                         </div>
                       ))}
                       <div className="flex justify-between items-center pt-2 border-t border-zinc-700">
                         <span className="text-white font-semibold">Total</span>
-                        <span className="text-[#2DD4BF] font-bold">PKR {viewingBooking.totalPrice.toLocaleString()}</span>
+                        <span className="text-[#2DD4BF] font-bold">
+                          PKR {viewingBooking.totalPrice.toLocaleString()}
+                        </span>
                       </div>
                       <div className="bg-green-500/10 border border-green-500/30 rounded px-2 py-1 text-center">
-                        <span className="text-green-400 text-xs">Saved PKR {viewingBooking.discountAmount.toLocaleString()}</span>
+                        <span className="text-green-400 text-xs">
+                          Saved PKR{" "}
+                          {viewingBooking.discountAmount.toLocaleString()}
+                        </span>
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-1">
                     <Label className="text-zinc-400 text-xs">Total Price</Label>
-                    <p className="text-[#2DD4BF] font-semibold">PKR {viewingBooking.totalPrice.toLocaleString()}</p>
+                    <p className="text-[#2DD4BF] font-semibold">
+                      PKR {viewingBooking.totalPrice.toLocaleString()}
+                    </p>
                   </div>
                 )}
                 <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">Account received</Label>
+                  <Label className="text-zinc-400 text-xs">
+                    Account received
+                  </Label>
                   <p className="text-white font-semibold">
                     PKR{" "}
                     {(
                       (viewingBooking.amountReceivedOnline ?? 0) +
-                      (viewingBooking.amountReceivedCash ?? 0) ||
+                        (viewingBooking.amountReceivedCash ?? 0) ||
                       (viewingBooking.amountPaid ?? 0)
                     ).toLocaleString()}
                   </p>
                   {((viewingBooking.amountReceivedOnline ?? 0) > 0 ||
                     (viewingBooking.amountReceivedCash ?? 0) > 0) && (
                     <p className="text-zinc-500 text-xs">
-                      Online: PKR {(viewingBooking.amountReceivedOnline ?? 0).toLocaleString()} · Cash: PKR {(viewingBooking.amountReceivedCash ?? 0).toLocaleString()}
+                      Online: PKR{" "}
+                      {(
+                        viewingBooking.amountReceivedOnline ?? 0
+                      ).toLocaleString()}{" "}
+                      · Cash: PKR{" "}
+                      {(
+                        viewingBooking.amountReceivedCash ?? 0
+                      ).toLocaleString()}
                     </p>
                   )}
                 </div>
                 {(() => {
                   const received =
                     (viewingBooking.amountReceivedOnline ?? 0) +
-                    (viewingBooking.amountReceivedCash ?? 0) ||
+                      (viewingBooking.amountReceivedCash ?? 0) ||
                     (viewingBooking.amountPaid ?? 0);
-                  const discount = viewingBooking.status === "completed" && viewingBooking.totalPrice - received > 0
-                    ? viewingBooking.totalPrice - received
-                    : 0;
+                  const discount =
+                    viewingBooking.status === "completed" &&
+                    viewingBooking.totalPrice - received > 0
+                      ? viewingBooking.totalPrice - received
+                      : 0;
                   return discount > 0 ? (
                     <div className="space-y-1">
-                      <Label className="text-zinc-400 text-xs">Discount (total − received)</Label>
-                      <p className="text-amber-400 font-semibold">PKR {discount.toLocaleString()}</p>
+                      <Label className="text-zinc-400 text-xs">
+                        Discount (total − received)
+                      </Label>
+                      <p className="text-amber-400 font-semibold">
+                        PKR {discount.toLocaleString()}
+                      </p>
                     </div>
                   ) : null;
                 })()}
                 {(() => {
                   const received =
                     (viewingBooking.amountReceivedOnline ?? 0) +
-                    (viewingBooking.amountReceivedCash ?? 0) ||
+                      (viewingBooking.amountReceivedCash ?? 0) ||
                     (viewingBooking.amountPaid ?? 0);
                   return received < viewingBooking.totalPrice ? (
                     <div className="space-y-1">
-                      <Label className="text-zinc-400 text-xs">Remaining balance</Label>
+                      <Label className="text-zinc-400 text-xs">
+                        Remaining balance
+                      </Label>
                       <p className="text-yellow-400 font-semibold">
-                        PKR {(viewingBooking.totalPrice - received).toLocaleString()}
+                        PKR{" "}
+                        {(
+                          viewingBooking.totalPrice - received
+                        ).toLocaleString()}
                       </p>
                     </div>
                   ) : null;
@@ -992,7 +1252,9 @@ export default function BookingsPage() {
               <div className="border-t border-zinc-800 pt-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div>
-                    <Label className="text-zinc-400 text-xs mb-4 block">Entry Verification QR Code</Label>
+                    <Label className="text-zinc-400 text-xs mb-4 block">
+                      Entry Verification QR Code
+                    </Label>
                     <div className="flex justify-center lg:justify-start">
                       <div className="bg-white p-3 sm:p-4 rounded-xl inline-block">
                         <QRCode
@@ -1005,9 +1267,11 @@ export default function BookingsPage() {
                       Scan to verify booking entry
                     </p>
                   </div>
-                  
+
                   <div>
-                    <Label className="text-zinc-400 text-xs mb-4 block">Feedback QR Code</Label>
+                    <Label className="text-zinc-400 text-xs mb-4 block">
+                      Feedback QR Code
+                    </Label>
                     <div className="flex justify-center lg:justify-start">
                       <div className="bg-white p-3 sm:p-4 rounded-xl inline-block">
                         <QRCode
@@ -1059,27 +1323,37 @@ export default function BookingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">User:</span>
-                  <span className="text-white text-sm">{cancellingBooking.userName}</span>
+                  <span className="text-white text-sm">
+                    {cancellingBooking.userName}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Date:</span>
-                  <span className="text-white text-sm">{formatDisplayDate(cancellingBooking.date)}</span>
+                  <span className="text-white text-sm">
+                    {formatDisplayDate(cancellingBooking.date)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Time:</span>
                   <span className="text-white text-sm">
                     {formatTime12(cancellingBooking.startTime)} –{" "}
                     {formatTime12(
-                      ((cancellingBooking.startTime + cancellingBooking.duration) % 24 + 24) % 24,
+                      (((cancellingBooking.startTime +
+                        cancellingBooking.duration) %
+                        24) +
+                        24) %
+                        24,
                     )}
-                    {cancellingBooking.startTime + cancellingBooking.duration > 24
+                    {cancellingBooking.startTime + cancellingBooking.duration >
+                    24
                       ? " (+1 day)"
                       : ""}
                   </span>
                 </div>
               </div>
               <p className="text-zinc-300 text-sm">
-                This action will mark the booking as cancelled. The booking will remain in the system but will be marked as cancelled.
+                This action will mark the booking as cancelled. The booking will
+                remain in the system but will be marked as cancelled.
               </p>
             </div>
           )}
@@ -1118,7 +1392,8 @@ export default function BookingsPage() {
           <DialogHeader>
             <DialogTitle className="text-white">Delete Booking</DialogTitle>
             <DialogDescription className="text-zinc-400">
-              Are you sure you want to permanently delete this booking? This action cannot be undone.
+              Are you sure you want to permanently delete this booking? This
+              action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           {deletingBooking && (
@@ -1132,22 +1407,29 @@ export default function BookingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">User:</span>
-                  <span className="text-white text-sm">{deletingBooking.userName}</span>
+                  <span className="text-white text-sm">
+                    {deletingBooking.userName}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Email:</span>
-                  <span className="text-white text-sm">{deletingBooking.userEmail}</span>
+                  <span className="text-white text-sm">
+                    {deletingBooking.userEmail}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Date:</span>
-                  <span className="text-white text-sm">{formatDisplayDate(deletingBooking.date)}</span>
+                  <span className="text-white text-sm">
+                    {formatDisplayDate(deletingBooking.date)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Time:</span>
                   <span className="text-white text-sm">
                     {formatTime12(deletingBooking.startTime)} –{" "}
                     {formatTime12(
-                      ((deletingBooking.startTime + deletingBooking.duration) % 24 +
+                      (((deletingBooking.startTime + deletingBooking.duration) %
+                        24) +
                         24) %
                         24,
                     )}
@@ -1174,7 +1456,8 @@ export default function BookingsPage() {
                   >
                     {deletingBooking.status === "pending_payment"
                       ? "Pending Payment"
-                      : deletingBooking.status.charAt(0).toUpperCase() + deletingBooking.status.slice(1).replace(/_/g, " ")}
+                      : deletingBooking.status.charAt(0).toUpperCase() +
+                        deletingBooking.status.slice(1).replace(/_/g, " ")}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1186,7 +1469,8 @@ export default function BookingsPage() {
               </div>
               <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                 <p className="text-red-400 text-sm">
-                  This will permanently remove the booking from the system. This action cannot be undone.
+                  This will permanently remove the booking from the system. This
+                  action cannot be undone.
                 </p>
               </div>
             </div>
@@ -1224,7 +1508,9 @@ export default function BookingsPage() {
       <Dialog open={showRangeModal} onOpenChange={setShowRangeModal}>
         <DialogContent className="bg-zinc-950 border-zinc-800 max-w-xl text-white">
           <DialogHeader>
-            <DialogTitle className="text-white">Select custom date range</DialogTitle>
+            <DialogTitle className="text-white">
+              Select custom date range
+            </DialogTitle>
             <DialogDescription className="text-zinc-400">
               Choose a start and end date to filter bookings.
             </DialogDescription>
