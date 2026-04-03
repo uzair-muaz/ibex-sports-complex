@@ -62,6 +62,8 @@ import {
   formatCourtTypes,
   isDiscountCurrentlyActive,
 } from "@/lib/discount-utils";
+import { formatLocalDate } from "@/lib/utils";
+import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from "@/lib/date-time";
 import type { Discount, CourtType } from "@/types";
 
 const COURT_TYPES: CourtType[] = ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"];
@@ -137,11 +139,12 @@ export default function DiscountsPage() {
     
     setIsSubmitting(true);
 
-    // Convert Date objects to ISO strings for the API
+    // Convert Date objects to local date strings (YYYY-MM-DD)
+    // so business-day boundaries are interpreted correctly.
     const formData = {
       ...discountForm,
-      validFrom: discountForm.validFrom.toISOString(),
-      validUntil: discountForm.validUntil.toISOString(),
+      validFrom: formatLocalDate(discountForm.validFrom),
+      validUntil: formatLocalDate(discountForm.validUntil),
     };
 
     try {
@@ -343,10 +346,13 @@ export default function DiscountsPage() {
       );
     }
     
-    const now = new Date();
-    const validFrom = new Date(discount.validFrom);
-    
-    if (now < validFrom) {
+    const nowKey = toDateKeyInTimezone(new Date(), BUSINESS_TIMEZONE);
+    const validFromKey = toDateKeyInTimezone(
+      new Date(discount.validFrom),
+      BUSINESS_TIMEZONE,
+    );
+
+    if (nowKey < validFromKey) {
       return (
         <Badge
           variant="outline"

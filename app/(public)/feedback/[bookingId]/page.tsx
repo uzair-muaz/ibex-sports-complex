@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Star, CheckCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
-import { createFeedback, getFeedbackByBookingId, getBookingById } from "@/app/actions/feedback";
+import {
+  createFeedback,
+  getFeedbackByBookingId,
+  getBookingById,
+} from "@/app/actions/feedback";
 import { useParams } from "next/navigation";
 
 export default function FeedbackPage() {
@@ -23,20 +25,16 @@ export default function FeedbackPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState("");
-  const [bookingInfo, setBookingInfo] = useState<any>(null);
-
-  useEffect(() => {
-    if (bookingId) {
-      loadBookingInfo();
-    }
-  }, [bookingId]);
-
-  const loadBookingInfo = async () => {
+  const loadBookingInfo = useCallback(async () => {
     try {
       setIsLoading(true);
-      
+
       // Validate bookingId format
-      if (!bookingId || bookingId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(bookingId)) {
+      if (
+        !bookingId ||
+        bookingId.length !== 24 ||
+        !/^[0-9a-fA-F]{24}$/.test(bookingId)
+      ) {
         setError("Invalid booking ID. Please check the QR code or link.");
         setIsLoading(false);
         return;
@@ -51,26 +49,35 @@ export default function FeedbackPage() {
         setUserName(feedbackResult.feedback.userName);
         setUserEmail(feedbackResult.feedback.userEmail);
         setUserPhone(feedbackResult.feedback.userPhone);
-        setBookingInfo(feedbackResult.feedback.bookingId);
       } else {
         // Get booking info to pre-fill form
         const bookingResult = await getBookingById(bookingId);
         if (bookingResult.success && bookingResult.booking) {
-          setBookingInfo(bookingResult.booking);
           setUserName(bookingResult.booking.userName);
           setUserEmail(bookingResult.booking.userEmail);
           setUserPhone(bookingResult.booking.userPhone);
         } else {
-          setError(bookingResult.error || "Booking not found. Please check the QR code or link.");
+          setError(
+            bookingResult.error ||
+              "Booking not found. Please check the QR code or link.",
+          );
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load booking information.";
       console.error(error);
-      setError(error.message || "Failed to load booking information.");
+      setError(message);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [bookingId]);
+
+  useEffect(() => {
+    if (bookingId) {
+      loadBookingInfo();
+    }
+  }, [bookingId, loadBookingInfo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,12 +107,12 @@ export default function FeedbackPage() {
 
       if (result.success) {
         setIsSubmitted(true);
-        setBookingInfo(result.feedback.bookingId);
       } else {
         setError(result.error || "Failed to submit feedback");
       }
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "An error occurred";
+      setError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -122,7 +129,6 @@ export default function FeedbackPage() {
   if (error && !isSubmitted) {
     return (
       <div className="min-h-screen bg-black text-white relative">
-        <Navbar />
         <div className="pt-32 pb-20 px-4 md:px-6">
           <div className="max-w-2xl mx-auto">
             <motion.div
@@ -133,9 +139,7 @@ export default function FeedbackPage() {
               <h1 className="text-3xl md:text-4xl font-bold mb-4 text-white">
                 Invalid Booking Link
               </h1>
-              <p className="text-zinc-400 text-lg mb-8">
-                {error}
-              </p>
+              <p className="text-zinc-400 text-lg mb-8">{error}</p>
               <Button
                 onClick={() => (window.location.href = "/")}
                 className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
@@ -145,7 +149,6 @@ export default function FeedbackPage() {
             </motion.div>
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
@@ -153,7 +156,6 @@ export default function FeedbackPage() {
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-black text-white relative">
-        <Navbar />
         <div className="pt-32 pb-20 px-4 md:px-6">
           <div className="max-w-2xl mx-auto">
             <motion.div
@@ -190,7 +192,7 @@ export default function FeedbackPage() {
               )}
               {comment && (
                 <div className="bg-zinc-800/50 rounded-xl p-6 text-left mb-6">
-                  <p className="text-zinc-300 italic">"{comment}"</p>
+                  <p className="text-zinc-300 italic">&quot;{comment}&quot;</p>
                 </div>
               )}
               <Button
@@ -202,16 +204,13 @@ export default function FeedbackPage() {
             </motion.div>
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-black text-white relative">
-      <Navbar />
-
-      <div className="fixed top-0 left-0 w-full h-[50vh] bg-gradient-to-b from-[#2DD4BF]/10 to-transparent pointer-events-none" />
+      <div className="fixed top-0 left-0 w-full h-[50vh] bg-linear-to-b from-[#2DD4BF]/10 to-transparent pointer-events-none" />
 
       <div className="pt-32 pb-20 px-4 md:px-6">
         <div className="max-w-2xl mx-auto space-y-8 relative z-10">
@@ -220,7 +219,8 @@ export default function FeedbackPage() {
               Share Your Experience
             </h1>
             <p className="text-zinc-400 text-lg">
-              Help us improve by sharing your feedback about your booking experience
+              Help us improve by sharing your feedback about your booking
+              experience
             </p>
           </div>
 
@@ -313,7 +313,7 @@ export default function FeedbackPage() {
                   onChange={(e) => setUserPhone(e.target.value)}
                   className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-[#2DD4BF]/50 focus:border-[#2DD4BF] transition-all outline-none"
                   placeholder="+92 300 1234567"
-                  pattern="[+]?[0-9\s\-()]{10,}"
+                  pattern="[+]?[0-9\\s\\-()]{10,}"
                 />
               </div>
 
@@ -353,8 +353,6 @@ export default function FeedbackPage() {
           </motion.div>
         </div>
       </div>
-
-      <Footer />
     </div>
   );
 }

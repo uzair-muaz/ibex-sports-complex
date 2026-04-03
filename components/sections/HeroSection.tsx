@@ -35,10 +35,10 @@ export const HeroSection = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="flex items-center gap-2 px-3 py-2 sm:px-4 rounded-full border border-zinc-300/50 dark:border-white/10 bg-white/60 dark:bg-white/5 backdrop-blur-md mb-4 sm:mb-8"
+          className="flex items-center gap-2 px-3 py-2 sm:px-4 rounded-full border border-white/10 bg-white/5 backdrop-blur-md mb-4 sm:mb-8"
         >
-          <MapPin className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
-          <span className="text-xs font-medium uppercase tracking-widest text-zinc-600 dark:text-zinc-400">
+          <MapPin className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span className="text-xs font-medium uppercase tracking-widest text-zinc-400">
             Islamabad, Pakistan
           </span>
         </motion.div>
@@ -64,7 +64,7 @@ export const HeroSection = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.55 }}
-          className="max-w-2xl text-lg sm:text-lg md:text-xl text-zinc-500 dark:text-zinc-400 font-light leading-relaxed mb-6 sm:mb-10 md:mb-12"
+          className="max-w-2xl text-lg sm:text-lg md:text-xl text-zinc-400 font-light leading-relaxed mb-6 sm:mb-10 md:mb-12"
         >
           Where peak performance meets premium leisure. Experience the finest
           paddle, pickleball, and futsal in the heart of the capital.
@@ -112,9 +112,9 @@ export const HeroSection = () => {
               </Button>
             </motion.div>
           </Link>
-          <div className="flex flex-col text-xs font-mono text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-center sm:text-left sm:border-l sm:border-zinc-300/40 dark:sm:border-zinc-700 sm:pl-5">
+          <div className="flex flex-col text-xs font-mono text-zinc-400 uppercase tracking-widest text-center sm:text-left sm:border-l sm:border-zinc-700 sm:pl-5">
             <span>Open Daily</span>
-            <span className="text-black dark:text-white font-bold">
+            <span className="text-white font-bold">
               12 PM — 4 AM
             </span>
           </div>

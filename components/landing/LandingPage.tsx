@@ -1,8 +1,5 @@
 "use client";
 
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
-import { DiscountBanner } from "@/components/DiscountBanner";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { FacilitiesSection } from "@/components/sections/FacilitiesSection";
 import { AmenitiesSection } from "@/components/sections/AmenitiesSection";
@@ -19,17 +16,7 @@ import { GALLERY_IMAGES } from "@/types";
 export function LandingPage() {
   return (
     <SectionThemeProvider>
-      <div className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white overflow-x-hidden transition-colors duration-500">
-        <Navbar />
-        <DiscountBanner className="fixed left-0 right-0 z-40 top-16 sm:top-[4.25rem]" />
-
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-20 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-[#2DD4BF] focus:text-[#0F172A] focus:rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2DD4BF] focus:ring-offset-2"
-        >
-          Skip to main content
-        </a>
-
+      <>
         <main id="main-content" className="relative" tabIndex={-1}>
           {/* 1 — Hero */}
           <SectionWrapper id="hero">
@@ -77,9 +64,7 @@ export function LandingPage() {
             <GetInTouchSection />
           </SectionWrapper>
         </main>
-
-        <Footer />
-      </div>
+      </>
     </SectionThemeProvider>
   );
 }

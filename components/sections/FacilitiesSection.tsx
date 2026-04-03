@@ -9,7 +9,7 @@ const SPORTS = [
   {
     key: "paddle",
     tag: "Trending",
-    tagColor: "bg-white/90 text-black dark:bg-white/20 dark:text-white",
+    tagColor: "bg-white/20 text-white",
     name: "Paddle Tennis",
     description:
       "Fast-paced, social, and addictive. Our panoramic courts offer the best playing experience in Islamabad.",
@@ -18,7 +18,7 @@ const SPORTS = [
   {
     key: "pickleball",
     tag: "New",
-    tagColor: "bg-white/90 text-black dark:bg-white/20 dark:text-white",
+    tagColor: "bg-white/20 text-white",
     name: "Pickleball",
     description:
       "The fastest growing sport in the world has found its home at Ibex. Perfect for all ages and skill levels.",
@@ -27,7 +27,7 @@ const SPORTS = [
   {
     key: "futsal",
     tag: "Classic",
-    tagColor: "bg-zinc-800 text-white dark:bg-zinc-700",
+    tagColor: "bg-zinc-700 text-white",
     name: "Futsal",
     description:
       "High-intensity action on professional-grade turf. Bring your team and dominate the pitch.",
@@ -37,7 +37,7 @@ const SPORTS = [
 
 export const FacilitiesSection = () => {
   return (
-    <section className="py-12 sm:py-16 md:py-24 lg:py-36 px-4 sm:px-6 bg-zinc-50 dark:bg-[#0a0a0a] transition-colors duration-500 relative z-20">
+    <section className="py-12 sm:py-16 md:py-24 lg:py-36 px-4 sm:px-6 bg-[#0a0a0a] transition-colors duration-500 relative z-20">
       <div className="max-w-7xl mx-auto">
         {/* Section intro */}
         <ScrollReveal range={[0.05, 0.3]}>
@@ -65,7 +65,7 @@ export const FacilitiesSection = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="mt-4 sm:mt-6 text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-2xl"
+              className="mt-4 sm:mt-6 text-base sm:text-lg md:text-xl text-zinc-400 leading-relaxed max-w-2xl"
             >
               Whether you&apos;re a seasoned pro or picking up a racket for the
               first time, our world-class facilities are designed to elevate
@@ -128,7 +128,7 @@ export const FacilitiesSection = () => {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, delay: 0.35 }}
-                    className="text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-lg"
+                    className="text-base sm:text-lg md:text-xl text-zinc-400 leading-relaxed max-w-lg"
                   >
                     {sport.description}
                   </motion.p>

@@ -13,7 +13,7 @@ export const theme = {
   // Primary brand color (teal/mint green from logo)
   primary: {
     DEFAULT: "#2DD4BF", // Teal/mint green
-    dark: "#14B8A6", // Darker teal for hover states
+    hover: "#14B8A6", // Darker teal for hover states
     light: "#5EEAD4", // Lighter teal for highlights
     // RGB values for opacity variations
     rgb: "45, 212, 191",
@@ -23,7 +23,7 @@ export const theme = {
   secondary: {
     DEFAULT: "#0F172A", // Dark navy blue
     light: "#1E293B", // Slightly lighter navy
-    dark: "#020617", // Darker navy
+    deep: "#020617", // Darker navy
   },
 
   // Accent colors

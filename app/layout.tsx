@@ -12,11 +12,11 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: {
-    default: "Ibex sports Complex - Premium Sports Court Booking",
-    template: "%s | Ibex sports Complex",
+    default: "Ibex Sports Complex - Premium Sports Court Booking",
+    template: "%s | Ibex Sports Complex",
   },
   description:
-    "Book premium Padel, Cricket, Pickleball, and Futsal courts at Ibex sports Complex. Experience world-class facilities with professional-grade courts. Dynamic pricing available.",
+    "Book premium Padel, Cricket, Pickleball, and Futsal courts at Ibex Sports Complex. Experience world-class facilities with professional-grade courts in Islamabad.",
   keywords: [
     "sports arena",
     "padel tennis",
@@ -24,14 +24,14 @@ export const metadata: Metadata = {
     "pickleball",
     "futsal",
     "court booking",
-    "Ibex sports Complex",
+    "Ibex Sports Complex",
     "sports facility",
     "premium courts",
     "sports booking",
   ],
-  authors: [{ name: "Ibex sports Complex" }],
-  creator: "Ibex sports Complex",
-  publisher: "Ibex sports Complex",
+  authors: [{ name: "Ibex Sports Complex" }],
+  creator: "Ibex Sports Complex",
+  publisher: "Ibex Sports Complex",
   metadataBase: new URL(getBaseUrl()),
   icons: {
     icon: [
@@ -42,12 +42,12 @@ export const metadata: Metadata = {
     shortcut: "/logo.png",
   },
   openGraph: {
-    title: "Ibex sports Complex - Premium Sports Court Booking",
+    title: "Ibex Sports Complex - Premium Sports Court Booking",
     description:
-      "Book premium sports courts at Ibex sports Complex. Experience world-class facilities with dynamic pricing.",
+      "Book premium sports courts at Ibex Sports Complex. Experience world-class facilities with dynamic pricing.",
     type: "website",
     locale: "en_US",
-    siteName: "Ibex sports Complex",
+    siteName: "Ibex Sports Complex",
     url: getBaseUrl(),
     images: [
       {
@@ -60,9 +60,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Ibex sports Complex - Premium Sports Court Booking",
+    title: "Ibex Sports Complex - Premium Sports Court Booking",
     description:
-      "Book premium sports courts at Ibex sports Complex. Dynamic pricing available.",
+      "Book premium sports courts at Ibex Sports Complex. Dynamic pricing available.",
     images: ["/logo.png"],
   },
   robots: {
@@ -87,8 +87,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body className={`${inter.className} bg-[#050505] text-white`}>
         <Providers>
           {children}
           <ConditionalWhatsApp />

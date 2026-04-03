@@ -2,7 +2,7 @@
  * Booking Confirmation Email Template
  * 
  * This template generates the HTML email content for booking confirmations.
- * It includes booking details and QR codes for entry verification and feedback.
+ * It includes booking details and a feedback link.
  */
 
 export interface AppliedDiscountEmail {
@@ -89,8 +89,11 @@ export function generateBookingConfirmationEmail(data: BookingEmailData): string
               <p style="margin: 0 0 10px 0; font-size: 16px; line-height: 1.6; color: #e4e4e7;">
                 Your booking has been confirmed! We're excited to have you at IBEX Sports Complex.
               </p>
-              <p style="margin: 0 0 30px 0; font-size: 13px; line-height: 1.6; color: #7dd3fc;">
+              <p style="margin: 0 0 12px 0; font-size: 13px; line-height: 1.6; color: #7dd3fc;">
                 Please pay <strong>50% advance</strong> to confirm your slot. Bookings without advance may be cancelled.
+              </p>
+              <p style="margin: 0 0 30px 0; font-size: 13px; line-height: 1.6; color: #a1a1aa;">
+                <strong style="color: #e4e4e7;">Please note:</strong> Advance payments are <strong style="color: #e4e4e7;">non-refundable</strong> once made.
               </p>
 
               <!-- Booking Details Card -->
@@ -181,7 +184,7 @@ export function generateBookingConfirmationEmail(data: BookingEmailData): string
                 <tr>
                   <td style="padding: 20px;">
                     <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #e4e4e7;">
-                      <strong style="color: #2DD4BF;">Important:</strong> Please arrive 10 minutes before your scheduled time. The Entry Verification QR code must be presented at the entrance.
+                      <strong style="color: #2DD4BF;">Important:</strong> Please arrive 10 minutes before your scheduled time.
                     </p>
                   </td>
                 </tr>

@@ -5,6 +5,8 @@ import connectDB from './mongodb';
 import User from '@/models/User';
 
 export const authOptions = {
+  // Heroku (and similar proxies): trust X-Forwarded-Host / Proto so the app URL matches.
+  trustHost: true,
   providers: [
     CredentialsProvider({
       name: 'Credentials',

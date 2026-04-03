@@ -73,7 +73,7 @@ function CollageItem({
         delay: index * 0.05,
         ease: [0.22, 1, 0.36, 1],
       }}
-      className={`relative overflow-hidden rounded-2xl group ring-1 ring-zinc-200 dark:ring-white/10 ${
+      className={`relative overflow-hidden rounded-2xl group ring-1 ring-white/10 ${
         tall ? "aspect-[3/4]" : "aspect-[4/3]"
       }`}
     >
