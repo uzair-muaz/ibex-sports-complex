@@ -9,17 +9,12 @@ type SlotView = {
   end: string;
   isSelected: boolean;
   isPeak: boolean;
-  isPastSlot: boolean;
 };
 
 type BookingSlotsGridProps = {
   isLoadingAvailability: boolean;
   isSelectedDateToday: boolean;
-  slotsForDesign: SlotView[];
-  orderedSlots: {
-    upcoming: SlotView[];
-    past: SlotView[];
-  };
+  slots: SlotView[];
   onSelectQuote: (quote: AvailableStartTimeQuote) => void;
 };
 
@@ -34,15 +29,14 @@ function SelectableSlotsEmptyCallout({
         Today&apos;s courts are fully booked.
       </p>
       <p className="text-zinc-500 text-sm mt-2 max-w-md mx-auto leading-relaxed">
-        There are no time slots left that you can book for today. Please choose
-        another day from the calendar to see open times. Times shown under
-        &quot;Passed Slots&quot; are for reference only.
+        There are no bookable time slots left for today. Please choose another
+        day from the calendar to see open times.
       </p>
     </>
   ) : (
     <p className="text-zinc-500 text-sm max-w-md mx-auto leading-relaxed">
       No bookable slots remain for this date and duration. Try another date or
-      length of play, or review past times below for reference.
+      length of play.
     </p>
   );
 }
@@ -57,15 +51,8 @@ function SlotCard({
   return (
     <button
       key={slot.id}
-      onClick={() => {
-        if (!slot.isPastSlot) onSelectQuote(slot.quote);
-      }}
-      disabled={slot.isPastSlot}
+      onClick={() => onSelectQuote(slot.quote)}
       className={`relative h-28 rounded-3xl border transition-all duration-300 flex flex-col items-start justify-between p-5 overflow-hidden ${
-        slot.isPastSlot
-          ? "bg-zinc-900/12 border-white/10 text-zinc-700 cursor-not-allowed opacity-55 bg-[repeating-linear-gradient(-45deg,rgba(255,255,255,0.02)_0px,rgba(255,255,255,0.02)_6px,transparent_6px,transparent_14px)]"
-          : ""
-      } ${
         slot.isSelected
           ? "bg-[#2DD4BF] border-[#2DD4BF] text-black scale-[0.98] shadow-[0_10px_30px_rgba(45,212,191,0.2)]"
           : "bg-zinc-900/40 border-white/10 hover:border-white/20 active:scale-95"
@@ -79,7 +66,7 @@ function SlotCard({
         </span>
         {slot.isSelected ? <Check size={16} className="text-black" /> : null}
         {slot.isPeak && !slot.isSelected ? (
-          <div className="w-1.5 h-1.5 rounded-full bg-[#2DD4BF]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 ring-1 ring-amber-400/40 shrink-0" />
         ) : null}
       </div>
       <div className="flex flex-col items-start">
@@ -101,8 +88,7 @@ function SlotCard({
 export function BookingSlotsGrid({
   isLoadingAvailability,
   isSelectedDateToday,
-  slotsForDesign,
-  orderedSlots,
+  slots,
   onSelectQuote,
 }: BookingSlotsGridProps) {
   const skeletonCount = 8;
@@ -129,35 +115,14 @@ export function BookingSlotsGrid({
             </div>
           ))}
         </>
-      ) : slotsForDesign.length === 0 ? (
+      ) : slots.length === 0 ? (
         <div className="col-span-2 text-center py-10 px-6 bg-zinc-900/20 border border-white/10 rounded-3xl">
           <SelectableSlotsEmptyCallout isSelectedDateToday={isSelectedDateToday} />
         </div>
       ) : (
-        <>
-          {orderedSlots.upcoming.length === 0 ? (
-            <div className="col-span-2 text-center py-8 px-6 bg-zinc-900/20 border border-white/10 rounded-3xl">
-              <SelectableSlotsEmptyCallout
-                isSelectedDateToday={isSelectedDateToday}
-              />
-            </div>
-          ) : null}
-          {orderedSlots.upcoming.map((slot) => (
-            <SlotCard key={slot.id} slot={slot} onSelectQuote={onSelectQuote} />
-          ))}
-          {orderedSlots.past.length > 0 ? (
-            <div className="col-span-2 mt-2 mb-1 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/10" />
-              <span className="text-[9px] font-black uppercase tracking-[0.25em] text-zinc-600">
-                Passed Slots
-              </span>
-              <div className="h-px flex-1 bg-white/10" />
-            </div>
-          ) : null}
-          {orderedSlots.past.map((slot) => (
-            <SlotCard key={slot.id} slot={slot} onSelectQuote={onSelectQuote} />
-          ))}
-        </>
+        slots.map((slot) => (
+          <SlotCard key={slot.id} slot={slot} onSelectQuote={onSelectQuote} />
+        ))
       )}
     </div>
   );

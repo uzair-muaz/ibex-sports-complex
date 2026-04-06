@@ -201,13 +201,10 @@ export default function BookingClient() {
     return new Date(y, m - 1, d);
   };
 
-  const quickCheckMinDate = useMemo(
-    () => {
-      const biz = dateKeyToLocalDate(minSelectableDateKey);
-      return COMPLEX_OPENING_DATE > biz ? COMPLEX_OPENING_DATE : biz;
-    },
-    [minSelectableDateKey],
-  );
+  const quickCheckMinDate = useMemo(() => {
+    const biz = dateKeyToLocalDate(minSelectableDateKey);
+    return COMPLEX_OPENING_DATE > biz ? COMPLEX_OPENING_DATE : biz;
+  }, [minSelectableDateKey]);
 
   const [quickCheckDate, setQuickCheckDate] = useState<Date>(selectedDate);
   const quickCheckDateKey = useMemo(
@@ -225,7 +222,9 @@ export default function BookingClient() {
           const courts = result.courts as CourtRecord[];
           setAllCourts(courts);
 
-          const types = [...new Set(courts.map((c: CourtRecord) => c.type))] as CourtType[];
+          const types = [
+            ...new Set(courts.map((c: CourtRecord) => c.type)),
+          ] as CourtType[];
           setActiveCourtTypes(types);
 
           // Default to the first court type, and derive courts locally from the
@@ -255,7 +254,9 @@ export default function BookingClient() {
     // If we don't have courts cached yet, keep current state until `loadTypes` finishes.
     if (allCourts.length === 0) return;
 
-    setSelectedTypeCourts(allCourts.filter((c) => c.type === selectedCourtType));
+    setSelectedTypeCourts(
+      allCourts.filter((c) => c.type === selectedCourtType),
+    );
   }, [selectedCourtType, allCourts]);
 
   const { availableStartTimes, isLoadingAvailability, refreshAvailability } =
@@ -322,25 +323,28 @@ export default function BookingClient() {
     [courtPricing.peakPeriod],
   );
 
-  const slotsForDesign = useMemo(() => {
-    return availableStartTimes.map((q, i) => {
-      const end = formatEndTimeWithDay(
-        q.startTime,
-        selectedDurationHours,
-      ).endLabel;
-      const isSelected = selectedQuote?.startTime === q.startTime;
-      const isPastSlot =
-        dateString === todayBusinessKey && q.startTime < nowBusinessHourDecimal;
-      return {
-        id: `slot-${i}`,
-        quote: q,
-        time: formatTime12(q.startTime),
-        end,
-        isSelected,
-        isPeak: getIsPeakTime(q.startTime),
-        isPastSlot,
-      };
-    });
+  const bookableSlotsForGrid = useMemo(() => {
+    return availableStartTimes
+      .filter(
+        (q) =>
+          dateString !== todayBusinessKey ||
+          q.startTime >= nowBusinessHourDecimal,
+      )
+      .map((q, i) => {
+        const end = formatEndTimeWithDay(
+          q.startTime,
+          selectedDurationHours,
+        ).endLabel;
+        const isSelected = selectedQuote?.startTime === q.startTime;
+        return {
+          id: `slot-${i}`,
+          quote: q,
+          time: formatTime12(q.startTime),
+          end,
+          isSelected,
+          isPeak: getIsPeakTime(q.startTime),
+        };
+      });
   }, [
     availableStartTimes,
     selectedDurationHours,
@@ -350,19 +354,6 @@ export default function BookingClient() {
     todayBusinessKey,
     nowBusinessHourDecimal,
   ]);
-
-  const orderedSlots = useMemo(() => {
-    if (dateString !== todayBusinessKey) {
-      return { upcoming: slotsForDesign, past: [] as typeof slotsForDesign };
-    }
-    const upcoming = slotsForDesign.filter((slot) => !slot.isPastSlot);
-    // Latest passed times first (e.g. 11 PM right under the divider), so evening
-    // slots are not buried below early-morning times from the same calendar day.
-    const past = slotsForDesign
-      .filter((slot) => slot.isPastSlot)
-      .sort((a, b) => b.quote.startTime - a.quote.startTime);
-    return { upcoming, past };
-  }, [slotsForDesign, dateString, todayBusinessKey]);
 
   useEffect(() => {
     if (!selectedQuote) return;
@@ -451,7 +442,9 @@ export default function BookingClient() {
 
         if (!result.success) {
           setQuickCheckSlots([]);
-          setQuickCheckError(result.error || "Failed to load quick availability");
+          setQuickCheckError(
+            result.error || "Failed to load quick availability",
+          );
           return;
         }
 
@@ -619,11 +612,15 @@ export default function BookingClient() {
             <div className="mb-6 flex justify-end">
               <Button
                 type="button"
-                disabled={!selectedCourtType || isLoadingTypes || quickCheckLoading}
+                disabled={
+                  !selectedCourtType || isLoadingTypes || quickCheckLoading
+                }
                 variant="outline"
                 onClick={() => {
                   const initialDate =
-                    selectedDate >= quickCheckMinDate ? selectedDate : quickCheckMinDate;
+                    selectedDate >= quickCheckMinDate
+                      ? selectedDate
+                      : quickCheckMinDate;
                   setQuickCheckDate(initialDate);
                   setQuickCheckOpen(true);
                   loadQuickCheck(formatLocalDate(initialDate));
@@ -743,8 +740,7 @@ export default function BookingClient() {
           <BookingSlotsGrid
             isLoadingAvailability={isLoadingAvailability}
             isSelectedDateToday={dateString === todayBusinessKey}
-            slotsForDesign={slotsForDesign}
-            orderedSlots={orderedSlots}
+            slots={bookableSlotsForGrid}
             onSelectQuote={(quote) => setSelectedQuote(quote)}
           />
         </div>
@@ -768,7 +764,10 @@ export default function BookingClient() {
           <DialogHeader>
             <DialogTitle>Quick booking check</DialogTitle>
             <DialogDescription className="text-zinc-400">
-              Green = all courts available, Red = fully booked, Amber = partially booked, Grey = not bookable (past time or no courts).
+              Green = all courts available, Red = fully booked, Amber fill =
+              partially booked, Grey = closed (past time or no courts). Small
+              amber dot on a cell = peak pricing window for this court type
+              (same as booking page).
             </DialogDescription>
           </DialogHeader>
 
@@ -787,7 +786,13 @@ export default function BookingClient() {
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-zinc-700" />
-              <span className="text-xs text-zinc-400">Closed (past time / no courts)</span>
+              <span className="text-xs text-zinc-400">
+                Closed (past time / no courts)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 ring-1 ring-amber-400/50" />
+              <span className="text-xs text-zinc-400">Peak pricing</span>
             </div>
           </div>
 
@@ -823,8 +828,7 @@ export default function BookingClient() {
               </div>
               <div className="text-xs text-zinc-400 mb-3">
                 {selectedCourtType ? selectedCourtType : "COURT"} •{" "}
-                {quickCheckDateKey}{" "}
-                • {selectedDurationHours}h
+                {quickCheckDateKey} • {selectedDurationHours}h
               </div>
 
               {quickCheckSlots.length === 0 ? (
@@ -879,12 +883,20 @@ export default function BookingClient() {
                             ? "bg-amber-500/20 border-amber-500/40 text-amber-200"
                             : "bg-zinc-800/60 border-zinc-700 text-zinc-500";
 
+                    const isPeakCell = getIsPeakTime(startTime);
+
                     return (
                       <div
                         key={startTime}
-                        className={`h-10 rounded-xl border flex items-center justify-center text-[11px] font-black tracking-tight ${baseClass}`}
+                        className={`relative h-10 rounded-xl border flex items-center justify-center text-[11px] font-black tracking-tight ${baseClass}`}
                         title={formatTime12(startTime)}
                       >
+                        {isPeakCell ? (
+                          <span
+                            className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-amber-400 ring-1 ring-amber-400/50"
+                            aria-hidden
+                          />
+                        ) : null}
                         {formatTime12(startTime)}
                       </div>
                     );

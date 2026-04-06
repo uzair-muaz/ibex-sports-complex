@@ -72,7 +72,7 @@ function AdminSlotCard({
         </span>
         {isSelected ? <Check size={16} className="text-black" /> : null}
         {isPeak && !isSelected && !isBooked ? (
-          <div className="w-1.5 h-1.5 rounded-full bg-[#2DD4BF]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 ring-1 ring-amber-400/40 shrink-0" />
         ) : null}
       </div>
       <div className="flex flex-col items-start">
