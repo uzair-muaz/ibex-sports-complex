@@ -286,6 +286,12 @@ export interface AvailableStartTimeQuote {
   appliedDiscounts: AppliedDiscount[];
 }
 
+export interface QuickSlotCourtAvailability {
+  startTime: number; // decimal hour: 0, 0.5, ..., 23.5
+  availableCourtCount: number;
+  totalCourtCount: number;
+}
+
 export async function getAvailableStartTimes(
   input: GetAvailableStartTimesInput,
 ): Promise<{ success: true; startTimes: AvailableStartTimeQuote[] } | { success: false; error: string; startTimes: [] }> {
@@ -403,6 +409,87 @@ export async function getAvailableStartTimes(
   } catch (error: any) {
     console.error('getAvailableStartTimes error:', error);
     return { success: false, error: error.message || 'Failed to fetch availability', startTimes: [] };
+  }
+}
+
+export async function getQuickSlotCourtAvailability(
+  input: GetAvailableStartTimesInput,
+): Promise<{ success: true; slots: QuickSlotCourtAvailability[] } | { success: false; error: string; slots: [] }> {
+  try {
+    await connectDB();
+
+    if (input.duration <= 0) {
+      return { success: false, error: 'Duration must be greater than 0', slots: [] };
+    }
+
+    const minDuration = input.courtType === 'FUTSAL' ? 1.5 : 1;
+    if (input.duration < minDuration) {
+      return {
+        success: false,
+        error:
+          input.courtType === 'FUTSAL'
+            ? 'Minimum booking time for Futsal is 90 minutes'
+            : 'Minimum booking time is 1 hour',
+        slots: [],
+      };
+    }
+
+    if (input.duration % 0.5 !== 0) {
+      return { success: false, error: 'Duration must be in 30-minute increments', slots: [] };
+    }
+
+    const courts = await Court.find({ type: input.courtType, isActive: true }).sort({ createdAt: 1 });
+    if (courts.length === 0) {
+      return { success: false, error: `No ${input.courtType} courts available`, slots: [] };
+    }
+
+    const totalCourtCount = courts.length;
+
+    const dateMinus = shiftDateUTC(input.date, -1);
+    const datePlus = shiftDateUTC(input.date, 1);
+    const existingBookings = await Booking.find({
+      date: { $in: [dateMinus, input.date, datePlus] },
+      status: { $ne: 'cancelled' },
+    });
+
+    // Group bookings by courtId to reduce inner-loop scanning.
+    const bookingsByCourtId = new Map<string, any[]>();
+    for (const b of existingBookings) {
+      const key = b?.courtId?.toString?.();
+      if (!key) continue;
+      const arr = bookingsByCourtId.get(key);
+      if (arr) arr.push(b);
+      else bookingsByCourtId.set(key, [b]);
+    }
+
+    const slotCount = 48; // 0..23.5 in 0.5 increments
+    const slots: QuickSlotCourtAvailability[] = [];
+
+    for (let i = 0; i < slotCount; i++) {
+      const startTime = Number((i * 0.5).toFixed(1));
+      let availableCourtCount = 0;
+
+      for (const court of courts) {
+        const courtBookings = bookingsByCourtId.get(court._id.toString()) ?? [];
+
+        const hasConflict = courtBookings.some((booking) => {
+          if (input.excludeBookingId && booking._id.toString() === input.excludeBookingId) {
+            return false;
+          }
+
+          return bookingOverlapsCandidate(input.date, startTime, input.duration, booking);
+        });
+
+        if (!hasConflict) availableCourtCount++;
+      }
+
+      slots.push({ startTime, availableCourtCount, totalCourtCount });
+    }
+
+    return { success: true, slots };
+  } catch (error: any) {
+    console.error('getQuickSlotCourtAvailability error:', error);
+    return { success: false, error: error.message || 'Failed to fetch quick availability', slots: [] };
   }
 }
 

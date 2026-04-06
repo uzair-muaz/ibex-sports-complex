@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronRight, Clock, Info, Zap } from "lucide-react";
+import { useSession } from "next-auth/react";
 
 import { BookingSectionHeader } from "@/components/booking/BookingSectionHeader";
 import { BookingChipSelector } from "@/components/booking/BookingChipSelector";
@@ -12,9 +13,20 @@ import { BookingCheckoutModal } from "@/components/booking/BookingCheckoutModal"
 import { BookingActionBar } from "@/components/booking/BookingActionBar";
 import { BookingSuccessModal } from "@/components/booking/BookingSuccessModal";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
+
 import { getCourts } from "../actions/courts";
 import {
   createBooking,
+  getQuickSlotCourtAvailability,
   type AvailableStartTimeQuote,
 } from "../actions/bookings";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
@@ -123,6 +135,10 @@ function isHourInPeriod(
 }
 
 export default function BookingClient() {
+  const { data: session } = useSession();
+  const userRole = session?.user?.role;
+  const canQuickCheck = userRole === "admin" || userRole === "super_admin";
+
   // Default to opening date if today is before it
   const getInitialDate = () => {
     const today = new Date();
@@ -156,6 +172,19 @@ export default function BookingClient() {
   const [createdBooking, setCreatedBooking] = useState<CreatedBooking | null>(
     null,
   );
+
+  // Quick booking check (read-only)
+  const [quickCheckOpen, setQuickCheckOpen] = useState(false);
+  const [quickCheckLoading, setQuickCheckLoading] = useState(false);
+  const [quickCheckError, setQuickCheckError] = useState<string | null>(null);
+  const [quickCheckSlots, setQuickCheckSlots] = useState<
+    Array<{
+      startTime: number;
+      availableCourtCount: number;
+      totalCourtCount: number;
+    }>
+  >([]);
+
   const handleAvailabilityBeforeLoad = useCallback(() => {
     setSelectedQuote(null);
   }, []);
@@ -166,6 +195,25 @@ export default function BookingClient() {
   );
   const { todayBusinessKey, minSelectableDateKey, nowBusinessHourDecimal } =
     useBusinessTime(COMPLEX_OPENING_DATE);
+
+  const dateKeyToLocalDate = (key: string) => {
+    const [y, m, d] = key.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  };
+
+  const quickCheckMinDate = useMemo(
+    () => {
+      const biz = dateKeyToLocalDate(minSelectableDateKey);
+      return COMPLEX_OPENING_DATE > biz ? COMPLEX_OPENING_DATE : biz;
+    },
+    [minSelectableDateKey],
+  );
+
+  const [quickCheckDate, setQuickCheckDate] = useState<Date>(selectedDate);
+  const quickCheckDateKey = useMemo(
+    () => formatLocalDate(quickCheckDate),
+    [quickCheckDate],
+  );
 
   // Load court types on mount
   useEffect(() => {
@@ -388,6 +436,38 @@ export default function BookingClient() {
     setSelectedQuote(null);
   };
 
+  const loadQuickCheck = useCallback(
+    async (overrideDateKey?: string) => {
+      if (!selectedCourtType) return;
+
+      setQuickCheckLoading(true);
+      setQuickCheckError(null);
+      try {
+        const result = await getQuickSlotCourtAvailability({
+          courtType: selectedCourtType,
+          date: overrideDateKey ?? quickCheckDateKey,
+          duration: selectedDurationHours,
+        });
+
+        if (!result.success) {
+          setQuickCheckSlots([]);
+          setQuickCheckError(result.error || "Failed to load quick availability");
+          return;
+        }
+
+        setQuickCheckSlots(result.slots ?? []);
+      } catch (e: unknown) {
+        setQuickCheckSlots([]);
+        setQuickCheckError(
+          e instanceof Error ? e.message : "Failed to load quick availability",
+        );
+      } finally {
+        setQuickCheckLoading(false);
+      }
+    },
+    [quickCheckDateKey, selectedCourtType, selectedDurationHours],
+  );
+
   const handleSubmit = async () => {
     if (!selectedCourtType || !selectedQuote) return;
     if (formStatus === "loading") return;
@@ -488,35 +568,37 @@ export default function BookingClient() {
           </div>
 
           {/* Date trigger */}
-          <div className="mb-6">
-            <button
-              onClick={() => setIsDatePickerOpen(true)}
-              className="w-full bg-zinc-900/40 border border-white/10 rounded-3xl p-6 flex items-center justify-between hover:border-[#2DD4BF]/40 transition-all group"
-            >
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 bg-[#2DD4BF]/10 rounded-2xl flex items-center justify-center text-[#2DD4BF] group-hover:bg-[#2DD4BF] group-hover:text-black transition-all">
-                  <CalendarDays size={28} />
-                </div>
-                <div className="text-left">
-                  <div className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">
-                    Active Date
+          <div className="mb-6 flex flex-col lg:flex-row gap-3">
+            <div className="flex-1">
+              <button
+                onClick={() => setIsDatePickerOpen(true)}
+                className="w-full bg-zinc-900/40 border border-white/10 rounded-3xl p-6 flex items-center justify-between hover:border-[#2DD4BF]/40 transition-all group"
+              >
+                <div className="flex items-center gap-5">
+                  <div className="w-14 h-14 bg-[#2DD4BF]/10 rounded-2xl flex items-center justify-center text-[#2DD4BF] group-hover:bg-[#2DD4BF] group-hover:text-black transition-all">
+                    <CalendarDays size={28} />
                   </div>
-                  <div className="text-xl font-semibold text-white tracking-tight">
-                    {selectedDate
-                      .toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
-                      .toUpperCase()}
+                  <div className="text-left">
+                    <div className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">
+                      Active Date
+                    </div>
+                    <div className="text-xl font-semibold text-white tracking-tight">
+                      {selectedDate
+                        .toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
+                        .toUpperCase()}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <ChevronRight
-                size={24}
-                className="text-zinc-400 group-hover:text-[#2DD4BF] transition-all"
-              />
-            </button>
+                <ChevronRight
+                  size={24}
+                  className="text-zinc-400 group-hover:text-[#2DD4BF] transition-all"
+                />
+              </button>
+            </div>
           </div>
 
           {/* Sport selector */}
@@ -532,6 +614,26 @@ export default function BookingClient() {
               setSelectedQuote(null);
             }}
           />
+
+          {canQuickCheck && (
+            <div className="mb-6 flex justify-end">
+              <Button
+                type="button"
+                disabled={!selectedCourtType || isLoadingTypes || quickCheckLoading}
+                variant="outline"
+                onClick={() => {
+                  const initialDate =
+                    selectedDate >= quickCheckMinDate ? selectedDate : quickCheckMinDate;
+                  setQuickCheckDate(initialDate);
+                  setQuickCheckOpen(true);
+                  loadQuickCheck(formatLocalDate(initialDate));
+                }}
+                className="h-[52px] rounded-3xl bg-zinc-900/40 border-white/10 text-zinc-200 hover:border-[#2DD4BF]/40"
+              >
+                Check Slots
+              </Button>
+            </div>
+          )}
 
           {/* Court details */}
           <div className="mb-6">
@@ -647,6 +749,152 @@ export default function BookingClient() {
           />
         </div>
       </main>
+
+      <Dialog
+        open={quickCheckOpen}
+        onOpenChange={(open) => {
+          setQuickCheckOpen(open);
+          if (open) {
+            const initialDate =
+              selectedDate >= quickCheckMinDate
+                ? selectedDate
+                : quickCheckMinDate;
+            setQuickCheckDate(initialDate);
+            loadQuickCheck(formatLocalDate(initialDate));
+          }
+        }}
+      >
+        <DialogContent className="bg-zinc-950 border-zinc-800 max-w-4xl text-white">
+          <DialogHeader>
+            <DialogTitle>Quick booking check</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Green = all courts available, Red = fully booked, Amber = partially booked, Grey = not bookable (past time or no courts).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-emerald-500" />
+              <span className="text-xs text-zinc-400">Available</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-red-500" />
+              <span className="text-xs text-zinc-400">Booked</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-amber-500" />
+              <span className="text-xs text-zinc-400">Partially booked</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-zinc-700" />
+              <span className="text-xs text-zinc-400">Closed (past time / no courts)</span>
+            </div>
+          </div>
+
+          {quickCheckLoading ? (
+            <div className="mt-6 grid grid-cols-4 gap-2">
+              {Array.from({ length: 16 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-8 rounded-xl bg-zinc-900/60 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : quickCheckError ? (
+            <div className="mt-6 bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+              {quickCheckError}
+            </div>
+          ) : (
+            <div className="mt-6">
+              <div className="flex items-center gap-3 flex-wrap mb-4">
+                <div className="w-[210px]">
+                  <div className="text-xs text-zinc-400 mb-2">Date</div>
+                  <DatePicker
+                    date={quickCheckDate}
+                    onDateChange={(d) => {
+                      if (!d) return;
+                      setQuickCheckDate(d);
+                      loadQuickCheck(formatLocalDate(d));
+                    }}
+                    variant="admin"
+                    minDate={quickCheckMinDate}
+                  />
+                </div>
+              </div>
+              <div className="text-xs text-zinc-400 mb-3">
+                {selectedCourtType ? selectedCourtType : "COURT"} •{" "}
+                {quickCheckDateKey}{" "}
+                • {selectedDurationHours}h
+              </div>
+
+              {quickCheckSlots.length === 0 ? (
+                <div className="mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-red-200 text-xs">
+                  No available slots found. Showing booked/closed states below.
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-4 gap-2 max-h-[55vh] overflow-y-auto pr-2">
+                {(() => {
+                  const slotMap = new Map<
+                    number,
+                    { availableCourtCount: number; totalCourtCount: number }
+                  >();
+
+                  for (const s of quickCheckSlots) {
+                    slotMap.set(s.startTime, {
+                      availableCourtCount: s.availableCourtCount,
+                      totalCourtCount: s.totalCourtCount,
+                    });
+                  }
+
+                  return Array.from({ length: 48 }).map((_, i) => {
+                    const startTime = Number((i * 0.5).toFixed(1));
+                    const isPastSlot =
+                      quickCheckDateKey === todayBusinessKey &&
+                      startTime < nowBusinessHourDecimal;
+
+                    const slot = slotMap.get(startTime);
+                    const totalCourtCount = slot?.totalCourtCount ?? 0;
+                    const availableCourtCount = slot?.availableCourtCount ?? 0;
+
+                    let status: "available" | "booked" | "partial" | "closed";
+                    if (totalCourtCount === 0) {
+                      status = "closed";
+                    } else if (isPastSlot) {
+                      status = "closed";
+                    } else if (availableCourtCount === 0) {
+                      status = "booked";
+                    } else if (availableCourtCount === totalCourtCount) {
+                      status = "available";
+                    } else {
+                      status = "partial";
+                    }
+
+                    const baseClass =
+                      status === "available"
+                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-200"
+                        : status === "booked"
+                          ? "bg-red-500/20 border-red-500/40 text-red-200"
+                          : status === "partial"
+                            ? "bg-amber-500/20 border-amber-500/40 text-amber-200"
+                            : "bg-zinc-800/60 border-zinc-700 text-zinc-500";
+
+                    return (
+                      <div
+                        key={startTime}
+                        className={`h-10 rounded-xl border flex items-center justify-center text-[11px] font-black tracking-tight ${baseClass}`}
+                        title={formatTime12(startTime)}
+                      >
+                        {formatTime12(startTime)}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <BookingDatePickerModal
         isOpen={isDatePickerOpen}
