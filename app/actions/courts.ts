@@ -2,18 +2,30 @@
 
 import connectDB from '@/lib/mongodb';
 import Court from '@/models/Court';
-import { revalidatePath } from 'next/cache';
+import { safeRevalidatePath } from '@/lib/safe-revalidate';
 import type { CourtPricingPeriod } from '@/types';
 
-const BUSINESS_START_HOUR = 12; // 12 PM
-const BUSINESS_END_HOUR = 28; // 4 AM next day (24 + 4)
+const FULL_DAY_HOURS = 24;
 
-function normalizeHour(hour: number): number {
-  // Map 0-4 (AM) to 24-28 for continuous timeline
-  if (hour < BUSINESS_START_HOUR) {
-    return hour + 24;
+function addPeriodSlots(
+  covered: Set<number>,
+  startHour: number,
+  endHour: number,
+): void {
+  if (startHour < endHour) {
+    for (let t = startHour; t < endHour; t += 0.5) {
+      covered.add(Number(t.toFixed(2)));
+    }
+    return;
   }
-  return hour;
+
+  // Wraps past midnight, e.g. 10:00 PM – 2:00 AM
+  for (let t = startHour; t < FULL_DAY_HOURS; t += 0.5) {
+    covered.add(Number(t.toFixed(2)));
+  }
+  for (let t = 0; t < endHour; t += 0.5) {
+    covered.add(Number(t.toFixed(2)));
+  }
 }
 
 function validateTimeBasedPricing(periods: CourtPricingPeriod[]): string | null {
@@ -24,27 +36,31 @@ function validateTimeBasedPricing(periods: CourtPricingPeriod[]): string | null 
   const covered = new Set<number>();
 
   for (const period of periods) {
-    const ns = normalizeHour(period.startHour);
-    const ne = normalizeHour(period.endHour);
+    const start = period.startHour;
+    const end = period.endHour;
 
-    if (ns < BUSINESS_START_HOUR || ne > BUSINESS_END_HOUR) {
-      return 'Peak/off-peak hours must be within 12:00 PM to 4:00 AM.';
+    if (
+      typeof start !== 'number' ||
+      typeof end !== 'number' ||
+      start < 0 ||
+      start > FULL_DAY_HOURS ||
+      end < 0 ||
+      end > FULL_DAY_HOURS
+    ) {
+      return 'Peak/off-peak hours must be within a full 24-hour day (12:00 AM to 12:00 AM).';
     }
 
-    if (ne <= ns) {
+    if (start === end) {
       return 'Each peak/off-peak period must have an end time after its start time.';
     }
 
-    for (let t = ns; t < ne; t += 0.5) {
-      covered.add(Number(t.toFixed(2)));
-    }
+    addPeriodSlots(covered, start, end);
   }
 
-  // Ensure full coverage from 12 PM (12) to 4 AM next day (28) in 30-minute steps
-  for (let t = BUSINESS_START_HOUR; t < BUSINESS_END_HOUR; t += 0.5) {
+  for (let t = 0; t < FULL_DAY_HOURS; t += 0.5) {
     const key = Number(t.toFixed(2));
     if (!covered.has(key)) {
-      return 'Peak/off-peak periods must fully cover 12:00 PM to 4:00 AM without gaps.';
+      return 'Peak/off-peak periods must fully cover the full 24 hours without gaps.';
     }
   }
 
@@ -131,8 +147,8 @@ export async function createCourt(input: CreateCourtInput) {
       pricingPeriods: input.pricingPeriods ?? [],
     });
 
-    revalidatePath('/admin');
-    revalidatePath('/');
+    safeRevalidatePath('/admin');
+    safeRevalidatePath('/');
 
     return {
       success: true,
@@ -185,8 +201,8 @@ export async function updateCourt(input: UpdateCourtInput) {
       throw new Error('Court not found');
     }
 
-    revalidatePath('/admin');
-    revalidatePath('/');
+    safeRevalidatePath('/admin');
+    safeRevalidatePath('/');
 
     return {
       success: true,
@@ -211,8 +227,8 @@ export async function deleteCourt(courtId: string) {
       throw new Error('Court not found');
     }
 
-    revalidatePath('/admin');
-    revalidatePath('/');
+    safeRevalidatePath('/admin');
+    safeRevalidatePath('/');
 
     return {
       success: true,

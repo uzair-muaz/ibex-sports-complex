@@ -30,17 +30,13 @@ function isHourInPeriod(hour: number, period: CourtPricingPeriod): boolean {
   }
 
   if (start === end) {
-    // Treat as disabled / invalid range
     return false;
   }
 
-  // Simple case: same-day window (e.g. 12 -> 16)
   if (start < end) {
     return hour >= start && hour < end;
   }
 
-  // Wraps past midnight (e.g. 16 -> 2)
-  // Interpreted as [start, 24) U [0, end)
   return hour >= start || hour < end;
 }
 
@@ -90,14 +86,11 @@ export function getPricePerHourForTime(
   const c = plainCourt(court);
   const hasPeriods =
     Array.isArray(c.pricingPeriods) && c.pricingPeriods.length > 0;
-  // Always keep a fallback base price for hours not covered by peak/off-peak periods.
-  // This matters now that bookings are available for the full 24 hours.
   const basePrice = Number(c.pricePerHour);
   const basePriceN = Number.isFinite(basePrice) ? basePrice : 0;
 
-  // For FUTSAL courts, prices are stored as "per 90 minutes", convert to "per hour"
   const isFutsal = c.type === "FUTSAL";
-  const futsalMultiplier = isFutsal ? 60 / 90 : 1; // Convert 90-min price to hourly rate
+  const futsalMultiplier = isFutsal ? 60 / 90 : 1;
 
   if (!c.timeBasedPricingEnabled || !hasPeriods) {
     return { pricePerHour: basePriceN * futsalMultiplier };
@@ -128,7 +121,6 @@ export function getPricePerHourForTime(
     return { pricePerHour: basePriceN * futsalMultiplier };
   }
 
-  // If multiple match, prefer the highest priced one (treat as peak)
   const chosen = matching.reduce((prev, curr) =>
     Number(curr.pricePerHour) > Number(prev.pricePerHour) ? curr : prev,
   );
@@ -140,33 +132,68 @@ export function getPricePerHourForTime(
   };
 }
 
+/** Label for the first slot of a booking (used for peak/off-peak discount rules). */
+export function getBookingStartPricingLabel(
+  court: CourtLike,
+  startTime: number,
+): PricingLabel | undefined {
+  const hour = ((startTime % 24) + 24) % 24;
+  return getPricePerHourForTime(court, hour).label;
+}
+
 export function calculateOriginalPrice(
   court: CourtLike,
   startTime: number,
   duration: number,
 ): { originalPrice: number } {
+  const { total } = calculatePeakOffPeakNeutralSplit(court, startTime, duration);
+  return { originalPrice: total };
+}
+
+/** Money in each tier for proportional discounts (neutral = no peak/off label). */
+export function calculatePeakOffPeakNeutralSplit(
+  court: CourtLike,
+  startTime: number,
+  duration: number,
+): {
+  total: number;
+  peakAmount: number;
+  offPeakAmount: number;
+  neutralAmount: number;
+} {
   const c = plainCourt(court);
   if (!c || typeof startTime !== "number" || typeof duration !== "number") {
-    return { originalPrice: 0 };
+    return { total: 0, peakAmount: 0, offPeakAmount: 0, neutralAmount: 0 };
   }
 
   if (duration <= 0) {
-    return { originalPrice: 0 };
+    return { total: 0, peakAmount: 0, offPeakAmount: 0, neutralAmount: 0 };
   }
 
-  // Duration is always a multiple of 0.5 hours
   const slots = Math.round(duration / 0.5);
-  let total = 0;
+  let peakAmount = 0;
+  let offPeakAmount = 0;
+  let neutralAmount = 0;
 
   for (let i = 0; i < slots; i++) {
-    // Allow bookings that span past midnight by wrapping into 0–24 range
     const rawSlotStart = startTime + i * 0.5;
     const slotStart = ((rawSlotStart % 24) + 24) % 24;
-    const { pricePerHour } = getPricePerHourForTime(c, slotStart);
-    total += pricePerHour * 0.5;
+    const { pricePerHour, label } = getPricePerHourForTime(c, slotStart);
+    const slotTotal = pricePerHour * 0.5;
+    if (label === "peak") {
+      peakAmount += slotTotal;
+    } else if (label === "off_peak") {
+      offPeakAmount += slotTotal;
+    } else {
+      neutralAmount += slotTotal;
+    }
   }
 
-  // Keep minor decimals but avoid floating point noise
-  const rounded = Number(total.toFixed(2));
-  return { originalPrice: rounded };
+  const total = Number((peakAmount + offPeakAmount + neutralAmount).toFixed(2));
+  return {
+    total,
+    peakAmount: Number(peakAmount.toFixed(2)),
+    offPeakAmount: Number(offPeakAmount.toFixed(2)),
+    neutralAmount: Number(neutralAmount.toFixed(2)),
+  };
 }

@@ -182,7 +182,7 @@ export default function CourtsPage() {
   const addPricingPeriod = (label: PricingLabel) => {
     setCourtForm((prev) => {
       const last = prev.pricingPeriods[prev.pricingPeriods.length - 1];
-      const defaultStart = last ? last.endHour : 12; // start after previous
+      const defaultStart = last ? last.endHour : 0;
       let defaultEnd = defaultStart + 4;
       if (defaultEnd <= defaultStart) {
         defaultEnd = defaultStart + 1;
@@ -679,7 +679,9 @@ export default function CourtsPage() {
                       Peak & Off-peak Hours
                     </p>
                     <p className="text-xs text-zinc-400">
-                      Configure different prices for specific time ranges.
+                      Set peak and off-peak rates for the full 24-hour day. Periods
+                      must cover every half-hour from 12:00 AM to 12:00 AM with no
+                      gaps.
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -843,8 +845,9 @@ export default function CourtsPage() {
                       );
                     })}
                     <p className="text-[11px] text-zinc-500">
-                      Ranges can also wrap past midnight (e.g. 16:00 - 02:00 for
-                      evening peak pricing).
+                      Periods must tile the full day (12:00 AM → 12:00 AM). Ranges
+                      can wrap past midnight (e.g. 10:00 PM – 2:00 AM for evening
+                      peak). Example: Off-peak 12:00 AM–5:00 PM, Peak 5:00 PM–12:00 AM.
                     </p>
                   </div>
                 )}
