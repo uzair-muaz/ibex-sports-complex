@@ -63,13 +63,27 @@ export const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as c
 export const WEEKDAY_DAYS = [1, 2, 3, 4, 5];
 export const WEEKEND_DAYS = [0, 6];
 
-export function hasDayRules(d: Pick<DiscountInput, 'dayRules'>): boolean {
+export function isDayRuleSplit(rule: DiscountDayRule): boolean {
   return (
-    Array.isArray(d.dayRules) &&
-    d.dayRules.some(
-      (r) => Array.isArray(r?.days) && r.days.length > 0 && r.value > 0,
-    )
+    rule.rateMode === "split" ||
+    (rule.peakDiscount != null && rule.peakDiscount.value > 0) ||
+    (rule.offPeakDiscount != null && rule.offPeakDiscount.value > 0)
   );
+}
+
+export function isValidDayRule(rule: DiscountDayRule | null | undefined): boolean {
+  if (!rule || !Array.isArray(rule.days) || rule.days.length === 0) return false;
+  if (isDayRuleSplit(rule)) {
+    return (
+      (rule.peakDiscount != null && rule.peakDiscount.value > 0) ||
+      (rule.offPeakDiscount != null && rule.offPeakDiscount.value > 0)
+    );
+  }
+  return rule.value > 0;
+}
+
+export function hasDayRules(d: Pick<DiscountInput, 'dayRules'>): boolean {
+  return Array.isArray(d.dayRules) && d.dayRules.some(isValidDayRule);
 }
 
 export function getMatchingDayRule(
@@ -107,6 +121,20 @@ export function tierSplitAmountSaved(
   discount: DiscountInput,
   ctx: DiscountCalculationContext,
 ): number {
+  return tierSplitAmountSavedWithSlices(
+    runningPrice,
+    discount.peakDiscount,
+    discount.offPeakDiscount,
+    ctx,
+  );
+}
+
+export function tierSplitAmountSavedWithSlices(
+  runningPrice: number,
+  peakDiscount: TierSliceDiscount | undefined,
+  offPeakDiscount: TierSliceDiscount | undefined,
+  ctx: DiscountCalculationContext,
+): number {
   const breakdown = calculatePeakOffPeakNeutralSplit(
     ctx.court,
     ctx.startTime,
@@ -116,9 +144,44 @@ export function tierSplitAmountSaved(
   const peakPortion = runningPrice * (breakdown.peakAmount / breakdown.total);
   const offPortion = runningPrice * (breakdown.offPeakAmount / breakdown.total);
   return (
-    savingsOnPortion(peakPortion, discount.peakDiscount) +
-    savingsOnPortion(offPortion, discount.offPeakDiscount)
+    savingsOnPortion(peakPortion, peakDiscount) +
+    savingsOnPortion(offPortion, offPeakDiscount)
   );
+}
+
+export function dayRuleAmountSaved(
+  runningPrice: number,
+  rule: DiscountDayRule,
+  ctx: DiscountCalculationContext,
+): {
+  amountSaved: number;
+  appliedType: 'percentage' | 'fixed';
+  appliedValue: number;
+} {
+  if (isDayRuleSplit(rule)) {
+    const amountSaved = tierSplitAmountSavedWithSlices(
+      runningPrice,
+      rule.peakDiscount,
+      rule.offPeakDiscount,
+      ctx,
+    );
+    const pk = rule.peakDiscount;
+    const ok = rule.offPeakDiscount;
+    const primary =
+      pk && pk.value > 0 ? pk : ok && ok.value > 0 ? ok : { type: 'fixed' as const, value: amountSaved };
+    return {
+      amountSaved,
+      appliedType: primary.type,
+      appliedValue: primary.value,
+    };
+  }
+
+  if (rule.type === 'percentage') {
+    const amountSaved = Math.round(runningPrice * (rule.value / 100));
+    return { amountSaved, appliedType: 'percentage', appliedValue: rule.value };
+  }
+  const amountSaved = Math.min(rule.value, runningPrice);
+  return { amountSaved, appliedType: 'fixed', appliedValue: rule.value };
 }
 
 /**
@@ -229,13 +292,10 @@ export function calculateDiscountedPrice(
     } else if (usesDaySplitDiscount(discount) && tierCtx) {
       const rule = getMatchingDayRule(discount, tierCtx.date);
       if (!rule) continue;
-      appliedType = rule.type;
-      appliedValue = rule.value;
-      if (rule.type === 'percentage') {
-        amountSaved = Math.round(runningPrice * (rule.value / 100));
-      } else {
-        amountSaved = Math.min(rule.value, runningPrice);
-      }
+      const dayResult = dayRuleAmountSaved(runningPrice, rule, tierCtx);
+      amountSaved = dayResult.amountSaved;
+      appliedType = dayResult.appliedType;
+      appliedValue = dayResult.appliedValue;
     } else if (discount.type === 'percentage') {
       amountSaved = Math.round(runningPrice * (discount.value / 100));
     } else {
@@ -279,15 +339,24 @@ export function formatTierSlice(slice?: TierSliceDiscount | null): string {
   return formatDiscountValue(slice.type, slice.value);
 }
 
+export function formatDayRuleRateSummary(rule: DiscountDayRule): string {
+  const dayPart = formatDaySet(rule.days);
+  if (isDayRuleSplit(rule)) {
+    const parts: string[] = [];
+    if (rule.peakDiscount && rule.peakDiscount.value > 0) {
+      parts.push(`Peak ${formatTierSlice(rule.peakDiscount)}`);
+    }
+    if (rule.offPeakDiscount && rule.offPeakDiscount.value > 0) {
+      parts.push(`Off-peak ${formatTierSlice(rule.offPeakDiscount)}`);
+    }
+    return `${dayPart} ${parts.join(' · ')}`;
+  }
+  return `${dayPart} ${formatDiscountValue(rule.type, rule.value)}`;
+}
+
 export function formatDayRulesSummary(d: { dayRules?: DiscountDayRule[] }): string {
   if (!hasDayRules(d)) return '—';
-  return d.dayRules!
-    .filter((r) => r.days.length > 0 && r.value > 0)
-    .map((r) => {
-      const dayPart = formatDaySet(r.days);
-      return `${dayPart} ${formatDiscountValue(r.type, r.value)}`;
-    })
-    .join(' · ');
+  return d.dayRules!.filter(isValidDayRule).map(formatDayRuleRateSummary).join(' · ');
 }
 
 function formatDaySet(days: number[]): string {

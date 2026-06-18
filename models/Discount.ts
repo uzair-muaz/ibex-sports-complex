@@ -9,10 +9,15 @@ export type DiscountCategory = "flat" | "time_based";
 
 export type TierDiscountMode = "uniform" | "split";
 
+export type DayRuleRateMode = "uniform" | "split";
+
 export interface DiscountDayRule {
   days: number[];
+  rateMode?: DayRuleRateMode;
   type: DiscountType;
   value: number;
+  peakDiscount?: { type: DiscountType; value: number };
+  offPeakDiscount?: { type: DiscountType; value: number };
 }
 
 export interface IDiscount extends Document {
@@ -76,6 +81,19 @@ const DayRuleSchema = new Schema(
       type: Number,
       required: true,
       min: [0.01, "Day rule value must be greater than 0"],
+    },
+    rateMode: {
+      type: String,
+      enum: ["uniform", "split"],
+      default: "uniform",
+    },
+    peakDiscount: {
+      type: TierSliceSchema,
+      required: false,
+    },
+    offPeakDiscount: {
+      type: TierSliceSchema,
+      required: false,
     },
   },
   { _id: false },
@@ -184,8 +202,24 @@ const DiscountSchema: Schema = new Schema(
 DiscountSchema.pre("validate", function (this: IDiscount, next) {
   const cat = this.discountCategory ?? "flat";
   const mode = this.tierDiscountMode ?? "uniform";
+
+  function isValidDayRuleDoc(r: DiscountDayRule): boolean {
+    if (!r || !Array.isArray(r.days) || r.days.length === 0) return false;
+    const split =
+      r.rateMode === "split" ||
+      (r.peakDiscount != null && r.peakDiscount.value > 0) ||
+      (r.offPeakDiscount != null && r.offPeakDiscount.value > 0);
+    if (split) {
+      return (
+        (r.peakDiscount != null && r.peakDiscount.value > 0) ||
+        (r.offPeakDiscount != null && r.offPeakDiscount.value > 0)
+      );
+    }
+    return r.value > 0;
+  }
+
   const dayRules = Array.isArray(this.dayRules)
-    ? this.dayRules.filter((r) => r && r.days?.length > 0 && r.value > 0)
+    ? this.dayRules.filter(isValidDayRuleDoc)
     : [];
   const hasDayRules = dayRules.length > 0;
 
@@ -197,10 +231,31 @@ DiscountSchema.pre("validate", function (this: IDiscount, next) {
   if (hasDayRules) {
     const seen = new Set<number>();
     for (const rule of dayRules) {
-      if (rule.type === "percentage" && rule.value > 100) {
+      const ruleSplit =
+        rule.rateMode === "split" ||
+        (rule.peakDiscount != null && rule.peakDiscount.value > 0) ||
+        (rule.offPeakDiscount != null && rule.offPeakDiscount.value > 0);
+
+      if (ruleSplit) {
+        if (
+          rule.peakDiscount?.type === "percentage" &&
+          rule.peakDiscount.value > 100
+        ) {
+          next(new Error("Day rule peak percentage must be at most 100"));
+          return;
+        }
+        if (
+          rule.offPeakDiscount?.type === "percentage" &&
+          rule.offPeakDiscount.value > 100
+        ) {
+          next(new Error("Day rule off-peak percentage must be at most 100"));
+          return;
+        }
+      } else if (rule.type === "percentage" && rule.value > 100) {
         next(new Error("Day rule percentage must be at most 100"));
         return;
       }
+
       for (const d of rule.days) {
         if (seen.has(d)) {
           next(new Error("Each day of the week can only appear in one day rule"));
@@ -211,8 +266,23 @@ DiscountSchema.pre("validate", function (this: IDiscount, next) {
     }
     const first = dayRules[0];
     if (first) {
-      (this as unknown as { type: DiscountType }).type = first.type;
-      (this as unknown as { value: number }).value = first.value;
+      const firstSplit =
+        first.rateMode === "split" ||
+        (first.peakDiscount != null && first.peakDiscount.value > 0) ||
+        (first.offPeakDiscount != null && first.offPeakDiscount.value > 0);
+      if (firstSplit) {
+        const slice =
+          first.peakDiscount && first.peakDiscount.value > 0
+            ? first.peakDiscount
+            : first.offPeakDiscount;
+        if (slice) {
+          (this as unknown as { type: DiscountType }).type = slice.type;
+          (this as unknown as { value: number }).value = slice.value;
+        }
+      } else {
+        (this as unknown as { type: DiscountType }).type = first.type;
+        (this as unknown as { value: number }).value = first.value;
+      }
     }
   }
 
