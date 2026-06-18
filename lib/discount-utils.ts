@@ -11,6 +11,7 @@ import type {
 import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from './date-time';
 import {
   getBookingStartPricingLabel,
+  getPricePerHourForTime,
   calculatePeakOffPeakNeutralSplit,
   type CourtLike,
 } from '@/lib/pricing-utils';
@@ -141,12 +142,40 @@ export function tierSplitAmountSavedWithSlices(
     ctx.duration,
   );
   if (breakdown.total <= 0 || runningPrice <= 0) return 0;
-  const peakPortion = runningPrice * (breakdown.peakAmount / breakdown.total);
-  const offPortion = runningPrice * (breakdown.offPeakAmount / breakdown.total);
-  return (
-    savingsOnPortion(peakPortion, peakDiscount) +
-    savingsOnPortion(offPortion, offPeakDiscount)
-  );
+
+  const slots = Math.round(ctx.duration / 0.5);
+  if (slots <= 0) return 0;
+
+  // When earlier discounts already reduced the price, scale each slot proportionally.
+  const priceScale = runningPrice / breakdown.total;
+  let totalSaved = 0;
+
+  for (let i = 0; i < slots; i++) {
+    const rawSlotStart = ctx.startTime + i * 0.5;
+    const slotStart = ((rawSlotStart % 24) + 24) % 24;
+    const { pricePerHour, label } = getPricePerHourForTime(ctx.court, slotStart);
+    const slotBase = pricePerHour * 0.5;
+    const slotRunning = slotBase * priceScale;
+
+    const slice =
+      label === 'peak'
+        ? peakDiscount
+        : label === 'off_peak'
+          ? offPeakDiscount
+          : null;
+
+    if (!slice || slice.value <= 0 || slotRunning <= 0) continue;
+
+    if (slice.type === 'fixed') {
+      // Fixed amounts are per hour — prorate for each 30-minute slot.
+      const proratedFixed = slice.value * 0.5;
+      totalSaved += Math.min(proratedFixed, slotRunning);
+    } else {
+      totalSaved += savingsOnPortion(slotRunning, slice);
+    }
+  }
+
+  return Math.round(totalSaved);
 }
 
 export function dayRuleAmountSaved(
