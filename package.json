@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx scripts/seed.ts",
-    "db:dump": "bash scripts/mongo-dump.sh"
+    "db:dump": "bash scripts/mongo-dump.sh",
+    "db:restore": "bash scripts/mongo-restore.sh"
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.975.0",

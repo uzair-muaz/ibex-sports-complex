@@ -6,22 +6,49 @@ import Booking from '@/models/Booking';
 import Court from '@/models/Court';
 import Discount from '@/models/Discount';
 import { auth } from '@/lib/auth';
-import { revalidatePath } from 'next/cache';
+import { safeRevalidatePath } from '@/lib/safe-revalidate';
 import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
-import { getApplicableDiscounts, calculateDiscountedPrice, DiscountInput } from '@/lib/discount-utils';
+import {
+  getApplicableDiscounts,
+  calculateDiscountedPrice,
+  DiscountInput,
+} from '@/lib/discount-utils';
 import { calculateOriginalPrice } from '@/lib/pricing-utils';
 import type { AppliedDiscount } from '@/types';
 import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from '@/lib/date-time';
 
-async function getActiveDiscountsForBusinessDate() {
-  const todayKey = toDateKeyInTimezone(new Date(), BUSINESS_TIMEZONE);
+async function getActiveDiscountsForBusinessDate(bookingDateKey: string) {
   const discountsRaw = await Discount.find({ isActive: true });
   return discountsRaw.filter((d: any) => {
     const fromKey = toDateKeyInTimezone(new Date(d.validFrom), BUSINESS_TIMEZONE);
     const untilKey = toDateKeyInTimezone(new Date(d.validUntil), BUSINESS_TIMEZONE);
-    return fromKey <= todayKey && todayKey <= untilKey;
+    return fromKey <= bookingDateKey && bookingDateKey <= untilKey;
   });
+}
+
+function toDiscountInput(d: any): DiscountInput {
+  return {
+    _id: d._id.toString(),
+    name: d.name,
+    type: d.type,
+    value: d.value,
+    courtTypes: Array.isArray(d.courtTypes) ? d.courtTypes : [],
+    discountCategory: d.discountCategory,
+    tierDiscountMode: d.tierDiscountMode,
+    peakDiscount: d.peakDiscount,
+    offPeakDiscount: d.offPeakDiscount,
+    dayRules: Array.isArray(d.dayRules) ? d.dayRules : undefined,
+    minBookingHours: d.minBookingHours,
+    maxBookingHours: d.maxBookingHours,
+    pricingTier: d.pricingTier ?? 'any',
+    allDay: d.allDay,
+    startHour: d.startHour,
+    endHour: d.endHour,
+    validFrom: d.validFrom,
+    validUntil: d.validUntil,
+    isActive: d.isActive,
+  };
 }
 
 function toDayIndexUTC(dateStr: string): number {
@@ -162,38 +189,32 @@ export async function createBooking(input: CreateBookingInput) {
     const { originalPrice } = calculateOriginalPrice(
       assignedCourt,
       input.startTime,
-      input.duration
+      input.duration,
     );
 
     // Fetch active discounts using business timezone date boundary
-    const activeDiscounts = await getActiveDiscountsForBusinessDate();
+    const activeDiscounts = await getActiveDiscountsForBusinessDate(input.date);
 
-    // Get applicable discounts for this booking (empty courtTypes = all court types)
-    const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
-      _id: d._id.toString(),
-      name: d.name,
-      type: d.type,
-      value: d.value,
-      courtTypes: Array.isArray(d.courtTypes) ? d.courtTypes : [],
-      allDay: d.allDay,
-      startHour: d.startHour,
-      endHour: d.endHour,
-      validFrom: d.validFrom,
-      validUntil: d.validUntil,
-      isActive: d.isActive,
-    }));
+    const discountsData: DiscountInput[] = activeDiscounts.map(toDiscountInput);
 
-    const applicableDiscounts = getApplicableDiscounts(
-      discountsData,
-      input.courtType,
-      input.startTime,
-      input.date
-    );
+    const applicableDiscounts = getApplicableDiscounts(discountsData, {
+      courtType: input.courtType,
+      court: assignedCourt,
+      duration: input.duration,
+      startTime: input.startTime,
+      date: input.date,
+    });
 
     // Calculate discounted price
     const { finalPrice, discountAmount, appliedDiscounts } = calculateDiscountedPrice(
       originalPrice,
-      applicableDiscounts
+      applicableDiscounts,
+      {
+        court: assignedCourt,
+        startTime: input.startTime,
+        duration: input.duration,
+        date: input.date,
+      },
     );
 
     // Convert discounts for Mongoose (string discountId to ObjectId)
@@ -250,8 +271,8 @@ export async function createBooking(input: CreateBookingInput) {
       return { success: false, message: error.message || 'Failed to send email' };
     });
 
-    revalidatePath('/booking');
-    revalidatePath('/admin');
+    safeRevalidatePath('/booking');
+    safeRevalidatePath('/admin');
 
     return {
       success: true,
@@ -331,7 +352,7 @@ export async function getAvailableStartTimes(
     });
 
     // Fetch active discounts once (pricing varies per startTime due to time restrictions).
-    const activeDiscounts = await getActiveDiscountsForBusinessDate();
+    const activeDiscounts = await getActiveDiscountsForBusinessDate(input.date);
 
     // Performance: group bookings by courtId once so we don't scan every booking
     // for every court/time slot. This reduces the inner-loop work substantially.
@@ -344,19 +365,7 @@ export async function getAvailableStartTimes(
       else bookingsByCourtId.set(key, [b]);
     }
 
-    const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
-      _id: d._id.toString(),
-      name: d.name,
-      type: d.type,
-      value: d.value,
-      courtTypes: Array.isArray(d.courtTypes) ? d.courtTypes : [],
-      allDay: d.allDay,
-      startHour: d.startHour,
-      endHour: d.endHour,
-      validFrom: d.validFrom,
-      validUntil: d.validUntil,
-      isActive: d.isActive,
-    }));
+    const discountsData: DiscountInput[] = activeDiscounts.map(toDiscountInput);
 
     const results: AvailableStartTimeQuote[] = [];
     const slotCount = 48; // 0..23.5 in 0.5 increments
@@ -390,9 +399,28 @@ export async function getAvailableStartTimes(
 
       if (!assignedCourt) continue;
 
-      const { originalPrice } = calculateOriginalPrice(assignedCourt, startTime, input.duration);
-      const applicable = getApplicableDiscounts(discountsData, input.courtType, startTime, input.date);
-      const { finalPrice, discountAmount, appliedDiscounts } = calculateDiscountedPrice(originalPrice, applicable);
+      const { originalPrice } = calculateOriginalPrice(
+        assignedCourt,
+        startTime,
+        input.duration,
+      );
+      const applicable = getApplicableDiscounts(discountsData, {
+        courtType: input.courtType,
+        court: assignedCourt,
+        duration: input.duration,
+        startTime,
+        date: input.date,
+      });
+      const { finalPrice, discountAmount, appliedDiscounts } = calculateDiscountedPrice(
+        originalPrice,
+        applicable,
+        {
+          court: assignedCourt,
+          startTime,
+          duration: input.duration,
+          date: input.date,
+        },
+      );
 
       results.push({
         startTime,
@@ -623,8 +651,8 @@ export async function cancelBooking(bookingId: string) {
       throw new Error('Booking not found');
     }
 
-    revalidatePath('/admin');
-    revalidatePath('/booking');
+    safeRevalidatePath('/admin');
+    safeRevalidatePath('/booking');
 
     return {
       success: true,
@@ -738,37 +766,31 @@ export async function updateBooking(input: UpdateBookingInput) {
       const { originalPrice } = calculateOriginalPrice(
         courtForSlot,
         finalStartTime,
-        finalDuration
+        finalDuration,
       );
 
       // Fetch active discounts using business timezone date boundary
-      const activeDiscounts = await getActiveDiscountsForBusinessDate();
+      const activeDiscounts = await getActiveDiscountsForBusinessDate(finalDate);
 
-      // Get applicable discounts (empty courtTypes = all court types)
-      const discountsData: DiscountInput[] = activeDiscounts.map((d) => ({
-        _id: d._id.toString(),
-        name: d.name,
-        type: d.type,
-        value: d.value,
-        courtTypes: Array.isArray(d.courtTypes) ? d.courtTypes : [],
-        allDay: d.allDay,
-        startHour: d.startHour,
-        endHour: d.endHour,
-        validFrom: d.validFrom,
-        validUntil: d.validUntil,
-        isActive: d.isActive,
-      }));
+      const discountsData: DiscountInput[] = activeDiscounts.map(toDiscountInput);
 
-      const applicableDiscounts = getApplicableDiscounts(
-        discountsData,
-        courtForSlot.type,
-        finalStartTime,
-        finalDate
-      );
+      const applicableDiscounts = getApplicableDiscounts(discountsData, {
+        courtType: courtForSlot.type,
+        court: courtForSlot,
+        duration: finalDuration,
+        startTime: finalStartTime,
+        date: finalDate,
+      });
 
       const { finalPrice, discountAmount, appliedDiscounts } = calculateDiscountedPrice(
         originalPrice,
-        applicableDiscounts
+        applicableDiscounts,
+        {
+          court: courtForSlot,
+          startTime: finalStartTime,
+          duration: finalDuration,
+          date: finalDate,
+        },
       );
 
       (updateData as any).originalPrice = originalPrice;
@@ -787,8 +809,8 @@ export async function updateBooking(input: UpdateBookingInput) {
       throw new Error('Booking not found');
     }
 
-    revalidatePath('/admin');
-    revalidatePath('/booking');
+    safeRevalidatePath('/admin');
+    safeRevalidatePath('/booking');
 
     return {
       success: true,
@@ -904,8 +926,8 @@ export async function deleteBooking(bookingId: string) {
       throw new Error('Booking not found');
     }
 
-    revalidatePath('/admin');
-    revalidatePath('/booking');
+    safeRevalidatePath('/admin');
+    safeRevalidatePath('/booking');
 
     return {
       success: true,

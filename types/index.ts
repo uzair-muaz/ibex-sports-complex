@@ -67,12 +67,45 @@ export interface Booking {
   updatedAt: string;
 }
 
+/** Peak/off-peak scope for a discount; `any` = no tier filter (legacy). */
+export type DiscountPricingTier = "any" | "peak" | "off_peak";
+
+export type DiscountCategory = "flat" | "time_based";
+
+/** Uniform = single rate for whole booking; split = separate peak / off-peak amounts */
+export type TierDiscountMode = "uniform" | "split";
+
+export interface TierSliceDiscount {
+  type: "percentage" | "fixed";
+  value: number;
+}
+
+/** Per-day-of-week discount rate. days: 0=Sun … 6=Sat */
+export interface DiscountDayRule {
+  days: number[];
+  type: "percentage" | "fixed";
+  value: number;
+}
+
 export interface Discount {
   _id: string;
   name: string;
   type: "percentage" | "fixed";
   value: number;
   courtTypes: CourtType[];
+  discountCategory?: DiscountCategory;
+  /** When `time_based` and `split`, use peakDiscount / offPeakDiscount instead of uniform type/value */
+  tierDiscountMode?: TierDiscountMode;
+  peakDiscount?: TierSliceDiscount;
+  offPeakDiscount?: TierSliceDiscount;
+  /** When set, discount applies only on matching days with that rule's rate */
+  dayRules?: DiscountDayRule[];
+  /** Inclusive min booking duration (hours, 0.5 steps). Omit with max for no duration filter. */
+  minBookingHours?: number;
+  /** Inclusive max booking duration (hours, 0.5 steps). */
+  maxBookingHours?: number;
+  /** When not `any`, discount applies only if booking start matches this pricing tier on the court */
+  pricingTier?: DiscountPricingTier;
   allDay: boolean;
   startHour: number;
   endHour: number;
