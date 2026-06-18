@@ -81,10 +81,16 @@ export interface TierSliceDiscount {
 }
 
 /** Per-day-of-week discount rate. days: 0=Sun … 6=Sat */
+export type DayRuleRateMode = "uniform" | "split";
+
 export interface DiscountDayRule {
   days: number[];
+  /** uniform = one rate all day; split = peak/off-peak amounts on matching days */
+  rateMode?: DayRuleRateMode;
   type: "percentage" | "fixed";
   value: number;
+  peakDiscount?: TierSliceDiscount;
+  offPeakDiscount?: TierSliceDiscount;
 }
 
 export interface Discount {

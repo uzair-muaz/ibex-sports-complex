@@ -57,11 +57,22 @@ function validateOptionalTierSlice(
 
 export interface DayRuleInput {
   days: number[];
+  rateMode?: 'uniform' | 'split';
   type: 'percentage' | 'fixed';
   value: number;
+  peakDiscount?: TierSliceInput;
+  offPeakDiscount?: TierSliceInput;
 }
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function isDayRuleSplitInput(rule: DayRuleInput): boolean {
+  return (
+    rule.rateMode === 'split' ||
+    (rule.peakDiscount != null && rule.peakDiscount.value > 0) ||
+    (rule.offPeakDiscount != null && rule.offPeakDiscount.value > 0)
+  );
+}
 
 function validateDayRules(rules: DayRuleInput[]) {
   if (rules.length === 0) {
@@ -72,7 +83,19 @@ function validateDayRules(rules: DayRuleInput[]) {
     if (!Array.isArray(rule.days) || rule.days.length === 0) {
       throw new Error('Each day rule must include at least one day');
     }
-    validateUniformTypeValue(rule.type, rule.value);
+
+    if (isDayRuleSplitInput(rule)) {
+      const hasP = !!(rule.peakDiscount && rule.peakDiscount.value > 0);
+      const hasO = !!(rule.offPeakDiscount && rule.offPeakDiscount.value > 0);
+      if (!hasP && !hasO) {
+        throw new Error('Each split day rule needs a peak and/or off-peak amount');
+      }
+      validateOptionalTierSlice(rule.peakDiscount, 'Day rule peak');
+      validateOptionalTierSlice(rule.offPeakDiscount, 'Day rule off-peak');
+    } else {
+      validateUniformTypeValue(rule.type, rule.value);
+    }
+
     for (const d of rule.days) {
       if (!Number.isInteger(d) || d < 0 || d > 6) {
         throw new Error('Invalid day of week');
@@ -85,16 +108,77 @@ function validateDayRules(rules: DayRuleInput[]) {
   }
 }
 
+function primaryDayRuleSlice(rule: DayRuleInput): { type: 'percentage' | 'fixed'; value: number } {
+  if (isDayRuleSplitInput(rule)) {
+    if (rule.peakDiscount && rule.peakDiscount.value > 0) {
+      return rule.peakDiscount;
+    }
+    if (rule.offPeakDiscount && rule.offPeakDiscount.value > 0) {
+      return rule.offPeakDiscount;
+    }
+  }
+  return { type: rule.type, value: rule.value };
+}
+
 function applyDayRulesToDoc(
   doc: Record<string, unknown>,
   dayRules: DayRuleInput[] | undefined | null,
 ) {
   if (dayRules && dayRules.length > 0) {
     validateDayRules(dayRules);
-    doc.dayRules = dayRules;
-    doc.type = dayRules[0].type;
-    doc.value = dayRules[0].value;
+    doc.dayRules = dayRules.map((rule) => {
+      const split = isDayRuleSplitInput(rule);
+      const primary = primaryDayRuleSlice(rule);
+      return {
+        days: rule.days,
+        rateMode: split ? 'split' : 'uniform',
+        type: primary.type,
+        value: primary.value,
+        ...(split && rule.peakDiscount && rule.peakDiscount.value > 0
+          ? { peakDiscount: rule.peakDiscount }
+          : {}),
+        ...(split && rule.offPeakDiscount && rule.offPeakDiscount.value > 0
+          ? { offPeakDiscount: rule.offPeakDiscount }
+          : {}),
+      };
+    });
+    const first = primaryDayRuleSlice(dayRules[0]);
+    doc.type = first.type;
+    doc.value = first.value;
   }
+}
+
+function normalizeTierSlice(raw: unknown): TierSliceInput | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as { type?: unknown; value?: unknown };
+  const value = Number(r.value) || 0;
+  if (value <= 0) return undefined;
+  return {
+    type: r.type === 'fixed' ? 'fixed' : 'percentage',
+    value,
+  };
+}
+
+function isSerializedDayRuleValid(rule: {
+  days: number[];
+  rateMode?: string;
+  type: 'percentage' | 'fixed';
+  value: number;
+  peakDiscount?: TierSliceInput;
+  offPeakDiscount?: TierSliceInput;
+}): boolean {
+  if (!rule.days.length) return false;
+  const split =
+    rule.rateMode === 'split' ||
+    (rule.peakDiscount != null && rule.peakDiscount.value > 0) ||
+    (rule.offPeakDiscount != null && rule.offPeakDiscount.value > 0);
+  if (split) {
+    return (
+      (rule.peakDiscount != null && rule.peakDiscount.value > 0) ||
+      (rule.offPeakDiscount != null && rule.offPeakDiscount.value > 0)
+    );
+  }
+  return rule.value > 0;
 }
 
 function dateBoundaryUTC(input: string, boundary: "start" | "end"): Date {
@@ -161,14 +245,25 @@ function serializeDiscount(raw: Record<string, unknown>) {
           (r): r is Record<string, unknown> =>
             !!r && typeof r === 'object' && Array.isArray((r as { days?: unknown }).days),
         )
-        .map((r) => ({
-          days: (r.days as unknown[])
-            .map((d) => Number(d))
-            .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6),
-          type: r.type === 'fixed' ? 'fixed' : 'percentage',
-          value: Number(r.value) || 0,
-        }))
-        .filter((r) => r.days.length > 0 && r.value > 0)
+        .map((r) => {
+          const peakDiscount = normalizeTierSlice(r.peakDiscount);
+          const offPeakDiscount = normalizeTierSlice(r.offPeakDiscount);
+          const split =
+            r.rateMode === 'split' ||
+            (peakDiscount != null && peakDiscount.value > 0) ||
+            (offPeakDiscount != null && offPeakDiscount.value > 0);
+          return {
+            days: (r.days as unknown[])
+              .map((d) => Number(d))
+              .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6),
+            rateMode: split ? ('split' as const) : ('uniform' as const),
+            type: r.type === 'fixed' ? ('fixed' as const) : ('percentage' as const),
+            value: Number(r.value) || 0,
+            ...(peakDiscount ? { peakDiscount } : {}),
+            ...(offPeakDiscount ? { offPeakDiscount } : {}),
+          };
+        })
+        .filter(isSerializedDayRuleValid)
     : undefined;
 
   return {

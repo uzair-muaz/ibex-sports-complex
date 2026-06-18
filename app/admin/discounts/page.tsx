@@ -63,6 +63,7 @@ import {
   updateDiscount,
   deleteDiscount,
   toggleDiscountActive,
+  type DayRuleInput,
 } from "@/app/actions/discounts";
 import {
   formatDiscountValue,
@@ -76,6 +77,7 @@ import {
   inferDiscountCategory,
   inferTierDiscountMode,
   usesTierSplitDiscount,
+  isValidDayRule,
   DAY_LABELS,
 } from "@/lib/discount-utils";
 import { cn, formatLocalDate } from "@/lib/utils";
@@ -86,21 +88,78 @@ import type {
   DiscountPricingTier,
   DiscountCategory,
   TierDiscountMode,
+  DayRuleRateMode,
 } from "@/types";
 
 const COURT_TYPES: CourtType[] = ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"];
 
 type DayRuleForm = {
   days: number[];
+  rateMode: DayRuleRateMode;
   type: "percentage" | "fixed";
   value: number;
+  peakType: "percentage" | "fixed";
+  peakValue: number | "";
+  offPeakType: "percentage" | "fixed";
+  offPeakValue: number | "";
 };
 
 const emptyDayRule = (): DayRuleForm => ({
   days: [],
+  rateMode: "uniform",
   type: "percentage",
   value: 0,
+  peakType: "percentage",
+  peakValue: "",
+  offPeakType: "percentage",
+  offPeakValue: "",
 });
+
+function isDayRuleFormSplit(rule: DayRuleForm): boolean {
+  return rule.rateMode === "split";
+}
+
+function isDayRuleFormValid(rule: DayRuleForm): boolean {
+  if (!rule.days.length) return false;
+  if (isDayRuleFormSplit(rule)) {
+    return (
+      (rule.peakValue !== "" && Number(rule.peakValue) > 0) ||
+      (rule.offPeakValue !== "" && Number(rule.offPeakValue) > 0)
+    );
+  }
+  return rule.value > 0;
+}
+
+function dayRuleFormToInput(rule: DayRuleForm): DayRuleInput | null {
+  if (!isDayRuleFormValid(rule)) return null;
+
+  if (isDayRuleFormSplit(rule)) {
+    const peakDiscount =
+      rule.peakValue !== "" && Number(rule.peakValue) > 0
+        ? { type: rule.peakType, value: Number(rule.peakValue) }
+        : undefined;
+    const offPeakDiscount =
+      rule.offPeakValue !== "" && Number(rule.offPeakValue) > 0
+        ? { type: rule.offPeakType, value: Number(rule.offPeakValue) }
+        : undefined;
+    const primary = peakDiscount ?? offPeakDiscount!;
+    return {
+      days: rule.days,
+      rateMode: "split",
+      type: primary.type,
+      value: primary.value,
+      peakDiscount,
+      offPeakDiscount,
+    };
+  }
+
+  return {
+    days: rule.days,
+    rateMode: "uniform",
+    type: rule.type,
+    value: rule.value,
+  };
+}
 
 function getDaysClaimedByOtherRules(
   rules: DayRuleForm[],
@@ -123,17 +182,32 @@ function normalizeDayRulesFromDiscount(
       (r): r is NonNullable<(typeof dayRules)[number]> =>
         !!r && Array.isArray(r.days) && r.days.length > 0,
     )
-    .map((r) => ({
-      days: [...r.days]
-        .map((d) => Number(d))
-        .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
-        .sort((a, b) => a - b),
-      type: (r.type === "fixed" ? "fixed" : "percentage") as
-        | "percentage"
-        | "fixed",
-      value: Number(r.value) || 0,
-    }))
-    .filter((r) => r.days.length > 0 && r.value > 0);
+    .map((r) => {
+      const split =
+        r.rateMode === "split" ||
+        (r.peakDiscount != null && r.peakDiscount.value > 0) ||
+        (r.offPeakDiscount != null && r.offPeakDiscount.value > 0);
+      const pk = r.peakDiscount;
+      const ok = r.offPeakDiscount;
+      return {
+        days: [...r.days]
+          .map((d) => Number(d))
+          .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+          .sort((a, b) => a - b),
+        rateMode: split ? ("split" as const) : ("uniform" as const),
+        type: (r.type === "fixed" ? "fixed" : "percentage") as
+          | "percentage"
+          | "fixed",
+        value: Number(r.value) || 0,
+        peakType: (pk?.type ?? "percentage") as "percentage" | "fixed",
+        peakValue:
+          pk != null && pk.value > 0 ? pk.value : ("" as number | ""),
+        offPeakType: (ok?.type ?? "percentage") as "percentage" | "fixed",
+        offPeakValue:
+          ok != null && ok.value > 0 ? ok.value : ("" as number | ""),
+      };
+    })
+    .filter((r) => isDayRuleFormValid(r));
 }
 
 type DiscountFormState = {
@@ -199,10 +273,10 @@ function discountToFormState(discount: Discount): DiscountFormState {
 function dayRulesForUpdate(
   editing: Discount | null,
   enabled: boolean,
-  payload: DayRuleForm[] | null,
-): DayRuleForm[] | null | undefined {
+  payload: DayRuleInput[] | null,
+): DayRuleInput[] | null | undefined {
   if (enabled) return payload;
-  if (editing && normalizeDayRulesFromDiscount(editing.dayRules).length > 0) {
+  if (editing && (editing.dayRules ?? []).some(isValidDayRule)) {
     return null;
   }
   return undefined;
@@ -312,17 +386,19 @@ export default function DiscountsPage() {
       return;
     }
 
-    let dayRulesPayload: DayRuleForm[] | null = null;
+    let dayRulesPayload: DayRuleInput[] | null = null;
     if (discountForm.dayScheduleEnabled) {
       if (isSplit) {
         alert("Day-based rates cannot be combined with peak/off-peak split");
         return;
       }
-      dayRulesPayload = discountForm.dayRules.filter(
-        (r) => r.days.length > 0 && r.value > 0,
-      );
+      dayRulesPayload = discountForm.dayRules
+        .map(dayRuleFormToInput)
+        .filter((r): r is DayRuleInput => r != null);
       if (dayRulesPayload.length === 0) {
-        alert("Add at least one day rule with selected days and a discount amount");
+        alert(
+          "Add at least one day rule with selected days and a discount amount (uniform or peak/off-peak)",
+        );
         return;
       }
       const seen = new Set<number>();
@@ -1374,8 +1450,9 @@ export default function DiscountsPage() {
                       Different rate by day
                     </div>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      e.g. weekdays PKR 2,500 off, weekends PKR 2,000 off — or
-                      Wednesday 50% only.
+                      Match court peak/off-peak pricing. e.g. weekdays off-peak
+                      PKR 1,500 off and peak PKR 2,500 off — different per day
+                      group.
                     </p>
                   </div>
                   <Button
@@ -1471,57 +1548,186 @@ export default function DiscountsPage() {
                           })}
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <Label className="text-zinc-400 text-xs">Type</Label>
-                            <Select
-                              value={rule.type}
-                              onValueChange={(v) =>
-                                updateDayRule(ruleIndex, {
-                                  type: v as "percentage" | "fixed",
-                                })
-                              }
-                            >
-                              <SelectTrigger className="text-sm h-9">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="percentage">
-                                  Percentage (%)
-                                </SelectItem>
-                                <SelectItem value="fixed">Fixed (PKR)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-zinc-400 text-xs">
-                              {rule.type === "percentage"
-                                ? "Discount %"
-                                : "Amount off (PKR)"}
-                            </Label>
-                            <div className="relative">
-                              <Input
-                                type="number"
-                                min="0.01"
-                                max={rule.type === "percentage" ? 100 : undefined}
-                                step="0.01"
-                                value={rule.value || ""}
-                                onChange={(e) =>
+                        <div className="space-y-1.5">
+                          <Label className="text-zinc-400 text-xs">
+                            Rate style
+                          </Label>
+                          <Select
+                            value={rule.rateMode}
+                            onValueChange={(v) =>
+                              updateDayRule(ruleIndex, {
+                                rateMode: v as DayRuleRateMode,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="text-sm h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="uniform">
+                                Same all day
+                              </SelectItem>
+                              <SelectItem value="split">
+                                Peak &amp; off-peak (uses court hours)
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {rule.rateMode === "uniform" ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-zinc-400 text-xs">Type</Label>
+                              <Select
+                                value={rule.type}
+                                onValueChange={(v) =>
                                   updateDayRule(ruleIndex, {
-                                    value: parseFloat(e.target.value) || 0,
+                                    type: v as "percentage" | "fixed",
                                   })
                                 }
-                                placeholder={
-                                  rule.type === "percentage" ? "50" : "2500"
-                                }
-                                className="text-sm pr-12 h-9"
-                              />
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">
-                                {rule.type === "percentage" ? "%" : "PKR"}
-                              </span>
+                              >
+                                <SelectTrigger className="text-sm h-9">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="percentage">
+                                    Percentage (%)
+                                  </SelectItem>
+                                  <SelectItem value="fixed">Fixed (PKR)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-zinc-400 text-xs">
+                                {rule.type === "percentage"
+                                  ? "Discount %"
+                                  : "Amount off (PKR)"}
+                              </Label>
+                              <div className="relative">
+                                <Input
+                                  type="number"
+                                  min="0.01"
+                                  max={
+                                    rule.type === "percentage" ? 100 : undefined
+                                  }
+                                  step="0.01"
+                                  value={rule.value || ""}
+                                  onChange={(e) =>
+                                    updateDayRule(ruleIndex, {
+                                      value: parseFloat(e.target.value) || 0,
+                                    })
+                                  }
+                                  placeholder={
+                                    rule.type === "percentage" ? "50" : "2500"
+                                  }
+                                  className="text-sm pr-12 h-9"
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">
+                                  {rule.type === "percentage" ? "%" : "PKR"}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="rounded-md border border-zinc-800 bg-zinc-900/40 p-3 space-y-2">
+                              <div className="text-xs font-semibold text-zinc-300">
+                                Off-peak hours
+                              </div>
+                              <Select
+                                value={rule.offPeakType}
+                                onValueChange={(v) =>
+                                  updateDayRule(ruleIndex, {
+                                    offPeakType: v as "percentage" | "fixed",
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-xs h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="percentage">%</SelectItem>
+                                  <SelectItem value="fixed">PKR</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <div className="relative">
+                                <Input
+                                  type="number"
+                                  min="0.01"
+                                  max={
+                                    rule.offPeakType === "percentage"
+                                      ? 100
+                                      : undefined
+                                  }
+                                  step="0.01"
+                                  value={
+                                    rule.offPeakValue === ""
+                                      ? ""
+                                      : rule.offPeakValue
+                                  }
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    updateDayRule(ruleIndex, {
+                                      offPeakValue:
+                                        raw === "" ? "" : parseFloat(raw) || 0,
+                                    });
+                                  }}
+                                  placeholder="Optional"
+                                  className="text-sm pr-12 h-8"
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">
+                                  {rule.offPeakType === "percentage" ? "%" : "PKR"}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="rounded-md border border-zinc-800 bg-zinc-900/40 p-3 space-y-2">
+                              <div className="text-xs font-semibold text-zinc-300">
+                                Peak hours
+                              </div>
+                              <Select
+                                value={rule.peakType}
+                                onValueChange={(v) =>
+                                  updateDayRule(ruleIndex, {
+                                    peakType: v as "percentage" | "fixed",
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-xs h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="percentage">%</SelectItem>
+                                  <SelectItem value="fixed">PKR</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <div className="relative">
+                                <Input
+                                  type="number"
+                                  min="0.01"
+                                  max={
+                                    rule.peakType === "percentage" ? 100 : undefined
+                                  }
+                                  step="0.01"
+                                  value={
+                                    rule.peakValue === "" ? "" : rule.peakValue
+                                  }
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    updateDayRule(ruleIndex, {
+                                      peakValue:
+                                        raw === "" ? "" : parseFloat(raw) || 0,
+                                    });
+                                  }}
+                                  placeholder="Optional"
+                                  className="text-sm pr-12 h-8"
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">
+                                  {rule.peakType === "percentage" ? "%" : "PKR"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
