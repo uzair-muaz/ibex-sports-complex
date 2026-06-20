@@ -18,17 +18,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useAllFeedback } from "@/hooks/admin/use-feedback";
+import { AdminTableSkeleton } from "@/components/admin/loaders";
+import {
+  useAllFeedback,
+  getQueryLoadingState,
+} from "@/lib/tanstack/hooks/queries";
 
 export default function FeedbackPage() {
   const { data: session } = useSession();
-  const {
-    data: feedbacks = [],
-    isLoading,
-    isFetching,
-    refetch,
-  } = useAllFeedback({ enabled: !!session });
+  const feedbackQuery = useAllFeedback({ enabled: !!session });
+  const { isInitialLoading, isLoading } = getQueryLoadingState(feedbackQuery);
+  const feedbacks = feedbackQuery.data ?? [];
   const [filter, setFilter] = useState("");
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -99,12 +99,25 @@ export default function FeedbackPage() {
     );
   };
 
+  if (isInitialLoading && feedbacks.length === 0) {
+    return (
+      <AdminLayout
+        title="Feedback"
+        description="View customer feedback"
+        onRefresh={() => feedbackQuery.refetch()}
+        isLoading={isLoading}
+      >
+        <AdminTableSkeleton columns={6} />
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout
       title="Feedback"
       description="View customer feedback"
-      onRefresh={() => refetch()}
-      isLoading={isLoading || isFetching}
+      onRefresh={() => feedbackQuery.refetch()}
+      isLoading={isLoading}
     >
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
@@ -167,23 +180,7 @@ export default function FeedbackPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
-                    <>
-                      {[...Array(5)].map((_, i) => (
-                        <TableRow key={i} className="border-zinc-800">
-                          <TableCell>
-                            <Skeleton className="h-4 w-32 mb-2" />
-                            <Skeleton className="h-3 w-40" />
-                          </TableCell>
-                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                          <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                        </TableRow>
-                      ))}
-                    </>
-                  ) : sortedFeedbacks.length === 0 ? (
+                  {sortedFeedbacks.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={6}

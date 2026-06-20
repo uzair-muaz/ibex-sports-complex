@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useAllUsers, getQueryLoadingState } from "@/lib/tanstack/hooks/queries";
 import {
-  useAllUsers,
   useCreateUserMutation,
   useUpdateUserMutation,
   useDeleteUserMutation,
-} from "@/hooks/admin/use-users";
+} from "@/lib/tanstack/hooks/mutations";
+import type { AdminUser } from "@/lib/tanstack/types/users.types";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Plus, Edit2, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
@@ -42,34 +43,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Skeleton } from "@/components/ui/skeleton";
-
-interface User {
-  _id: string;
-  email: string;
-  name: string;
-  role: "super_admin" | "admin" | "user";
-  createdAt: string;
-}
+import { AdminTableSkeleton } from "@/components/admin/loaders";
 
 export default function UsersPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const userRole = (session?.user as any)?.role;
   const isSuperAdmin = userRole === "super_admin";
-  const {
-    data: users = [],
-    isLoading,
-    isFetching,
-    refetch,
-  } = useAllUsers({ enabled: !!session && isSuperAdmin });
+  const usersQuery = useAllUsers({ enabled: !!session && isSuperAdmin });
+  const { isInitialLoading, isLoading } = getQueryLoadingState(usersQuery);
+  const users = usersQuery.data ?? [];
   const createUserMutation = useCreateUserMutation();
   const updateUserMutation = useUpdateUserMutation();
   const deleteUserMutation = useDeleteUserMutation();
   const [showUserModal, setShowUserModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [isSubmittingUser, setIsSubmittingUser] = useState(false);
-  const [sortColumn, setSortColumn] = useState<keyof User | null>(null);
+  const [sortColumn, setSortColumn] = useState<keyof AdminUser | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [userForm, setUserForm] = useState({
     email: "",
@@ -78,7 +68,7 @@ export default function UsersPage() {
     role: "admin" as "super_admin" | "admin" | "user",
   });
 
-  const handleSort = (column: keyof User) => {
+  const handleSort = (column: keyof AdminUser) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -116,7 +106,7 @@ export default function UsersPage() {
     return 0;
   });
 
-  const SortIcon = ({ column }: { column: keyof User }) => {
+  const SortIcon = ({ column }: { column: keyof AdminUser }) => {
     if (sortColumn !== column) {
       return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
     }
@@ -183,7 +173,7 @@ export default function UsersPage() {
     setEditingUser(null);
   };
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = (user: AdminUser) => {
     setEditingUser(user);
     setUserForm({
       email: user.email,
@@ -211,12 +201,37 @@ export default function UsersPage() {
     return null;
   }
 
+  if (isInitialLoading && users.length === 0) {
+    return (
+      <AdminLayout
+        title="User Management"
+        description="Manage user accounts"
+        onRefresh={() => usersQuery.refetch()}
+        isLoading={isLoading}
+        actionButton={
+          <Button
+            onClick={() => {
+              resetUserForm();
+              setShowUserModal(true);
+            }}
+            className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6] w-full sm:w-auto text-xs sm:text-sm"
+          >
+            <Plus className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add User</span>
+          </Button>
+        }
+      >
+        <AdminTableSkeleton columns={5} />
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout
       title="User Management"
       description="Manage user accounts"
-      onRefresh={() => refetch()}
-      isLoading={isLoading || isFetching}
+      onRefresh={() => usersQuery.refetch()}
+      isLoading={isLoading}
       actionButton={
         <Button
           onClick={() => {
@@ -277,24 +292,7 @@ export default function UsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
-                    <>
-                      {[...Array(5)].map((_, i) => (
-                        <TableRow key={i} className="border-zinc-800">
-                          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                          <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                          <TableCell>
-                            <div className="flex gap-2 justify-end">
-                              <Skeleton className="h-8 w-8 rounded" />
-                              <Skeleton className="h-8 w-8 rounded" />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </>
-                  ) : sortedUsers.length === 0 ? (
+                  {sortedUsers.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={5}

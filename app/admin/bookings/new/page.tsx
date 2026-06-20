@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminPageLoader } from "@/components/admin/loaders";
 import { AdminAvailableSlotGrid } from "@/components/admin/AdminAvailableSlotGrid";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -24,10 +25,11 @@ import { formatAdminBookingEndLabel } from "@/lib/admin-booking-slots";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
 import type { AvailableStartTimeQuote } from "@/app/actions/bookings";
 import {
+  getQueryLoadingState,
   useAvailableStartTimes,
-  useCreateBookingMutation,
-} from "@/hooks/admin/use-bookings";
-import { useCourtsByType } from "@/hooks/admin/use-courts";
+  useCourtsByType,
+} from "@/lib/tanstack/hooks/queries";
+import { useCreateBookingMutation } from "@/lib/tanstack/hooks/mutations";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 import { toast } from "sonner";
 
@@ -77,8 +79,17 @@ export default function AdminNewBookingPage() {
     useState<AvailableStartTimeQuote | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { data: courts = [] } = useCourtsByType(formData.courtType, {
+  const {
+    data: courts = [],
+    isLoading: isLoadingCourtsQuery,
+    isFetching: isFetchingCourts,
+  } = useCourtsByType(formData.courtType, {
     enabled: !!session && isAdmin,
+  });
+
+  const courtsLoading = getQueryLoadingState({
+    isLoading: isLoadingCourtsQuery,
+    isFetching: isFetchingCourts,
   });
 
   const availabilityInput =
@@ -99,7 +110,14 @@ export default function AdminNewBookingPage() {
     enabled: !!session && isAdmin,
   });
 
-  const isLoadingQuotes = isLoadingQuotesQuery || isFetchingQuotes;
+  const quotesLoading = getQueryLoadingState({
+    isLoading: isLoadingQuotesQuery,
+    isFetching: isFetchingQuotes,
+  });
+
+  const isInitialSlotLoading =
+    courtsLoading.isInitialLoading ||
+    (availabilityInput != null && quotesLoading.isInitialLoading);
 
   const createBookingMutation = useCreateBookingMutation();
 
@@ -195,6 +213,7 @@ export default function AdminNewBookingPage() {
     <AdminLayout
       title="Create Booking"
       description="Pick date, duration, and an available start time. Court is assigned automatically."
+      isLoading={courtsLoading.isRefreshing || quotesLoading.isRefreshing}
     >
       <div className="space-y-8 p-6">
         <Button
@@ -289,19 +308,23 @@ export default function AdminNewBookingPage() {
               <p className="text-sm text-zinc-400">
                 Available start times (includes past dates and times)
               </p>
-              <AdminAvailableSlotGrid
-                quotes={quotableQuotes}
-                selectedQuote={selectedQuote}
-                durationHours={formData.durationHours}
-                courts={courts}
-                onSelect={(q) => setSelectedQuote(q)}
-                isLoading={isLoadingQuotes}
-                emptyMessage="No available slots for this date and duration."
-                formatTime12={formatTime12}
-                formatEndLabel={(start, dur) =>
-                  formatAdminBookingEndLabel(start, dur)
-                }
-              />
+              {isInitialSlotLoading ? (
+                <AdminPageLoader label="Loading available slots..." />
+              ) : (
+                <AdminAvailableSlotGrid
+                  quotes={quotableQuotes}
+                  selectedQuote={selectedQuote}
+                  durationHours={formData.durationHours}
+                  courts={courts}
+                  onSelect={(q) => setSelectedQuote(q)}
+                  isLoading={quotesLoading.isRefreshing}
+                  emptyMessage="No available slots for this date and duration."
+                  formatTime12={formatTime12}
+                  formatEndLabel={(start, dur) =>
+                    formatAdminBookingEndLabel(start, dur)
+                  }
+                />
+              )}
             </div>
           )}
 

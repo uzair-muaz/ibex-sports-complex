@@ -31,8 +31,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useAllBookings } from "@/hooks/admin/use-bookings";
-import { useAllCourts } from "@/hooks/admin/use-courts";
+import { AdminCardGridSkeleton } from "@/components/admin/loaders";
+import {
+  useAllBookings,
+  useAllCourts,
+  getQueryLoadingState,
+} from "@/lib/tanstack/hooks/queries";
 import type { Booking, Court } from "@/types";
 import {
   getTodayRange,
@@ -48,23 +52,15 @@ export default function AnalyticsPage() {
   const router = useRouter();
   const userRole = (session?.user as { role?: string })?.role;
   const isSuperAdmin = userRole === "super_admin";
-  const {
-    data: bookings = [],
-    isLoading: isBookingsLoading,
-    isFetching: isBookingsFetching,
-    refetch: refetchBookings,
-  } = useAllBookings({ enabled: !!session && isSuperAdmin });
-  const {
-    data: courts = [],
-    isLoading: isCourtsLoading,
-    isFetching: isCourtsFetching,
-    refetch: refetchCourts,
-  } = useAllCourts({ enabled: !!session && isSuperAdmin });
-  const isLoading =
-    isBookingsLoading ||
-    isBookingsFetching ||
-    isCourtsLoading ||
-    isCourtsFetching;
+  const bookingsQuery = useAllBookings({ enabled: !!session && isSuperAdmin });
+  const courtsQuery = useAllCourts({ enabled: !!session && isSuperAdmin });
+  const bookingsLoading = getQueryLoadingState(bookingsQuery);
+  const courtsLoading = getQueryLoadingState(courtsQuery);
+  const isInitialLoading =
+    bookingsLoading.isInitialLoading || courtsLoading.isInitialLoading;
+  const isLoading = bookingsLoading.isLoading || courtsLoading.isLoading;
+  const bookings = (bookingsQuery.data ?? []) as Booking[];
+  const courts = (courtsQuery.data ?? []) as Court[];
   const [timeFilter, setTimeFilter] = useState<
     "all" | "today" | "week" | "month" | "year" | "range"
   >("month");
@@ -80,12 +76,25 @@ export default function AnalyticsPage() {
   }, [session, isSuperAdmin, router]);
 
   const handleRefresh = () => {
-    void refetchBookings();
-    void refetchCourts();
+    void bookingsQuery.refetch();
+    void courtsQuery.refetch();
   };
 
   if (!isSuperAdmin) {
     return null;
+  }
+
+  if (isInitialLoading && bookings.length === 0 && courts.length === 0) {
+    return (
+      <AdminLayout
+        title="Analytics Dashboard"
+        description="Super Admin exclusive insights"
+        onRefresh={handleRefresh}
+        isLoading={isLoading}
+      >
+        <AdminCardGridSkeleton count={6} columns={3} />
+      </AdminLayout>
+    );
   }
 
   const getActiveDateRange = () => {

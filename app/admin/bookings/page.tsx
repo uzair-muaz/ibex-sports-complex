@@ -54,15 +54,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminTableSkeleton } from "@/components/admin/loaders";
 import { QRCode } from "@/components/ui/qr-code";
-import { Skeleton } from "@/components/ui/skeleton";
 import { checkBookingExtensionAvailability } from "@/app/actions/bookings";
 import {
+  getQueryLoadingState,
   useBookingsPaginated,
+} from "@/lib/tanstack/hooks/queries";
+import {
   useDeleteBookingMutation,
   useExtendBookingMutation,
   useUpdateBookingMutation,
-} from "@/hooks/admin/use-bookings";
+} from "@/lib/tanstack/hooks/mutations";
 import type { Booking, Court } from "@/types";
 import { formatDisplayDate, formatTime12 } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -155,13 +158,21 @@ export default function BookingsPage() {
     refetch,
   } = useBookingsPaginated(bookingsInput, { enabled: !!session });
 
+  const {
+    isInitialLoading: isBookingsInitialLoading,
+    isRefreshing: isBookingsRefreshing,
+    isLoading: isBookingsQueryLoading,
+  } = getQueryLoadingState({
+    isLoading: isBookingsLoading,
+    isFetching,
+  });
+
   const updateBookingMutation = useUpdateBookingMutation();
   const deleteBookingMutation = useDeleteBookingMutation();
   const extendBookingMutation = useExtendBookingMutation();
 
   const bookings = bookingsData?.bookings ?? [];
   const totalCount = bookingsData?.totalCount ?? 0;
-  const isLoading = isBookingsLoading || isFetching;
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedFilter(filter), 400);
@@ -446,7 +457,7 @@ export default function BookingsPage() {
       title="Bookings"
       description="Manage all bookings"
       onRefresh={() => refetch()}
-      isLoading={isLoading}
+      isLoading={isBookingsRefreshing}
       actionButton={
         isAdmin && (
           <Button
@@ -548,6 +559,10 @@ export default function BookingsPage() {
 
         <Card className="border-zinc-800 bg-zinc-950">
           <CardContent className="p-0">
+            {isBookingsInitialLoading ? (
+              <AdminTableSkeleton rows={8} columns={8} />
+            ) : (
+              <>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -609,44 +624,7 @@ export default function BookingsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
-                    <>
-                      {[...Array(5)].map((_, i) => (
-                        <TableRow key={i} className="border-zinc-800">
-                          <TableCell>
-                            <Skeleton className="h-4 w-10" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-32 mb-2" />
-                            <Skeleton className="h-3 w-40" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-24" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-24 mb-2" />
-                            <Skeleton className="h-3 w-32" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-20" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-24" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-6 w-16" />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2 justify-end">
-                              <Skeleton className="h-8 w-8 rounded" />
-                              <Skeleton className="h-8 w-8 rounded" />
-                              <Skeleton className="h-8 w-8 rounded" />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </>
-                  ) : sortedBookings.length === 0 ? (
+                  {sortedBookings.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={8}
@@ -874,10 +852,10 @@ export default function BookingsPage() {
                     <PaginationItem>
                       <PaginationPrevious
                         href="#"
-                        aria-disabled={isLoading || page <= 1}
+                        aria-disabled={isBookingsQueryLoading || page <= 1}
                         onClick={(e) => {
                           e.preventDefault();
-                          if (isLoading || page <= 1) return;
+                          if (isBookingsQueryLoading || page <= 1) return;
                           setPage((p) => Math.max(1, p - 1));
                         }}
                       />
@@ -902,7 +880,7 @@ export default function BookingsPage() {
                             isActive={isActive}
                             onClick={(e) => {
                               e.preventDefault();
-                              if (isLoading || isActive) return;
+                              if (isBookingsQueryLoading || isActive) return;
                               setPage(pageNum);
                             }}
                           >
@@ -915,10 +893,10 @@ export default function BookingsPage() {
                     <PaginationItem>
                       <PaginationNext
                         href="#"
-                        aria-disabled={isLoading || page >= totalPages}
+                        aria-disabled={isBookingsQueryLoading || page >= totalPages}
                         onClick={(e) => {
                           e.preventDefault();
-                          if (isLoading || page >= totalPages) return;
+                          if (isBookingsQueryLoading || page >= totalPages) return;
                           setPage((p) => Math.min(totalPages, p + 1));
                         }}
                       />
@@ -927,6 +905,8 @@ export default function BookingsPage() {
                 </Pagination>
               </div>
             </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

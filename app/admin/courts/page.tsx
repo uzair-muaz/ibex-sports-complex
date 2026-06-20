@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useAllCourts, getQueryLoadingState } from "@/lib/tanstack/hooks/queries";
 import {
-  useAllCourts,
   useCreateCourtMutation,
   useUpdateCourtMutation,
   useDeleteCourtMutation,
-} from "@/hooks/admin/use-courts";
+} from "@/lib/tanstack/hooks/mutations";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
@@ -48,7 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AdminTableSkeleton } from "@/components/admin/loaders";
 import type { Court, CourtPricingPeriod, PricingLabel } from "@/types";
 
 export default function CourtsPage() {
@@ -56,12 +56,9 @@ export default function CourtsPage() {
   const router = useRouter();
   const userRole = (session?.user as any)?.role;
   const isSuperAdmin = userRole === "super_admin";
-  const {
-    data: courts = [],
-    isLoading,
-    isFetching,
-    refetch,
-  } = useAllCourts({ enabled: !!session && isSuperAdmin });
+  const courtsQuery = useAllCourts({ enabled: !!session && isSuperAdmin });
+  const { isInitialLoading, isLoading } = getQueryLoadingState(courtsQuery);
+  const courts = courtsQuery.data ?? [];
   const createCourtMutation = useCreateCourtMutation();
   const updateCourtMutation = useUpdateCourtMutation();
   const deleteCourtMutation = useDeleteCourtMutation();
@@ -323,12 +320,37 @@ export default function CourtsPage() {
     return null;
   }
 
+  if (isInitialLoading && courts.length === 0) {
+    return (
+      <AdminLayout
+        title="Court Management"
+        description="Manage court settings"
+        onRefresh={() => courtsQuery.refetch()}
+        isLoading={isLoading}
+        actionButton={
+          <Button
+            onClick={() => {
+              resetCourtForm();
+              setShowCourtModal(true);
+            }}
+            className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6] w-full sm:w-auto text-xs sm:text-sm"
+          >
+            <Plus className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Court</span>
+          </Button>
+        }
+      >
+        <AdminTableSkeleton columns={6} />
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout
       title="Court Management"
       description="Manage court settings"
-      onRefresh={() => refetch()}
-      isLoading={isLoading || isFetching}
+      onRefresh={() => courtsQuery.refetch()}
+      isLoading={isLoading}
       actionButton={
         <Button
           onClick={() => {
@@ -392,35 +414,7 @@ export default function CourtsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
-                    <>
-                      {[...Array(5)].map((_, i) => (
-                        <TableRow key={i} className="border-zinc-800">
-                          <TableCell>
-                            <Skeleton className="h-4 w-32" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-20" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-48" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-24" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-6 w-16" />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Skeleton className="h-8 w-16" />
-                              <Skeleton className="h-8 w-8" />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </>
-                  ) : sortedCourts.length === 0 ? (
+                  {sortedCourts.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={6}

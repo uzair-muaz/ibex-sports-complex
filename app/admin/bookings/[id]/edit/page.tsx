@@ -15,16 +15,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminPageLoader } from "@/components/admin/loaders";
 import { DatePicker } from "@/components/ui/date-picker";
 import { AdminAvailableSlotGrid } from "@/components/admin/AdminAvailableSlotGrid";
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
 import type { AvailableStartTimeQuote } from "@/app/actions/bookings";
 import {
+  getQueryLoadingState,
   useAllBookings,
   useAvailableStartTimes,
-  useUpdateBookingMutation,
-} from "@/hooks/admin/use-bookings";
-import { useCourtsByType } from "@/hooks/admin/use-courts";
+  useCourtsByType,
+} from "@/lib/tanstack/hooks/queries";
+import { useUpdateBookingMutation } from "@/lib/tanstack/hooks/mutations";
 import { COMPLEX_OPENING_DATE } from "@/types";
 import type { Court, Booking } from "@/types";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
@@ -92,14 +94,23 @@ export default function EditBookingPage() {
     enabled: !!session && isAdmin && !!bookingId,
   });
 
-  const isLoadingBooking = isLoadingBookingsQuery || isFetchingBookings;
+  const bookingsLoading = getQueryLoadingState({
+    isLoading: isLoadingBookingsQuery,
+    isFetching: isFetchingBookings,
+  });
 
-  const { data: courts = [], isLoading: isLoadingCourtsQuery, isFetching: isFetchingCourts } =
-    useCourtsByType(formData.courtType, {
-      enabled: !!session && isAdmin && !!formData.courtType,
-    });
+  const {
+    data: courts = [],
+    isLoading: isLoadingCourtsQuery,
+    isFetching: isFetchingCourts,
+  } = useCourtsByType(formData.courtType, {
+    enabled: !!session && isAdmin && !!formData.courtType,
+  });
 
-  const isLoadingCourts = isLoadingCourtsQuery || isFetchingCourts;
+  const courtsLoading = getQueryLoadingState({
+    isLoading: isLoadingCourtsQuery,
+    isFetching: isFetchingCourts,
+  });
 
   const dateString = formatLocalDate(formData.date);
 
@@ -121,7 +132,14 @@ export default function EditBookingPage() {
     enabled: !!session && isAdmin && !!loadedBooking,
   });
 
-  const isLoadingQuotes = isLoadingQuotesQuery || isFetchingQuotes;
+  const quotesLoading = getQueryLoadingState({
+    isLoading: isLoadingQuotesQuery,
+    isFetching: isFetchingQuotes,
+  });
+
+  const isInitialSlotLoading =
+    courtsLoading.isInitialLoading ||
+    (availabilityInput != null && quotesLoading.isInitialLoading);
 
   const quotableQuotes = useMemo(() => {
     if (!loadedBooking) return [];
@@ -187,7 +205,7 @@ export default function EditBookingPage() {
   }, [isBookingsError, router]);
 
   useEffect(() => {
-    if (!session || !isAdmin || !bookingId || loadedBooking || isLoadingBooking)
+    if (!session || !isAdmin || !bookingId || loadedBooking || bookingsLoading.isInitialLoading)
       return;
 
     const booking = allBookings.find((b: Booking) => b._id === bookingId);
@@ -236,7 +254,7 @@ export default function EditBookingPage() {
     bookingId,
     allBookings,
     loadedBooking,
-    isLoadingBooking,
+    bookingsLoading.isInitialLoading,
     router,
   ]);
 
@@ -246,7 +264,11 @@ export default function EditBookingPage() {
 
   useEffect(() => {
     if (userChangedSlotRef.current) return;
-    if (!loadedBooking || isLoadingQuotes || quotableQuotes.length === 0)
+    if (
+      !loadedBooking ||
+      quotesLoading.isLoading ||
+      quotableQuotes.length === 0
+    )
       return;
     if (dateString !== loadedBooking.date) return;
     if (formData.durationHours !== Number(loadedBooking.duration)) return;
@@ -263,7 +285,7 @@ export default function EditBookingPage() {
   }, [
     loadedBooking,
     quotableQuotes,
-    isLoadingQuotes,
+    quotesLoading.isLoading,
     dateString,
     formData.durationHours,
   ]);
@@ -310,18 +332,24 @@ export default function EditBookingPage() {
     return null;
   }
 
-  if (isLoadingBooking) {
+  if (bookingsLoading.isInitialLoading) {
     return (
-      <AdminLayout title="Edit Booking" description="Loading...">
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="h-12 w-12 animate-spin text-[#2DD4BF]" />
-        </div>
+      <AdminLayout title="Edit Booking" description="Loading booking...">
+        <AdminPageLoader label="Loading booking..." />
       </AdminLayout>
     );
   }
 
   return (
-    <AdminLayout title="Edit Booking" description="Update booking details">
+    <AdminLayout
+      title="Edit Booking"
+      description="Update booking details"
+      isLoading={
+        bookingsLoading.isRefreshing ||
+        courtsLoading.isRefreshing ||
+        quotesLoading.isRefreshing
+      }
+    >
       <div className="p-6 space-y-6">
         <Button
           variant="ghost"
@@ -413,10 +441,8 @@ export default function EditBookingPage() {
               </span>
             </Label>
 
-            {isLoadingCourts ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
-              </div>
+            {isInitialSlotLoading ? (
+              <AdminPageLoader label="Loading available slots..." />
             ) : courts.length === 0 ? (
               <p className="text-zinc-400 text-sm py-8 text-center">
                 No courts available for this court type.
@@ -431,7 +457,7 @@ export default function EditBookingPage() {
                   userChangedSlotRef.current = true;
                   setSelectedQuote(q);
                 }}
-                isLoading={isLoadingQuotes}
+                isLoading={quotesLoading.isRefreshing}
                 emptyMessage="No available slots for this date and duration."
                 formatTime12={formatTime12}
                 formatEndLabel={(start, dur) =>
