@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, Lock, ArrowRight } from "lucide-react";
+import { Menu, X, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
 
@@ -100,16 +100,6 @@ export const Navbar = () => {
           })}
 
           <div className="flex items-center gap-2 ml-2 pl-2 border-l border-white/10">
-            <Link href="/admin">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 text-zinc-300 hover:text-white hover:bg-white/5"
-              >
-                <Lock className="w-4 h-4" />
-                <span>Admin</span>
-              </motion.button>
-            </Link>
             <Link href="/booking">
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                 <Button
@@ -248,21 +238,6 @@ export const Navbar = () => {
                       </Link>
                     </motion.div>
 
-                    <motion.div
-                      initial={{ opacity: 0, x: 12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className="mt-2"
-                    >
-                      <Link
-                        href="/admin"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center gap-3 py-3.5 px-4 rounded-xl text-base font-medium transition-colors text-zinc-400 active:bg-white/10"
-                      >
-                        <Lock className="w-4 h-4 shrink-0" />
-                        <span>Admin</span>
-                      </Link>
-                    </motion.div>
                   </nav>
                 </motion.div>
               </>

@@ -41,13 +41,9 @@ function dateKeyToLocalDate(key: string): Date {
 export default function AdminNewBookingPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const { todayBusinessKey, minSelectableDateKey, nowBusinessHourDecimal } =
-    useBusinessTime(COMPLEX_OPENING_DATE);
+  const { todayBusinessKey } = useBusinessTime(COMPLEX_OPENING_DATE);
 
-  const minPickDate = useMemo(() => {
-    const biz = dateKeyToLocalDate(minSelectableDateKey);
-    return COMPLEX_OPENING_DATE > biz ? COMPLEX_OPENING_DATE : biz;
-  }, [minSelectableDateKey]);
+  const minPickDate = COMPLEX_OPENING_DATE;
 
   const userRole = (session?.user as { role?: string })?.role;
   const isAdmin = userRole === "admin" || userRole === "super_admin";
@@ -55,16 +51,11 @@ export default function AdminNewBookingPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
-    if (!selectedDate && minSelectableDateKey) {
-      setSelectedDate(minPickDate);
+    if (!selectedDate && todayBusinessKey) {
+      const today = dateKeyToLocalDate(todayBusinessKey);
+      setSelectedDate(today >= minPickDate ? today : minPickDate);
     }
-  }, [selectedDate, minSelectableDateKey, minPickDate]);
-
-  useEffect(() => {
-    if (selectedDate && selectedDate < minPickDate) {
-      setSelectedDate(minPickDate);
-    }
-  }, [selectedDate, minPickDate]);
+  }, [selectedDate, todayBusinessKey, minPickDate]);
 
   const dateStr = selectedDate ? formatLocalDate(selectedDate) : "";
 
@@ -148,24 +139,14 @@ export default function AdminNewBookingPage() {
         setErrorMessage(result.error ?? "Could not load available times.");
         return;
       }
-      let list = result.startTimes ?? [];
-      if (dateStr === todayBusinessKey) {
-        list = list.filter((q) => q.startTime >= nowBusinessHourDecimal);
-      }
-      setQuotableQuotes(list);
+      setQuotableQuotes(result.startTimes ?? []);
     } catch (e) {
       setQuotableQuotes([]);
       setErrorMessage(e instanceof Error ? e.message : "Failed to load slots.");
     } finally {
       setIsLoadingQuotes(false);
     }
-  }, [
-    formData.courtType,
-    formData.durationHours,
-    dateStr,
-    todayBusinessKey,
-    nowBusinessHourDecimal,
-  ]);
+  }, [formData.courtType, formData.durationHours, dateStr]);
 
   useEffect(() => {
     fetchQuotes();
@@ -321,7 +302,7 @@ export default function AdminNewBookingPage() {
           {formData.courtType && dateStr && (
             <div className="space-y-3">
               <p className="text-sm text-zinc-400">
-                Available start times (past times today are hidden)
+                Available start times (includes past dates and times)
               </p>
               <AdminAvailableSlotGrid
                 quotes={quotableQuotes}
