@@ -1,6 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import {
+  useAllUsers,
+  useCreateUserMutation,
+  useUpdateUserMutation,
+  useDeleteUserMutation,
+} from "@/hooks/admin/use-users";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Plus, Edit2, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
@@ -37,12 +43,6 @@ import {
 } from "@/components/ui/select";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  getAllUsers,
-  createUser,
-  updateUser,
-  deleteUser,
-} from "../../actions/users";
 
 interface User {
   _id: string;
@@ -55,8 +55,17 @@ interface User {
 export default function UsersPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const userRole = (session?.user as any)?.role;
+  const isSuperAdmin = userRole === "super_admin";
+  const {
+    data: users = [],
+    isLoading,
+    isFetching,
+    refetch,
+  } = useAllUsers({ enabled: !!session && isSuperAdmin });
+  const createUserMutation = useCreateUserMutation();
+  const updateUserMutation = useUpdateUserMutation();
+  const deleteUserMutation = useDeleteUserMutation();
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isSubmittingUser, setIsSubmittingUser] = useState(false);
@@ -68,9 +77,6 @@ export default function UsersPage() {
     name: "",
     role: "admin" as "super_admin" | "admin" | "user",
   });
-
-  const userRole = (session?.user as any)?.role;
-  const isSuperAdmin = userRole === "super_admin";
 
   const handleSort = (column: keyof User) => {
     if (sortColumn === column) {
@@ -122,28 +128,10 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    if (session) {
-      if (!isSuperAdmin) {
-        router.push("/admin/bookings");
-        return;
-      }
-      loadData();
+    if (session && !isSuperAdmin) {
+      router.push("/admin/bookings");
     }
   }, [session, isSuperAdmin, router]);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const result = await getAllUsers();
-      if (result.success) {
-        setUsers(result.users);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,7 +139,7 @@ export default function UsersPage() {
 
     try {
       if (editingUser) {
-        const result = await updateUser({
+        const result = await updateUserMutation.mutateAsync({
           userId: editingUser._id,
           ...userForm,
           ...(userForm.password ? {} : { password: undefined }),
@@ -161,7 +149,6 @@ export default function UsersPage() {
           setShowUserModal(false);
           setEditingUser(null);
           resetUserForm();
-          loadData();
         } else {
           alert(result.error || "Failed to update user");
         }
@@ -170,12 +157,11 @@ export default function UsersPage() {
           alert("Password is required for new users");
           return;
         }
-        const result = await createUser(userForm);
+        const result = await createUserMutation.mutateAsync(userForm);
 
         if (result.success) {
           setShowUserModal(false);
           resetUserForm();
-          loadData();
         } else {
           alert(result.error || "Failed to create user");
         }
@@ -214,10 +200,8 @@ export default function UsersPage() {
         "Are you sure you want to delete this user? This action cannot be undone."
       )
     ) {
-      const result = await deleteUser(userId);
-      if (result.success) {
-        loadData();
-      } else {
+      const result = await deleteUserMutation.mutateAsync(userId);
+      if (!result.success) {
         alert(result.error || "Failed to delete user");
       }
     }
@@ -231,8 +215,8 @@ export default function UsersPage() {
     <AdminLayout
       title="User Management"
       description="Manage user accounts"
-      onRefresh={loadData}
-      isLoading={isLoading}
+      onRefresh={() => refetch()}
+      isLoading={isLoading || isFetching}
       actionButton={
         <Button
           onClick={() => {

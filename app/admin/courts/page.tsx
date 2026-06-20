@@ -1,6 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import {
+  useAllCourts,
+  useCreateCourtMutation,
+  useUpdateCourtMutation,
+  useDeleteCourtMutation,
+} from "@/hooks/admin/use-courts";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
@@ -43,25 +49,26 @@ import {
 } from "@/components/ui/select";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  getAllCourts,
-  createCourt,
-  updateCourt,
-  deleteCourt,
-} from "../../actions/courts";
 import type { Court, CourtPricingPeriod, PricingLabel } from "@/types";
 
 export default function CourtsPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [courts, setCourts] = useState<Court[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const userRole = (session?.user as any)?.role;
+  const isSuperAdmin = userRole === "super_admin";
+  const {
+    data: courts = [],
+    isLoading,
+    isFetching,
+    refetch,
+  } = useAllCourts({ enabled: !!session && isSuperAdmin });
+  const createCourtMutation = useCreateCourtMutation();
+  const updateCourtMutation = useUpdateCourtMutation();
+  const deleteCourtMutation = useDeleteCourtMutation();
   const [showCourtModal, setShowCourtModal] = useState(false);
   const [editingCourt, setEditingCourt] = useState<Court | null>(null);
-  const [isSubmittingCourt, setIsSubmittingCourt] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingCourt, setDeletingCourt] = useState<Court | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [sortColumn, setSortColumn] = useState<keyof Court | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [courtError, setCourtError] = useState<string>("");
@@ -83,41 +90,23 @@ export default function CourtsPage() {
     pricingPeriods: [],
   });
 
-  const userRole = (session?.user as any)?.role;
-  const isSuperAdmin = userRole === "super_admin";
-
   useEffect(() => {
-    if (session) {
-      if (!isSuperAdmin) {
-        router.push("/admin/bookings");
-        return;
-      }
-      loadData();
+    if (session && !isSuperAdmin) {
+      router.push("/admin/bookings");
     }
   }, [session, isSuperAdmin, router]);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const result = await getAllCourts();
-      if (result.success) {
-        setCourts(result.courts);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const isSubmittingCourt =
+    createCourtMutation.isPending || updateCourtMutation.isPending;
+  const isDeleting = deleteCourtMutation.isPending;
 
   const handleCourtSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmittingCourt(true);
     setCourtError("");
 
     try {
       if (editingCourt) {
-        const result = await updateCourt({
+        const result = await updateCourtMutation.mutateAsync({
           courtId: editingCourt._id,
           ...courtForm,
         });
@@ -126,12 +115,11 @@ export default function CourtsPage() {
           setShowCourtModal(false);
           setEditingCourt(null);
           resetCourtForm();
-          loadData();
         } else {
           setCourtError(result.error || "Failed to update court");
         }
       } else {
-        const result = await createCourt({
+        const result = await createCourtMutation.mutateAsync({
           ...courtForm,
           image: "",
         });
@@ -139,15 +127,12 @@ export default function CourtsPage() {
         if (result.success) {
           setShowCourtModal(false);
           resetCourtForm();
-          loadData();
         } else {
           setCourtError(result.error || "Failed to create court");
         }
       }
     } catch (error: any) {
       setCourtError(error.message || "An error occurred");
-    } finally {
-      setIsSubmittingCourt(false);
     }
   };
 
@@ -261,20 +246,16 @@ export default function CourtsPage() {
   const confirmDeleteCourt = async () => {
     if (!deletingCourt) return;
 
-    setIsDeleting(true);
     try {
-      const result = await deleteCourt(deletingCourt._id);
+      const result = await deleteCourtMutation.mutateAsync(deletingCourt._id);
       if (result.success) {
         setShowDeleteModal(false);
         setDeletingCourt(null);
-        loadData();
       } else {
         alert(result.error || "Failed to delete court");
-        setIsDeleting(false);
       }
     } catch (error: any) {
       alert(error.message || "An error occurred");
-      setIsDeleting(false);
     }
   };
 
@@ -346,8 +327,8 @@ export default function CourtsPage() {
     <AdminLayout
       title="Court Management"
       description="Manage court settings"
-      onRefresh={loadData}
-      isLoading={isLoading}
+      onRefresh={() => refetch()}
+      isLoading={isLoading || isFetching}
       actionButton={
         <Button
           onClick={() => {

@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
@@ -22,13 +22,13 @@ import {
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
 import { formatAdminBookingEndLabel } from "@/lib/admin-booking-slots";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
+import type { AvailableStartTimeQuote } from "@/app/actions/bookings";
 import {
-  createBooking,
-  getAvailableStartTimes,
-  type AvailableStartTimeQuote,
-} from "@/app/actions/bookings";
-import { getCourts } from "@/app/actions/courts";
-import { COMPLEX_OPENING_DATE, type Court, type CourtType } from "@/types";
+  useAvailableStartTimes,
+  useCreateBookingMutation,
+} from "@/hooks/admin/use-bookings";
+import { useCourtsByType } from "@/hooks/admin/use-courts";
+import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 import { toast } from "sonner";
 
 const COURT_TYPES: CourtType[] = ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"];
@@ -65,13 +65,6 @@ export default function AdminNewBookingPage() {
     }
   }, [session, isAdmin, router]);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingQuotes, setIsLoadingQuotes] = useState(false);
-  const [quotableQuotes, setQuotableQuotes] = useState<
-    AvailableStartTimeQuote[]
-  >([]);
-  const [courts, setCourts] = useState<Court[]>([]);
-
   const [formData, setFormData] = useState({
     courtType: "PADEL" as CourtType,
     durationHours: 1,
@@ -83,6 +76,32 @@ export default function AdminNewBookingPage() {
   const [selectedQuote, setSelectedQuote] =
     useState<AvailableStartTimeQuote | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const { data: courts = [] } = useCourtsByType(formData.courtType, {
+    enabled: !!session && isAdmin,
+  });
+
+  const availabilityInput =
+    formData.courtType && dateStr
+      ? {
+          courtType: formData.courtType,
+          date: dateStr,
+          duration: formData.durationHours,
+        }
+      : null;
+
+  const {
+    data: quotableQuotes = [],
+    isLoading: isLoadingQuotesQuery,
+    isFetching: isFetchingQuotes,
+    error: quotesError,
+  } = useAvailableStartTimes(availabilityInput, {
+    enabled: !!session && isAdmin,
+  });
+
+  const isLoadingQuotes = isLoadingQuotesQuery || isFetchingQuotes;
+
+  const createBookingMutation = useCreateBookingMutation();
 
   const durationPresets = useMemo(() => {
     if (formData.courtType === "FUTSAL") {
@@ -108,49 +127,18 @@ export default function AdminNewBookingPage() {
   }, [formData.courtType, durationPresets]);
 
   useEffect(() => {
-    if (!session || !isAdmin || !formData.courtType) return;
-    (async () => {
-      try {
-        const result = await getCourts(formData.courtType);
-        if (result.success) setCourts(result.courts as Court[]);
-        else setCourts([]);
-      } catch {
-        setCourts([]);
-      }
-    })();
-  }, [session, isAdmin, formData.courtType]);
-
-  const fetchQuotes = useCallback(async () => {
-    if (!formData.courtType || !dateStr) {
-      setQuotableQuotes([]);
-      return;
-    }
-    setIsLoadingQuotes(true);
     setSelectedQuote(null);
     setErrorMessage(null);
-    try {
-      const result = await getAvailableStartTimes({
-        courtType: formData.courtType,
-        date: dateStr,
-        duration: formData.durationHours,
-      });
-      if (!result.success) {
-        setQuotableQuotes([]);
-        setErrorMessage(result.error ?? "Could not load available times.");
-        return;
-      }
-      setQuotableQuotes(result.startTimes ?? []);
-    } catch (e) {
-      setQuotableQuotes([]);
-      setErrorMessage(e instanceof Error ? e.message : "Failed to load slots.");
-    } finally {
-      setIsLoadingQuotes(false);
-    }
   }, [formData.courtType, formData.durationHours, dateStr]);
 
   useEffect(() => {
-    fetchQuotes();
-  }, [fetchQuotes]);
+    if (!quotesError) return;
+    setErrorMessage(
+      quotesError instanceof Error
+        ? quotesError.message
+        : "Failed to load slots.",
+    );
+  }, [quotesError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,9 +161,8 @@ export default function AdminNewBookingPage() {
       return;
     }
 
-    setIsSubmitting(true);
     try {
-      const result = await createBooking({
+      const result = await createBookingMutation.mutateAsync({
         courtType: formData.courtType,
         date: dateStr,
         startTime: selectedQuote.startTime,
@@ -197,8 +184,6 @@ export default function AdminNewBookingPage() {
       setErrorMessage(
         err instanceof Error ? err.message : "Failed to create booking",
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -401,9 +386,9 @@ export default function AdminNewBookingPage() {
             <Button
               type="submit"
               className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-              disabled={isSubmitting || !selectedQuote}
+              disabled={createBookingMutation.isPending || !selectedQuote}
             >
-              {isSubmitting ? (
+              {createBookingMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Creating...

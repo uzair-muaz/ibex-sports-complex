@@ -1,6 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  useDiscounts,
+  useCreateDiscountMutation,
+  useUpdateDiscountMutation,
+  useDeleteDiscountMutation,
+  useToggleDiscountActiveMutation,
+} from "@/hooks/admin/use-discounts";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
@@ -56,15 +63,7 @@ import {
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePicker } from "@/components/ui/date-picker";
-import {
-  getDiscounts,
-  getDiscountById,
-  createDiscount,
-  updateDiscount,
-  deleteDiscount,
-  toggleDiscountActive,
-  type DayRuleInput,
-} from "@/app/actions/discounts";
+import { getDiscountById, type DayRuleInput } from "@/app/actions/discounts";
 import {
   formatDiscountValue,
   formatTimeRestriction,
@@ -285,16 +284,25 @@ function dayRulesForUpdate(
 export default function DiscountsPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [discounts, setDiscounts] = useState<Discount[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const userRole = (session?.user as any)?.role;
+  const isSuperAdmin = userRole === "super_admin";
+  const isAdmin = userRole === "admin" || isSuperAdmin;
+  const {
+    data: discountsData,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useDiscounts({ enabled: !!session && isAdmin });
+  const discounts = (discountsData ?? []) as Discount[];
+  const createDiscountMutation = useCreateDiscountMutation();
+  const updateDiscountMutation = useUpdateDiscountMutation();
+  const deleteDiscountMutation = useDeleteDiscountMutation();
+  const toggleDiscountActiveMutation = useToggleDiscountActiveMutation();
   const [showDiscountDrawer, setShowDiscountDrawer] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingEdit, setIsLoadingEdit] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingDiscount, setDeletingDiscount] = useState<Discount | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isToggling, setIsToggling] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<keyof Discount | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -325,33 +333,19 @@ export default function DiscountsPage() {
     dayRules: [] as DayRuleForm[],
   });
 
-  const userRole = (session?.user as any)?.role;
-  const isSuperAdmin = userRole === "super_admin";
-  const isAdmin = userRole === "admin" || isSuperAdmin;
-
   useEffect(() => {
-    if (session) {
-      if (!isAdmin) {
-        router.push("/admin/bookings");
-        return;
-      }
-      loadData();
+    if (session && !isAdmin) {
+      router.push("/admin/bookings");
     }
   }, [session, isAdmin, router]);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const discountResult = await getDiscounts();
-      if (discountResult.success) {
-        setDiscounts(discountResult.discounts);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const isSubmitting =
+    createDiscountMutation.isPending || updateDiscountMutation.isPending;
+  const isDeleting = deleteDiscountMutation.isPending;
+  const togglingDiscountId =
+    toggleDiscountActiveMutation.isPending
+      ? toggleDiscountActiveMutation.variables ?? null
+      : null;
 
   const handleDiscountSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -419,8 +413,6 @@ export default function DiscountsPage() {
       dayRulesPayload,
     );
 
-    setIsSubmitting(true);
-
     const validFrom = formatLocalDate(discountForm.validFrom);
     const validUntil = formatLocalDate(discountForm.validUntil);
 
@@ -447,14 +439,14 @@ export default function DiscountsPage() {
 
         if (isFlat) {
           const primaryRule = dayRulesPayload?.[0];
-          result = await updateDiscount({
+          result = await updateDiscountMutation.mutateAsync({
             ...baseUpdate,
             type: primaryRule?.type ?? discountForm.type,
             value: primaryRule?.value ?? discountForm.value,
             ...(dayRulesUpdate !== undefined ? { dayRules: dayRulesUpdate } : {}),
           });
         } else if (isSplit) {
-          result = await updateDiscount({
+          result = await updateDiscountMutation.mutateAsync({
             ...baseUpdate,
             tierDiscountMode: "split",
             ...(peakSlice || offPeakSlice
@@ -471,7 +463,7 @@ export default function DiscountsPage() {
           });
         } else {
           const primaryRule = dayRulesPayload?.[0];
-          result = await updateDiscount({
+          result = await updateDiscountMutation.mutateAsync({
             ...baseUpdate,
             tierDiscountMode: "uniform",
             type: primaryRule?.type ?? discountForm.type,
@@ -490,7 +482,6 @@ export default function DiscountsPage() {
           setShowDiscountDrawer(false);
           setEditingDiscount(null);
           resetForm();
-          loadData();
         } else {
           alert(result.error || "Failed to update discount");
         }
@@ -507,7 +498,7 @@ export default function DiscountsPage() {
 
         if (isFlat) {
           const primaryRule = dayRulesPayload?.[0];
-          result = await createDiscount({
+          result = await createDiscountMutation.mutateAsync({
             ...commonCreate,
             discountCategory: "flat",
             type: primaryRule?.type ?? discountForm.type,
@@ -516,7 +507,7 @@ export default function DiscountsPage() {
             dayRules: discountForm.dayScheduleEnabled ? dayRulesPayload ?? undefined : undefined,
           });
         } else if (isSplit) {
-          result = await createDiscount({
+          result = await createDiscountMutation.mutateAsync({
             ...commonCreate,
             discountCategory: "time_based",
             tierDiscountMode: "split",
@@ -530,7 +521,7 @@ export default function DiscountsPage() {
           });
         } else {
           const primaryRule = dayRulesPayload?.[0];
-          result = await createDiscount({
+          result = await createDiscountMutation.mutateAsync({
             ...commonCreate,
             discountCategory: "time_based",
             tierDiscountMode: "uniform",
@@ -548,15 +539,12 @@ export default function DiscountsPage() {
         if (result.success) {
           setShowDiscountDrawer(false);
           resetForm();
-          loadData();
         } else {
           alert(result.error || "Failed to create discount");
         }
       }
     } catch (error: any) {
       alert(error.message || "An error occurred");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -618,36 +606,27 @@ export default function DiscountsPage() {
   const confirmDelete = async () => {
     if (!deletingDiscount) return;
 
-    setIsDeleting(true);
     try {
-      const result = await deleteDiscount(deletingDiscount._id);
+      const result = await deleteDiscountMutation.mutateAsync(deletingDiscount._id);
       if (result.success) {
         setShowDeleteModal(false);
         setDeletingDiscount(null);
-        loadData();
       } else {
         alert(result.error || "Failed to delete discount");
       }
     } catch (error: any) {
       alert(error.message || "An error occurred");
-    } finally {
-      setIsDeleting(false);
     }
   };
 
   const handleToggleActive = async (discount: Discount) => {
-    setIsToggling(discount._id);
     try {
-      const result = await toggleDiscountActive(discount._id);
-      if (result.success) {
-        loadData();
-      } else {
+      const result = await toggleDiscountActiveMutation.mutateAsync(discount._id);
+      if (!result.success) {
         alert(result.error || "Failed to toggle discount status");
       }
     } catch (error: any) {
       alert(error.message || "An error occurred");
-    } finally {
-      setIsToggling(null);
     }
   };
 
@@ -844,8 +823,8 @@ export default function DiscountsPage() {
     <AdminLayout
       title="Discount Management"
       description="Create and manage promotional discounts"
-      onRefresh={loadData}
-      isLoading={isLoading}
+      onRefresh={() => refetch()}
+      isLoading={isLoading || isFetching}
       actionButton={
         <Button
           onClick={() => {
@@ -986,13 +965,13 @@ export default function DiscountsPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleToggleActive(discount)}
-                              disabled={isToggling === discount._id}
+                              disabled={togglingDiscountId === discount._id}
                               className="text-zinc-400 hover:text-[#2DD4BF] h-8 w-8"
                               title={
                                 discount.isActive ? "Disable" : "Enable"
                               }
                             >
-                              {isToggling === discount._id ? (
+                              {togglingDiscountId === discount._id ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : discount.isActive ? (
                                 <ToggleRight className="w-4 h-4 text-[#2DD4BF]" />
@@ -1223,13 +1202,13 @@ export default function DiscountsPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleToggleActive(discount)}
-                              disabled={isToggling === discount._id}
+                              disabled={togglingDiscountId === discount._id}
                               className="text-zinc-400 hover:text-[#2DD4BF] h-8 w-8"
                               title={
                                 discount.isActive ? "Disable" : "Enable"
                               }
                             >
-                              {isToggling === discount._id ? (
+                              {togglingDiscountId === discount._id ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : discount.isActive ? (
                                 <ToggleRight className="w-4 h-4 text-[#2DD4BF]" />

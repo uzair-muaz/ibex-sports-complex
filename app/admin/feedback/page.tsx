@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { Star, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Star, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,36 +19,19 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getAllFeedback } from "../../actions/feedback";
+import { useAllFeedback } from "@/hooks/admin/use-feedback";
 
 export default function FeedbackPage() {
   const { data: session } = useSession();
-  const router = useRouter();
-  const [feedbacks, setFeedbacks] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const {
+    data: feedbacks = [],
+    isLoading,
+    isFetching,
+    refetch,
+  } = useAllFeedback({ enabled: !!session });
   const [filter, setFilter] = useState("");
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-
-  useEffect(() => {
-    if (session) {
-      loadData();
-    }
-  }, [session]);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const result = await getAllFeedback();
-      if (result.success) {
-        setFeedbacks(result.feedbacks);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const filteredFeedbacks = feedbacks.filter(
     (f) =>
@@ -57,8 +39,10 @@ export default function FeedbackPage() {
       f.userEmail.toLowerCase().includes(filter.toLowerCase()) ||
       (typeof f.bookingId === "object" && f.bookingId?._id
         ? f.bookingId._id.includes(filter)
-        : f.bookingId?.includes(filter) || false) ||
-      (f.comment || "").toLowerCase().includes(filter.toLowerCase())
+        : typeof f.bookingId === "string"
+          ? f.bookingId.includes(filter)
+          : false) ||
+      (f.comment || "").toLowerCase().includes(filter.toLowerCase()),
   );
 
   const handleSort = (column: string) => {
@@ -89,8 +73,8 @@ export default function FeedbackPage() {
       aValue = new Date(a.createdAt).getTime();
       bValue = new Date(b.createdAt).getTime();
     } else {
-      aValue = a[sortColumn];
-      bValue = b[sortColumn];
+      aValue = (a as Record<string, unknown>)[sortColumn];
+      bValue = (b as Record<string, unknown>)[sortColumn];
     }
 
     // Handle number comparison
@@ -119,8 +103,8 @@ export default function FeedbackPage() {
     <AdminLayout
       title="Feedback"
       description="View customer feedback"
-      onRefresh={loadData}
-      isLoading={isLoading}
+      onRefresh={() => refetch()}
+      isLoading={isLoading || isFetching}
     >
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
@@ -222,7 +206,9 @@ export default function FeedbackPage() {
                         <TableCell className="font-mono text-zinc-400 text-sm">
                           #{typeof feedback.bookingId === "object" && feedback.bookingId?._id
                             ? feedback.bookingId._id.slice(-8)
-                            : feedback.bookingId?.slice(-8) || "N/A"}
+                            : typeof feedback.bookingId === "string"
+                              ? feedback.bookingId.slice(-8)
+                              : "N/A"}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">

@@ -31,8 +31,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getAllBookings } from "../../actions/bookings";
-import { getAllCourts } from "../../actions/courts";
+import { useAllBookings } from "@/hooks/admin/use-bookings";
+import { useAllCourts } from "@/hooks/admin/use-courts";
 import type { Booking, Court } from "@/types";
 import {
   getTodayRange,
@@ -46,9 +46,25 @@ import {
 export default function AnalyticsPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [courts, setCourts] = useState<Court[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const userRole = (session?.user as { role?: string })?.role;
+  const isSuperAdmin = userRole === "super_admin";
+  const {
+    data: bookings = [],
+    isLoading: isBookingsLoading,
+    isFetching: isBookingsFetching,
+    refetch: refetchBookings,
+  } = useAllBookings({ enabled: !!session && isSuperAdmin });
+  const {
+    data: courts = [],
+    isLoading: isCourtsLoading,
+    isFetching: isCourtsFetching,
+    refetch: refetchCourts,
+  } = useAllCourts({ enabled: !!session && isSuperAdmin });
+  const isLoading =
+    isBookingsLoading ||
+    isBookingsFetching ||
+    isCourtsLoading ||
+    isCourtsFetching;
   const [timeFilter, setTimeFilter] = useState<
     "all" | "today" | "week" | "month" | "year" | "range"
   >("month");
@@ -57,38 +73,15 @@ export default function AnalyticsPage() {
   );
   const [showRangeModal, setShowRangeModal] = useState(false);
 
-  const userRole = (session?.user as { role?: string })?.role;
-  const isSuperAdmin = userRole === "super_admin";
-
   useEffect(() => {
-    if (session) {
-      if (!isSuperAdmin) {
-        router.push("/admin/bookings");
-        return;
-      }
-      loadData();
+    if (session && !isSuperAdmin) {
+      router.push("/admin/bookings");
     }
   }, [session, isSuperAdmin, router]);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const [bookingsResult, courtsResult] = await Promise.all([
-        getAllBookings(),
-        getAllCourts(),
-      ]);
-
-      if (bookingsResult.success) {
-        setBookings(bookingsResult.bookings);
-      }
-      if (courtsResult.success) {
-        setCourts(courtsResult.courts);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleRefresh = () => {
+    void refetchBookings();
+    void refetchCourts();
   };
 
   if (!isSuperAdmin) {
@@ -277,7 +270,7 @@ export default function AnalyticsPage() {
     <AdminLayout
       title="Analytics Dashboard"
       description="Super Admin exclusive insights"
-      onRefresh={loadData}
+      onRefresh={handleRefresh}
       isLoading={isLoading}
     >
       {/* Time Filters */}
