@@ -9,34 +9,54 @@ import React, {
 } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import {
+  Alert,
+  App,
+  Button,
+  DatePicker,
+  Form,
+  Input,
+  InputNumber,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Spin,
+  Typography,
+} from "antd";
+import type { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { DatePicker } from "@/components/ui/date-picker";
 import { AdminAvailableSlotGrid } from "@/components/admin/AdminAvailableSlotGrid";
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
-import { getCourts } from "../../../../actions/courts";
+import { getCourts } from "@/app/actions/courts";
 import {
   getAvailableStartTimes,
   updateBooking,
   getAllBookings,
   type AvailableStartTimeQuote,
-} from "../../../../actions/bookings";
+} from "@/app/actions/bookings";
 import { COMPLEX_OPENING_DATE } from "@/types";
 import type { Court, Booking } from "@/types";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
 import { formatAdminBookingEndLabel } from "@/lib/admin-booking-slots";
 import { PriceBreakdown } from "@/components/PriceBreakdown";
-import { toast } from "sonner";
+
+const { Title, Text } = Typography;
+
+type BookingStatus =
+  | "pending_payment"
+  | "confirmed"
+  | "cancelled"
+  | "completed";
+
+type EditFormValues = {
+  date: Dayjs;
+  status: BookingStatus;
+  userName: string;
+  userEmail: string;
+  userPhone: string;
+  amountReceivedOnline: number;
+  amountReceivedCash: number;
+};
 
 function dateKeyToLocalDate(key: string): Date {
   const [y, m, d] = key.split("-").map(Number);
@@ -48,6 +68,8 @@ export default function EditBookingPage() {
   const router = useRouter();
   const params = useParams();
   const bookingId = params.id as string;
+  const { message } = App.useApp();
+  const [form] = Form.useForm<EditFormValues>();
 
   const { todayBusinessKey, minSelectableDateKey, nowBusinessHourDecimal } =
     useBusinessTime(COMPLEX_OPENING_DATE);
@@ -78,29 +100,19 @@ export default function EditBookingPage() {
     discountAmount?: number;
   } | null>(null);
 
-  const [formData, setFormData] = useState({
-    date: new Date(),
-    courtType: "PADEL" as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
-    durationHours: 1,
-    userName: "",
-    userEmail: "",
-    userPhone: "",
-    status: "pending_payment" as
-      | "pending_payment"
-      | "confirmed"
-      | "cancelled"
-      | "completed",
-    amountPaid: 0,
-    amountReceivedOnline: 0,
-    amountReceivedCash: 0,
-  });
+  const [courtType, setCourtType] = useState<
+    "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL"
+  >("PADEL");
+  const [durationHours, setDurationHours] = useState(1);
+
+  const selectedDate = Form.useWatch("date", form);
 
   const userRole = (session?.user as { role?: string })?.role;
   const isAdmin = userRole === "admin" || userRole === "super_admin";
 
   const durationPresets = useMemo(() => {
     let presets: { hours: number; label: string }[];
-    if (formData.courtType === "FUTSAL") {
+    if (courtType === "FUTSAL") {
       presets = [
         { hours: 1.5, label: "1h 30m" },
         { hours: 2, label: "2h" },
@@ -123,7 +135,7 @@ export default function EditBookingPage() {
       }
     }
     return presets;
-  }, [formData.courtType, loadedBooking]);
+  }, [courtType, loadedBooking]);
 
   useEffect(() => {
     if (session && !isAdmin) {
@@ -138,26 +150,26 @@ export default function EditBookingPage() {
   }, [session, isAdmin, bookingId]);
 
   useEffect(() => {
-    if (session && isAdmin && formData.courtType) {
+    if (session && isAdmin && courtType) {
       loadCourts();
     }
-  }, [session, isAdmin, formData.courtType]);
+  }, [session, isAdmin, courtType]);
 
   const fetchQuotes = useCallback(async () => {
-    if (!loadedBooking) return;
-    const dateString = formatLocalDate(formData.date);
+    if (!loadedBooking || !selectedDate) return;
+    const dateString = formatLocalDate(selectedDate.toDate());
     setIsLoadingQuotes(true);
     setSelectedQuote(null);
     try {
       const result = await getAvailableStartTimes({
-        courtType: formData.courtType,
+        courtType,
         date: dateString,
-        duration: formData.durationHours,
+        duration: durationHours,
         excludeBookingId: bookingId,
       });
       if (!result.success) {
         setQuotableQuotes([]);
-        toast.error(result.error ?? "Could not load available times.");
+        message.error(result.error ?? "Could not load available times.");
         return;
       }
       let list = result.startTimes ?? [];
@@ -165,7 +177,7 @@ export default function EditBookingPage() {
         const sameOriginalSlot = (q: AvailableStartTimeQuote) =>
           loadedBooking.date === dateString &&
           q.startTime === loadedBooking.startTime &&
-          formData.durationHours === Number(loadedBooking.duration);
+          durationHours === Number(loadedBooking.duration);
         list = list.filter(
           (q) => q.startTime >= nowBusinessHourDecimal || sameOriginalSlot(q),
         );
@@ -173,18 +185,19 @@ export default function EditBookingPage() {
       setQuotableQuotes(list);
     } catch (e) {
       setQuotableQuotes([]);
-      toast.error(e instanceof Error ? e.message : "Failed to load slots.");
+      message.error(e instanceof Error ? e.message : "Failed to load slots.");
     } finally {
       setIsLoadingQuotes(false);
     }
   }, [
     loadedBooking,
-    formData.date,
-    formData.courtType,
-    formData.durationHours,
+    selectedDate,
+    courtType,
+    durationHours,
     bookingId,
     todayBusinessKey,
     nowBusinessHourDecimal,
+    message,
   ]);
 
   useEffect(() => {
@@ -196,9 +209,10 @@ export default function EditBookingPage() {
     if (userChangedSlotRef.current) return;
     if (!loadedBooking || isLoadingQuotes || quotableQuotes.length === 0)
       return;
-    const dateString = formatLocalDate(formData.date);
+    if (!selectedDate) return;
+    const dateString = formatLocalDate(selectedDate.toDate());
     if (dateString !== loadedBooking.date) return;
-    if (formData.durationHours !== Number(loadedBooking.duration)) return;
+    if (durationHours !== Number(loadedBooking.duration)) return;
     const courtId =
       typeof loadedBooking.courtId === "object" && loadedBooking.courtId
         ? (loadedBooking.courtId as Court)._id
@@ -213,8 +227,8 @@ export default function EditBookingPage() {
     loadedBooking,
     quotableQuotes,
     isLoadingQuotes,
-    formData.date,
-    formData.durationHours,
+    selectedDate,
+    durationHours,
   ]);
 
   const loadBooking = async () => {
@@ -233,30 +247,29 @@ export default function EditBookingPage() {
             originalPrice: booking.originalPrice,
             discountAmount: booking.discountAmount,
           });
-          const courtType =
+          const resolvedCourtType =
             typeof booking.courtId === "object" &&
             booking.courtId &&
             "type" in booking.courtId
               ? (booking.courtId as Court).type
               : "PADEL";
 
+          setCourtType(
+            resolvedCourtType as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
+          );
+
           const hasNewPaymentFields =
             booking.amountReceivedOnline != null ||
             booking.amountReceivedCash != null;
           const dur = Number(booking.duration);
-          setFormData({
-            date: new Date(booking.date + "T12:00:00"),
-            courtType: courtType as
-              | "PADEL"
-              | "CRICKET"
-              | "PICKLEBALL"
-              | "FUTSAL",
-            durationHours: dur,
+          setDurationHours(dur);
+
+          form.setFieldsValue({
+            date: dayjs(booking.date + "T12:00:00"),
+            status: booking.status,
             userName: booking.userName,
             userEmail: booking.userEmail,
             userPhone: booking.userPhone || "",
-            status: booking.status,
-            amountPaid: booking.amountPaid || 0,
             amountReceivedOnline: hasNewPaymentFields
               ? (booking.amountReceivedOnline ?? 0)
               : 0,
@@ -265,13 +278,13 @@ export default function EditBookingPage() {
               : booking.amountPaid || 0,
           });
         } else {
-          toast.error("Booking not found");
+          message.error("Booking not found");
           router.push("/admin/bookings");
         }
       }
     } catch (error) {
       console.error(error);
-      toast.error("Failed to load booking");
+      message.error("Failed to load booking");
       router.push("/admin/bookings");
     } finally {
       setIsLoadingBooking(false);
@@ -281,7 +294,7 @@ export default function EditBookingPage() {
   const loadCourts = async () => {
     setIsLoadingCourts(true);
     try {
-      const result = await getCourts(formData.courtType);
+      const result = await getCourts(courtType);
       if (result.success) {
         setCourts(result.courts as Court[]);
       }
@@ -292,50 +305,58 @@ export default function EditBookingPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedQuote) {
-      toast.error("Please select a start time");
-      return;
+  const handlePaymentChange = () => {
+    const online = form.getFieldValue("amountReceivedOnline") ?? 0;
+    const cash = form.getFieldValue("amountReceivedCash") ?? 0;
+    const total = online + cash;
+    const status = form.getFieldValue("status");
+    if (total > 0 && status === "pending_payment") {
+      form.setFieldValue("status", "confirmed");
     }
+  };
 
-    if (!formData.userName || !formData.userEmail || !formData.userPhone) {
-      toast.error("Please fill in all user details");
+  const handleSubmit = async (values: EditFormValues) => {
+    if (!selectedQuote) {
+      message.error("Please select a start time");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const dateString = formatLocalDate(formData.date);
+      const dateString = formatLocalDate(values.date.toDate());
 
       const result = await updateBooking({
         bookingId,
         courtId: selectedQuote.assignedCourtId,
         date: dateString,
         startTime: selectedQuote.startTime,
-        duration: formData.durationHours,
-        userName: formData.userName,
-        userEmail: formData.userEmail,
-        userPhone: formData.userPhone,
-        status: formData.status,
-        amountReceivedOnline: formData.amountReceivedOnline,
-        amountReceivedCash: formData.amountReceivedCash,
+        duration: durationHours,
+        userName: values.userName,
+        userEmail: values.userEmail,
+        userPhone: values.userPhone,
+        status: values.status,
+        amountReceivedOnline: values.amountReceivedOnline,
+        amountReceivedCash: values.amountReceivedCash,
       });
 
       if (result.success) {
         router.replace("/admin/bookings");
       } else {
-        toast.error(result.error || "Failed to update booking");
+        message.error(result.error || "Failed to update booking");
         setIsSubmitting(false);
       }
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "An error occurred");
+      message.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const amountReceivedOnline = Form.useWatch("amountReceivedOnline", form) ?? 0;
+  const amountReceivedCash = Form.useWatch("amountReceivedCash", form) ?? 0;
+  const formStatus = Form.useWatch("status", form);
+  const paymentTotal = amountReceivedOnline + amountReceivedCash;
 
   if (!isAdmin) {
     return null;
@@ -345,7 +366,7 @@ export default function EditBookingPage() {
     return (
       <AdminLayout title="Edit Booking" description="Loading...">
         <div className="flex items-center justify-center py-24">
-          <Loader2 className="h-12 w-12 animate-spin text-[#2DD4BF]" />
+          <Spin size="large" />
         </div>
       </AdminLayout>
     );
@@ -353,79 +374,68 @@ export default function EditBookingPage() {
 
   return (
     <AdminLayout title="Edit Booking" description="Update booking details">
-      <div className="p-6 space-y-6">
+      <div className="space-y-6 p-6">
         <Button
-          variant="ghost"
+          type="text"
+          icon={<ArrowLeftOutlined />}
           onClick={() => router.push("/admin/bookings")}
           className="mb-4"
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Bookings
         </Button>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="date" className="text-zinc-200 text-sm">
-                Date
-              </Label>
+        <Form<EditFormValues>
+          form={form}
+          layout="vertical"
+          requiredMark={false}
+          onFinish={handleSubmit}
+          className="space-y-6"
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Form.Item
+              label="Date"
+              name="date"
+              rules={[{ required: true, message: "Please select a date" }]}
+            >
               <DatePicker
-                date={formData.date}
-                onDateChange={(date) => {
-                  if (date) {
-                    userChangedSlotRef.current = false;
-                    setFormData({ ...formData, date });
-                  }
+                className="w-full"
+                onChange={() => {
+                  userChangedSlotRef.current = false;
                 }}
-                variant="admin"
-                minDate={minPickDate}
+                disabledDate={(current) => {
+                  if (!current) return false;
+                  const min = dayjs(minPickDate).startOf("day");
+                  return current.startOf("day").isBefore(min);
+                }}
               />
-            </div>
+            </Form.Item>
 
-            <div className="space-y-2">
-              <Label htmlFor="status" className="text-zinc-200 text-sm">
-                Status
-              </Label>
+            <Form.Item
+              label="Status"
+              name="status"
+              rules={[{ required: true, message: "Please select a status" }]}
+            >
               <Select
-                value={formData.status}
-                onValueChange={(v) =>
-                  setFormData({
-                    ...formData,
-                    status: v as typeof formData.status,
-                  })
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending_payment">
-                    Pending Payment
-                  </SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                options={[
+                  { value: "pending_payment", label: "Pending Payment" },
+                  { value: "confirmed", label: "Confirmed" },
+                  { value: "cancelled", label: "Cancelled" },
+                  { value: "completed", label: "Completed" },
+                ]}
+              />
+            </Form.Item>
           </div>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-zinc-200 text-sm">Duration</Label>
+            <Form.Item label="Duration" required className="mb-0">
               <div className="flex flex-wrap gap-2">
                 {durationPresets.map((preset) => (
                   <button
                     key={preset.hours}
                     type="button"
-                    onClick={() =>
-                      setFormData({
-                        ...formData,
-                        durationHours: preset.hours,
-                      })
-                    }
+                    onClick={() => setDurationHours(preset.hours)}
                     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                      formData.durationHours === preset.hours
+                      durationHours === preset.hours
                         ? "border-teal-400 bg-teal-500/20 text-teal-200"
                         : "border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:border-zinc-500"
                     }`}
@@ -434,29 +444,31 @@ export default function EditBookingPage() {
                   </button>
                 ))}
               </div>
-            </div>
+            </Form.Item>
 
-            <Label className="text-zinc-200 text-sm">
-              Available start times
-              <span className="ml-2 font-normal text-zinc-500">
-                (court assigned automatically; past times today hidden unless
-                this booking)
-              </span>
-            </Label>
+            <div>
+              <Text className="text-sm text-zinc-200">
+                Available start times
+                <span className="ml-2 font-normal text-zinc-500">
+                  (court assigned automatically; past times today hidden unless
+                  this booking)
+                </span>
+              </Text>
+            </div>
 
             {isLoadingCourts ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
+                <Spin />
               </div>
             ) : courts.length === 0 ? (
-              <p className="text-zinc-400 text-sm py-8 text-center">
+              <p className="py-8 text-center text-sm text-zinc-400">
                 No courts available for this court type.
               </p>
             ) : (
               <AdminAvailableSlotGrid
                 quotes={quotableQuotes}
                 selectedQuote={selectedQuote}
-                durationHours={formData.durationHours}
+                durationHours={durationHours}
                 courts={courts}
                 onSelect={(q) => {
                   userChangedSlotRef.current = true;
@@ -472,8 +484,8 @@ export default function EditBookingPage() {
             )}
 
             {selectedQuote && selectedQuote.totalPrice > 0 && (
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 mt-4 space-y-3">
-                <p className="text-zinc-400 text-sm">
+              <div className="mt-4 space-y-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+                <p className="text-sm text-zinc-400">
                   Pricing for the selected slot (saved on update if time or date
                   changed).
                 </p>
@@ -484,7 +496,7 @@ export default function EditBookingPage() {
                   discountAmount={selectedQuote.discountAmount}
                 />
                 {savedBookingPricing ? (
-                  <p className="text-xs text-zinc-500 pt-1 border-t border-zinc-800">
+                  <p className="border-t border-zinc-800 pt-1 text-xs text-zinc-500">
                     Currently saved on booking: PKR{" "}
                     {savedBookingPricing.totalPrice.toLocaleString()}
                     {selectedQuote.totalPrice !==
@@ -502,184 +514,113 @@ export default function EditBookingPage() {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">User Details</h3>
+            <Title level={5} className="mb-0! text-white!">
+              User Details
+            </Title>
 
-            <div className="space-y-2">
-              <Label htmlFor="user-name" className="text-zinc-200 text-sm">
-                User Name
-              </Label>
-              <Input
-                id="user-name"
-                type="text"
-                required
-                value={formData.userName}
-                onChange={(e) =>
-                  setFormData({ ...formData, userName: e.target.value })
+            <Form.Item
+              label="User Name"
+              name="userName"
+              rules={[{ required: true, message: "Please enter the user name" }]}
+            >
+              <Input />
+            </Form.Item>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Form.Item
+                label="Email"
+                name="userEmail"
+                rules={[
+                  { required: true, message: "Please enter the email" },
+                  { type: "email", message: "Please enter a valid email address" },
+                ]}
+              >
+                <Input type="email" />
+              </Form.Item>
+
+              <Form.Item
+                label={
+                  <>
+                    Phone <span className="text-red-400">*</span>
+                  </>
                 }
-                className="text-sm"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="user-email" className="text-zinc-200 text-sm">
-                  Email
-                </Label>
-                <Input
-                  id="user-email"
-                  type="email"
-                  required
-                  value={formData.userEmail}
-                  onChange={(e) =>
-                    setFormData({ ...formData, userEmail: e.target.value })
-                  }
-                  className="text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="user-phone" className="text-zinc-200 text-sm">
-                  Phone <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="user-phone"
-                  type="tel"
-                  required
-                  value={formData.userPhone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, userPhone: e.target.value })
-                  }
-                  placeholder="+92 300 1234567"
-                  pattern="[+]?[0-9\s\-()]{10,}"
-                  className="text-sm"
-                />
-              </div>
+                name="userPhone"
+                rules={[{ required: true, message: "Please enter the phone number" }]}
+              >
+                <Input type="tel" placeholder="+92 300 1234567" />
+              </Form.Item>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">
+            <Title level={5} className="mb-0! text-white!">
               Payment Details
-            </h3>
+            </Title>
 
-            <div className="space-y-3">
-              <Label className="text-zinc-200 text-sm block">
-                Payment received
-              </Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-lg border border-zinc-800 bg-zinc-900/30">
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="amount-online"
-                    className="text-zinc-400 text-xs"
-                  >
-                    Received online (PKR)
-                  </Label>
-                  <Input
-                    id="amount-online"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={
-                      formData.amountReceivedOnline === 0
-                        ? ""
-                        : formData.amountReceivedOnline
-                    }
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value) || 0;
-                      const total = value + formData.amountReceivedCash;
-                      setFormData((prev) => ({
-                        ...prev,
-                        amountReceivedOnline: value,
-                        amountPaid: total,
-                        status:
-                          total > 0 && prev.status === "pending_payment"
-                            ? "confirmed"
-                            : prev.status,
-                      }));
-                    }}
-                    className="text-sm"
+            <Form.Item label="Payment received" className="mb-0">
+              <div className="grid grid-cols-1 gap-4 rounded-lg border border-zinc-800 bg-zinc-900/30 p-4 sm:grid-cols-2">
+                <Form.Item
+                  label="Received online (PKR)"
+                  name="amountReceivedOnline"
+                  className="mb-0"
+                >
+                  <InputNumber
+                    min={0}
+                    step={1}
+                    className="w-full"
                     placeholder="0"
+                    onChange={handlePaymentChange}
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="amount-cash"
-                    className="text-zinc-400 text-xs"
-                  >
-                    Received in cash (PKR)
-                  </Label>
-                  <Input
-                    id="amount-cash"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={
-                      formData.amountReceivedCash === 0
-                        ? ""
-                        : formData.amountReceivedCash
-                    }
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value) || 0;
-                      const total = formData.amountReceivedOnline + value;
-                      setFormData((prev) => ({
-                        ...prev,
-                        amountReceivedCash: value,
-                        amountPaid: total,
-                        status:
-                          total > 0 && prev.status === "pending_payment"
-                            ? "confirmed"
-                            : prev.status,
-                      }));
-                    }}
-                    className="text-sm"
+                </Form.Item>
+
+                <Form.Item
+                  label="Received in cash (PKR)"
+                  name="amountReceivedCash"
+                  className="mb-0"
+                >
+                  <InputNumber
+                    min={0}
+                    step={1}
+                    className="w-full"
                     placeholder="0"
+                    onChange={handlePaymentChange}
                   />
-                </div>
-                <div className="sm:col-span-2 flex items-center gap-2 pt-1 border-t border-zinc-800">
-                  <span className="text-zinc-400 text-xs">
+                </Form.Item>
+
+                <div className="flex items-center gap-2 border-t border-zinc-800 pt-1 sm:col-span-2">
+                  <Text type="secondary" className="text-xs">
                     Account received (total)
-                  </span>
-                  <span className="text-[#2DD4BF] font-semibold text-sm">
-                    PKR{" "}
-                    {(
-                      formData.amountReceivedOnline +
-                      formData.amountReceivedCash
-                    ).toLocaleString()}
-                  </span>
+                  </Text>
+                  <Text className="text-sm font-semibold text-[#2DD4BF]">
+                    PKR {paymentTotal.toLocaleString()}
+                  </Text>
                 </div>
               </div>
-              <p className="text-xs text-zinc-400">
-                {formData.amountReceivedOnline + formData.amountReceivedCash >
-                  0 && formData.status === "pending_payment"
-                  ? 'Status will change to "Confirmed" when saved. Set status to "Completed" when payment is fully settled.'
-                  : ""}
-              </p>
-            </div>
+            </Form.Item>
+
+            {paymentTotal > 0 && formStatus === "pending_payment" && (
+              <Alert
+                type="info"
+                showIcon
+                message='Status will change to "Confirmed" when saved. Set status to "Completed" when payment is fully settled.'
+              />
+            )}
           </div>
 
-          <div className="flex items-center justify-end gap-4 pt-4 border-t border-zinc-800">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => router.push("/admin/bookings")}
-            >
+          <div className="flex items-center justify-end gap-4 border-t border-zinc-800 pt-4">
+            <Button type="text" onClick={() => router.push("/admin/bookings")}>
               Cancel
             </Button>
             <Button
-              type="submit"
-              className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-              disabled={isSubmitting || !selectedQuote}
+              type="primary"
+              htmlType="submit"
+              loading={isSubmitting}
+              disabled={!selectedQuote}
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                "Update Booking"
-              )}
+              Update Booking
             </Button>
           </div>
-        </form>
+        </Form>
       </div>
     </AdminLayout>
   );

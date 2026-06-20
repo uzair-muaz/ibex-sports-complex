@@ -1,61 +1,35 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
-  Search,
-  Plus,
-  Edit2,
-  Trash2,
-  Eye,
-  Loader2,
-  X,
-  CalendarIcon,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
+  App,
+  Button,
+  Card,
+  DatePicker,
+  Input,
+  Modal,
   Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-  PaginationEllipsis,
-  PaginationLink,
-} from "@/components/ui/pagination";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
+  Segmented,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from "antd";
+import type { ColumnsType, TableProps } from "antd/es/table";
+import type { Dayjs } from "dayjs";
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+  CloseOutlined,
+  CalendarOutlined,
+} from "@ant-design/icons";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { QRCode } from "@/components/ui/qr-code";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   getBookingsPaginated,
   deleteBooking,
@@ -65,24 +39,130 @@ import {
 } from "../../actions/bookings";
 import type { Booking, Court } from "@/types";
 import { formatDisplayDate, formatTime12 } from "@/lib/utils";
-import { Calendar } from "@/components/ui/calendar";
-import type { DateRange as DayPickerDateRange } from "react-day-picker";
 import {
   getTodayRange,
   getCurrentWeekRange,
   getCurrentMonthRange,
   getRangeFromDates,
 } from "@/lib/date-range-utils";
-import { toast } from "sonner";
+
+const { Text } = Typography;
+
+type DateFilter = "all" | "today" | "week" | "month" | "range";
+type SortColumn = keyof Booking | "courtName";
+
+const DATE_FILTER_OPTIONS: { label: string; value: DateFilter }[] = [
+  { label: "All", value: "all" },
+  { label: "Today", value: "today" },
+  { label: "This Week", value: "week" },
+  { label: "This Month", value: "month" },
+  { label: "Custom Range", value: "range" },
+];
+
+const STATUS_OPTIONS: { value: Booking["status"]; label: string }[] = [
+  { value: "pending_payment", label: "Pending Payment" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+function getCourtName(booking: Booking): string {
+  return typeof booking.courtId === "object" &&
+    booking.courtId &&
+    "name" in booking.courtId
+    ? (booking.courtId as Court).name || "Unknown Court"
+    : "Unknown Court";
+}
+
+function formatStatusLabel(status: Booking["status"]): string {
+  if (status === "pending_payment") return "Pending Payment";
+  return (
+    status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ")
+  );
+}
+
+function getStatusTagColor(status: Booking["status"]): string {
+  switch (status) {
+    case "confirmed":
+      return "cyan";
+    case "pending_payment":
+      return "gold";
+    case "cancelled":
+      return "red";
+    case "completed":
+      return "green";
+    default:
+      return "default";
+  }
+}
+
+function getEndTimeLabel(booking: Booking): string {
+  const endTime =
+    (((booking.startTime + booking.duration) % 24) + 24) % 24;
+  const suffix =
+    booking.startTime + booking.duration > 24 ? " (+1 day)" : "";
+  return `${formatTime12(booking.startTime)} – ${formatTime12(endTime)}${suffix}`;
+}
+
+function sortBookings(
+  bookings: Booking[],
+  sortColumn: SortColumn | null,
+  sortDirection: "asc" | "desc",
+): Booking[] {
+  if (!sortColumn) return bookings;
+
+  return [...bookings].sort((a, b) => {
+    let aValue: unknown;
+    let bValue: unknown;
+
+    if (sortColumn === "courtName") {
+      aValue = getCourtName(a);
+      bValue = getCourtName(b);
+    } else if (sortColumn === "createdAt" || sortColumn === "updatedAt") {
+      const aDate = new Date(a[sortColumn]);
+      const bDate = new Date(b[sortColumn]);
+      const diff = aDate.getTime() - bDate.getTime();
+      return sortDirection === "asc" ? diff : -diff;
+    } else if (sortColumn === "date") {
+      const aDateStr = a.date;
+      const bDateStr = b.date;
+
+      if (aDateStr === bDateStr) {
+        const timeDiff = a.startTime - b.startTime;
+        return sortDirection === "asc" ? timeDiff : -timeDiff;
+      }
+
+      if (aDateStr < bDateStr) return sortDirection === "asc" ? -1 : 1;
+      if (aDateStr > bDateStr) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    } else {
+      const key = sortColumn as keyof Booking;
+      aValue = a[key];
+      bValue = b[key];
+    }
+
+    if (typeof aValue === "string" && typeof bValue === "string") {
+      aValue = aValue.toLowerCase();
+      bValue = bValue.toLowerCase();
+    }
+
+    if (typeof aValue === "number" && typeof bValue === "number") {
+      return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+    }
+
+    return 0;
+  });
+}
 
 export default function BookingsPage() {
+  const { message } = App.useApp();
   const { data: session } = useSession();
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState("");
   const [debouncedFilter, setDebouncedFilter] = useState("");
-  const [page, setPage] = useState(1); // 1-based
+  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
   const [showBookingDetailsModal, setShowBookingDetailsModal] = useState(false);
@@ -111,44 +191,33 @@ export default function BookingsPage() {
     canExtend30: boolean;
     canExtend60: boolean;
   } | null>(null);
-  const [sortColumn, setSortColumn] = useState<
-    keyof Booking | "courtName" | null
-  >("date");
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [dateFilter, setDateFilter] = useState<
-    "all" | "today" | "week" | "month" | "range"
-  >("today");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("today");
   const [customRange, setCustomRange] = useState<
-    DayPickerDateRange | undefined
-  >(undefined);
+    [Dayjs | null, Dayjs | null] | null
+  >(null);
   const [showRangeModal, setShowRangeModal] = useState(false);
 
   const userRole = session?.user.role;
   const isSuperAdmin = userRole === "super_admin";
   const isAdmin = userRole === "admin" || isSuperAdmin;
 
-  useEffect(() => {
-    if (!session) return;
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, page, pageSize, dateFilter, customRange, debouncedFilter]);
+  const getActiveDateRange = useCallback(() => {
+    const now = new Date();
+    if (dateFilter === "today") return getTodayRange(now);
+    if (dateFilter === "week") return getCurrentWeekRange(now);
+    if (dateFilter === "month") return getCurrentMonthRange(now);
+    if (dateFilter === "range") {
+      return getRangeFromDates(
+        customRange?.[0]?.toDate() ?? null,
+        customRange?.[1]?.toDate() ?? null,
+      );
+    }
+    return null;
+  }, [dateFilter, customRange]);
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedFilter(filter), 400);
-    return () => clearTimeout(t);
-  }, [filter]);
-
-  useEffect(() => {
-    // Reset to first page whenever filters change.
-    setPage(1);
-  }, [dateFilter, customRange, debouncedFilter]);
-
-  useEffect(() => {
-    // Reset to first page whenever rows-per-page changes.
-    setPage(1);
-  }, [pageSize]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const activeRange = getActiveDateRange();
@@ -167,11 +236,35 @@ export default function BookingsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [
+    page,
+    pageSize,
+    dateFilter,
+    debouncedFilter,
+    getActiveDateRange,
+  ]);
+
+  useEffect(() => {
+    if (!session) return;
+    loadData();
+  }, [session, loadData]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedFilter(filter), 400);
+    return () => clearTimeout(t);
+  }, [filter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [dateFilter, customRange, debouncedFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
 
   const handleCancelBooking = (booking: Booking) => {
     if (booking.status === "completed") {
-      toast.warning("Completed bookings cannot be cancelled.");
+      message.warning("Completed bookings cannot be cancelled.");
       return;
     }
     setCancellingBooking(booking);
@@ -193,10 +286,12 @@ export default function BookingsPage() {
         setCancellingBooking(null);
         loadData();
       } else {
-        toast.error(result.error || "Failed to cancel booking");
+        message.error(result.error || "Failed to cancel booking");
       }
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "An error occurred");
+      message.error(
+        error instanceof Error ? error.message : "An error occurred",
+      );
     } finally {
       setIsCancelling(false);
     }
@@ -218,10 +313,12 @@ export default function BookingsPage() {
         setDeletingBooking(null);
         loadData();
       } else {
-        toast.error(result.error || "Failed to delete booking");
+        message.error(result.error || "Failed to delete booking");
       }
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "An error occurred");
+      message.error(
+        error instanceof Error ? error.message : "An error occurred",
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -246,10 +343,10 @@ export default function BookingsPage() {
           );
         }
       } else {
-        toast.error(result.error || "Failed to update status");
+        message.error(result.error || "Failed to update status");
       }
     } catch (err: unknown) {
-      toast.error(
+      message.error(
         err instanceof Error ? err.message : "Failed to update status",
       );
     } finally {
@@ -276,15 +373,14 @@ export default function BookingsPage() {
     try {
       const result = await extendBooking({ bookingId, extraDuration });
       if (result.success) {
-        // Refresh list + modal data
         loadData();
         setViewingBooking(result.booking as Booking);
         setExtensionAvailability(null);
       } else {
-        toast.error(result.error || "Failed to extend booking");
+        message.error(result.error || "Failed to extend booking");
       }
     } catch (error: unknown) {
-      toast.error(
+      message.error(
         error instanceof Error ? error.message : "Failed to extend booking",
       );
     } finally {
@@ -298,7 +394,7 @@ export default function BookingsPage() {
     try {
       const result = await checkBookingExtensionAvailability(bookingId);
       if (!result.success) {
-        toast.error(result.error || "Failed to check extension availability");
+        message.error(result.error || "Failed to check extension availability");
         setExtensionAvailability(null);
         return;
       }
@@ -309,10 +405,10 @@ export default function BookingsPage() {
         canExtend60: result.canExtend60 ?? false,
       });
       if (!result.hasAnyOption) {
-        toast.warning("This booking cannot be extended right now.");
+        message.warning("This booking cannot be extended right now.");
       }
     } catch (error: unknown) {
-      toast.error(
+      message.error(
         error instanceof Error
           ? error.message
           : "Failed to check extension availability",
@@ -327,128 +423,242 @@ export default function BookingsPage() {
     router.push("/admin/bookings/new");
   };
 
-  const getActiveDateRange = () => {
-    const now = new Date();
-    if (dateFilter === "today") return getTodayRange(now);
-    if (dateFilter === "week") return getCurrentWeekRange(now);
-    if (dateFilter === "month") return getCurrentMonthRange(now);
-    if (dateFilter === "range") {
-      return getRangeFromDates(
-        customRange?.from ?? null,
-        customRange?.to ?? null,
-      );
+  const handleDateFilterChange = (value: DateFilter) => {
+    if (value === "range") {
+      setCustomRange(null);
+      setDateFilter("range");
+      setShowRangeModal(true);
+    } else {
+      setShowRangeModal(false);
+      setDateFilter(value);
     }
-    return null;
+  };
+
+  const handleTableChange: TableProps<Booking>["onChange"] = (
+    _pagination,
+    _filters,
+    sorter,
+  ) => {
+    const s = Array.isArray(sorter) ? sorter[0] : sorter;
+    if (s?.columnKey && s.order) {
+      setSortColumn(s.columnKey as SortColumn);
+      setSortDirection(s.order === "ascend" ? "asc" : "desc");
+    } else {
+      setSortColumn("date");
+      setSortDirection("desc");
+    }
   };
 
   const activeRange = getActiveDateRange();
-  // Date range + search filtering is now applied on the server to keep the admin fast.
-  const filteredBookings = bookings;
+  const sortedBookings = useMemo(
+    () => sortBookings(bookings, sortColumn, sortDirection),
+    [bookings, sortColumn, sortDirection],
+  );
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const paginationPages = React.useMemo(() => {
-    const pages: Array<number | "ellipsis"> = [];
 
-    if (totalPages <= 7) {
-      for (let p = 1; p <= totalPages; p++) pages.push(p);
-      return pages;
-    }
-
-    const current = page;
-    const windowSize = 2; // show current +/-2
-
-    pages.push(1);
-
-    const start = Math.max(2, current - windowSize);
-    const end = Math.min(totalPages - 1, current + windowSize);
-
-    if (start > 2) pages.push("ellipsis");
-
-    for (let p = start; p <= end; p++) pages.push(p);
-
-    if (end < totalPages - 1) pages.push("ellipsis");
-
-    pages.push(totalPages);
-    return pages;
-  }, [page, totalPages]);
-
-  const handleSort = (column: keyof Booking | "courtName") => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortColumn(column);
-      setSortDirection("asc");
-    }
+  const getSortOrder = (column: SortColumn) => {
+    if (sortColumn !== column) return null;
+    return sortDirection === "asc" ? ("ascend" as const) : ("descend" as const);
   };
 
-  const sortedBookings = [...filteredBookings].sort((a, b) => {
-    if (!sortColumn) return 0;
+  const columns: ColumnsType<Booking> = useMemo(
+    () => [
+      {
+        title: "No.",
+        key: "serialNumber",
+        width: 70,
+        render: (_, booking) => (
+          <Text type="secondary" className="font-mono text-xs">
+            {typeof booking.serialNumber === "number"
+              ? booking.serialNumber.toString().padStart(3, "0")
+              : "—"}
+          </Text>
+        ),
+      },
+      {
+        title: "User",
+        key: "userName",
+        minWidth: 160,
+        sorter: true,
+        sortOrder: getSortOrder("userName"),
+        render: (_, booking) => (
+          <div>
+            <div className="font-medium text-white">{booking.userName}</div>
+            <Text
+              type="secondary"
+              className="block max-w-[180px] truncate text-xs"
+              title={booking.userEmail}
+            >
+              {booking.userEmail}
+            </Text>
+            <Text type="secondary" className="text-xs">
+              {booking.userPhone || "—"}
+            </Text>
+          </div>
+        ),
+      },
+      {
+        title: "Court",
+        key: "courtName",
+        minWidth: 100,
+        sorter: true,
+        sortOrder: getSortOrder("courtName"),
+        render: (_, booking) => <Tag>{getCourtName(booking)}</Tag>,
+      },
+      {
+        title: "Date & Time",
+        key: "date",
+        minWidth: 140,
+        sorter: true,
+        sortOrder: getSortOrder("date"),
+        defaultSortOrder: "descend",
+        render: (_, booking) => (
+          <div>
+            <div>{formatDisplayDate(booking.date)}</div>
+            <Text type="secondary" className="text-xs">
+              {getEndTimeLabel(booking)}
+            </Text>
+          </div>
+        ),
+      },
+      {
+        title: "Booking total",
+        key: "totalPrice",
+        minWidth: 100,
+        sorter: true,
+        sortOrder: getSortOrder("totalPrice"),
+        render: (_, booking) => (
+          <span className="font-semibold text-[#2DD4BF]">
+            PKR {booking.totalPrice.toLocaleString()}
+          </span>
+        ),
+      },
+      {
+        title: "Received & discount",
+        key: "received",
+        minWidth: 160,
+        render: (_, booking) => {
+          const online = booking.amountReceivedOnline ?? 0;
+          const cash = booking.amountReceivedCash ?? 0;
+          const received =
+            online + cash > 0 ? online + cash : (booking.amountPaid ?? 0);
+          const discount =
+            booking.status === "completed" && booking.totalPrice - received > 0
+              ? booking.totalPrice - received
+              : 0;
+          const hasBreakdown = online > 0 || cash > 0;
 
-    let aValue: unknown;
-    let bValue: unknown;
-
-    if (sortColumn === "courtName") {
-      aValue =
-        typeof a.courtId === "object" && a.courtId && "name" in a.courtId
-          ? (a.courtId as Court).name || "Unknown Court"
-          : "Unknown Court";
-      bValue =
-        typeof b.courtId === "object" && b.courtId && "name" in b.courtId
-          ? (b.courtId as Court).name || "Unknown Court"
-          : "Unknown Court";
-    } else if (sortColumn === "createdAt" || sortColumn === "updatedAt") {
-      // Sort by date fields using actual Date comparison
-      const aDate = new Date(a[sortColumn]);
-      const bDate = new Date(b[sortColumn]);
-      const diff = aDate.getTime() - bDate.getTime();
-      return sortDirection === "asc" ? diff : -diff;
-    } else if (sortColumn === "date") {
-      // Sort by booking date, then by start time within the same day
-      const aDateStr = a.date;
-      const bDateStr = b.date;
-
-      if (aDateStr === bDateStr) {
-        const timeDiff = a.startTime - b.startTime;
-        return sortDirection === "asc" ? timeDiff : -timeDiff;
-      }
-
-      if (aDateStr < bDateStr) return sortDirection === "asc" ? -1 : 1;
-      if (aDateStr > bDateStr) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    } else {
-      const key = sortColumn as keyof Booking;
-      aValue = a[key];
-      bValue = b[key];
-    }
-
-    // Handle string comparison
-    if (typeof aValue === "string" && typeof bValue === "string") {
-      aValue = aValue.toLowerCase();
-      bValue = bValue.toLowerCase();
-    }
-
-    // Handle number comparison
-    if (typeof aValue === "number" && typeof bValue === "number") {
-      return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-    }
-
-    return 0;
-  });
-
-  const SortIcon = ({ column }: { column: keyof Booking | "courtName" }) => {
-    if (sortColumn !== column) {
-      return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
-    }
-    return sortDirection === "asc" ? (
-      <ArrowUp className="w-3 h-3 ml-1 text-[#2DD4BF]" />
-    ) : (
-      <ArrowDown className="w-3 h-3 ml-1 text-[#2DD4BF]" />
-    );
-  };
+          return (
+            <div className="space-y-1 text-xs">
+              {hasBreakdown ? (
+                <Text type="secondary">
+                  Online {online.toLocaleString()} + Cash{" "}
+                  {cash.toLocaleString()}
+                </Text>
+              ) : null}
+              <div className="font-medium text-white">
+                Total {received.toLocaleString()}
+              </div>
+              {discount > 0 && (
+                <div className="text-amber-400">
+                  Discount {discount.toLocaleString()}
+                </div>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        title: "Status",
+        key: "status",
+        minWidth: 180,
+        sorter: true,
+        sortOrder: getSortOrder("status"),
+        render: (_, booking) => (
+          <Select
+            value={booking.status}
+            onChange={(value) =>
+              handleStatusChange(booking._id, value as Booking["status"])
+            }
+            disabled={updatingStatusBookingId === booking._id}
+            loading={updatingStatusBookingId === booking._id}
+            options={STATUS_OPTIONS}
+            style={{ width: 165 }}
+            popupMatchSelectWidth={false}
+          />
+        ),
+      },
+      {
+        title: "Actions",
+        key: "actions",
+        align: "right",
+        minWidth: 140,
+        fixed: "right",
+        render: (_, booking) => (
+          <Space size="small">
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              onClick={() => handleViewBooking(booking)}
+              title="View Details"
+            />
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => handleEditBooking(booking)}
+              title="Edit"
+            />
+            {(booking.status === "confirmed" ||
+              booking.status === "pending_payment") && (
+              <Button
+                type="text"
+                danger
+                icon={<CloseOutlined />}
+                onClick={() => handleCancelBooking(booking)}
+                title="Cancel Booking"
+              />
+            )}
+            {isSuperAdmin && (
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleDeleteBooking(booking)}
+                title="Delete"
+              />
+            )}
+          </Space>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sortColumn, sortDirection, updatingStatusBookingId, isSuperAdmin],
+  );
 
   if (!isAdmin) {
     router.push("/admin");
     return null;
   }
+
+  const closeBookingDetailsModal = () => {
+    setShowBookingDetailsModal(false);
+    setViewingBooking(null);
+    setExtensionAvailability(null);
+  };
+
+  const viewingReceived =
+    viewingBooking
+      ? (viewingBooking.amountReceivedOnline ?? 0) +
+          (viewingBooking.amountReceivedCash ?? 0) ||
+        (viewingBooking.amountPaid ?? 0)
+      : 0;
+
+  const viewingDiscount =
+    viewingBooking &&
+    viewingBooking.status === "completed" &&
+    viewingBooking.totalPrice - viewingReceived > 0
+      ? viewingBooking.totalPrice - viewingReceived
+      : 0;
 
   return (
     <AdminLayout
@@ -458,1079 +668,585 @@ export default function BookingsPage() {
       isLoading={isLoading}
       actionButton={
         isAdmin && (
-          <Button
-            onClick={handleCreateBooking}
-            className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6] text-xs sm:text-sm"
-          >
-            <Plus className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateBooking}>
             <span className="hidden sm:inline">Create Booking</span>
           </Button>
         )
       }
     >
       <div className="space-y-4">
-        <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-stretch lg:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-            <Input
-              type="text"
-              placeholder="Search by name, email or booking ID..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="w-full pl-10 text-sm"
+        <div className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:gap-4">
+          <Input.Search
+            placeholder="Search by name, email or booking ID..."
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            allowClear
+            className="w-full flex-1"
+          />
+          <Space wrap>
+            <Segmented
+              options={DATE_FILTER_OPTIONS}
+              value={dateFilter}
+              onChange={(value) => handleDateFilterChange(value as DateFilter)}
             />
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-950 p-1 text-xs sm:text-sm">
-              {[
-                { id: "all", label: "All" },
-                { id: "today", label: "Today" },
-                { id: "week", label: "This Week" },
-                { id: "month", label: "This Month" },
-                { id: "range", label: "Custom Range" },
-              ].map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() =>
-                    option.id === "range"
-                      ? (() => {
-                          setCustomRange(undefined);
-                          setDateFilter("range");
-                          setShowRangeModal(true);
-                        })()
-                      : (() => {
-                          setShowRangeModal(false);
-                          setDateFilter(option.id as typeof dateFilter);
-                        })()
-                  }
-                  className={`px-2.5 py-1.5 rounded-md transition-colors ${
-                    dateFilter === option.id
-                      ? "bg-[#2DD4BF] text-[#0F172A]"
-                      : "text-zinc-300 hover:bg-zinc-900"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
             {dateFilter === "range" && (
               <Button
-                type="button"
-                variant="ghost"
+                icon={<CalendarOutlined />}
                 onClick={() => setShowRangeModal(true)}
-                className="h-9 px-3 text-zinc-200 hover:text-white hover:bg-zinc-900 border border-zinc-800"
               >
-                <CalendarIcon className="h-4 w-4 text-zinc-400 mr-2" />
-                <span className="text-xs sm:text-sm">
-                  {customRange?.from && customRange?.to
-                    ? `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`
-                    : "Select date range"}
-                </span>
+                {customRange?.[0] && customRange?.[1]
+                  ? `${customRange[0].format("MMM D, YYYY")} - ${customRange[1].format("MMM D, YYYY")}`
+                  : "Select date range"}
               </Button>
             )}
             {(dateFilter !== "all" || activeRange) && (
               <Button
-                type="button"
-                variant="ghost"
+                type="text"
+                icon={<CloseOutlined />}
                 onClick={() => {
                   setDateFilter("all");
-                  setCustomRange(undefined);
+                  setCustomRange(null);
                   setShowRangeModal(false);
                 }}
-                className="h-9 w-9 p-0 border border-zinc-800 hover:bg-zinc-900"
                 title="Clear date filter"
-              >
-                <X className="w-4 h-4 text-zinc-300" />
-              </Button>
+              />
             )}
-          </div>
+          </Space>
         </div>
 
         {activeRange && (
-          <p className="text-xs text-zinc-400">
+          <Text type="secondary" className="text-xs">
             Showing bookings from{" "}
             <span className="font-mono">{activeRange.from}</span> to{" "}
             <span className="font-mono">{activeRange.to}</span>
-          </p>
+          </Text>
         )}
 
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-zinc-800">
-                    <TableHead className="w-[70px]">
-                      <div className="flex items-center">No.</div>
-                    </TableHead>
-                    <TableHead
-                      className="min-w-[160px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("userName")}
-                    >
-                      <div className="flex items-center">
-                        User
-                        <SortIcon column="userName" />
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("courtName")}
-                    >
-                      <div className="flex items-center">
-                        Court
-                        <SortIcon column="courtName" />
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="min-w-[140px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("date")}
-                    >
-                      <div className="flex items-center">
-                        Date & Time
-                        <SortIcon column="date" />
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("totalPrice")}
-                    >
-                      <div className="flex items-center">
-                        Booking total
-                        <SortIcon column="totalPrice" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="min-w-[160px]">
-                      Received & discount
-                    </TableHead>
-                    <TableHead
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("status")}
-                    >
-                      <div className="flex items-center">
-                        Status
-                        <SortIcon column="status" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-right min-w-[140px]">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <>
-                      {[...Array(5)].map((_, i) => (
-                        <TableRow key={i} className="border-zinc-800">
-                          <TableCell>
-                            <Skeleton className="h-4 w-10" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-32 mb-2" />
-                            <Skeleton className="h-3 w-40" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-24" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-24 mb-2" />
-                            <Skeleton className="h-3 w-32" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-20" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-24" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-6 w-16" />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2 justify-end">
-                              <Skeleton className="h-8 w-8 rounded" />
-                              <Skeleton className="h-8 w-8 rounded" />
-                              <Skeleton className="h-8 w-8 rounded" />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </>
-                  ) : sortedBookings.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={8}
-                        className="text-center text-zinc-400 py-8"
-                      >
-                        No bookings found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    sortedBookings.map((booking) => {
-                      const courtName =
-                        typeof booking.courtId === "object" &&
-                        booking.courtId &&
-                        "name" in booking.courtId
-                          ? (booking.courtId as Court).name || "Unknown Court"
-                          : "Unknown Court";
-
-                      return (
-                        <TableRow key={booking._id} className="border-zinc-800">
-                          <TableCell className="font-mono text-zinc-400 text-xs">
-                            {typeof booking.serialNumber === "number"
-                              ? booking.serialNumber.toString().padStart(3, "0")
-                              : "—"}
-                          </TableCell>
-                          <TableCell className="text-zinc-200 text-sm">
-                            <div className="font-medium text-white">
-                              {booking.userName}
-                            </div>
-                            <div
-                              className="text-zinc-400 text-xs truncate max-w-[180px]"
-                              title={booking.userEmail}
-                            >
-                              {booking.userEmail}
-                            </div>
-                            <div className="text-zinc-500 text-xs">
-                              {booking.userPhone || "—"}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className="bg-zinc-900/50 border-zinc-800 text-zinc-200 text-xs"
-                            >
-                              {courtName}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-zinc-200 text-sm">
-                            <div>{formatDisplayDate(booking.date)}</div>
-                            <div className="text-xs text-zinc-400">
-                              {formatTime12(booking.startTime)} –{" "}
-                              {formatTime12(
-                                (((booking.startTime + booking.duration) % 24) +
-                                  24) %
-                                  24,
-                              )}
-                              {booking.startTime + booking.duration > 24
-                                ? " (+1 day)"
-                                : ""}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-zinc-200 text-sm">
-                            <span className="text-[#2DD4BF] font-semibold">
-                              PKR {booking.totalPrice.toLocaleString()}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-zinc-200 text-sm align-top">
-                            {(() => {
-                              const online = booking.amountReceivedOnline ?? 0;
-                              const cash = booking.amountReceivedCash ?? 0;
-                              const received =
-                                online + cash > 0
-                                  ? online + cash
-                                  : (booking.amountPaid ?? 0);
-                              const discount =
-                                booking.status === "completed" &&
-                                booking.totalPrice - received > 0
-                                  ? booking.totalPrice - received
-                                  : 0;
-                              const hasBreakdown = online > 0 || cash > 0;
-                              return (
-                                <div className="space-y-1 text-xs">
-                                  {hasBreakdown ? (
-                                    <div className="text-zinc-400">
-                                      Online {online.toLocaleString()} + Cash{" "}
-                                      {cash.toLocaleString()}
-                                    </div>
-                                  ) : null}
-                                  <div className="text-white font-medium">
-                                    Total {received.toLocaleString()}
-                                  </div>
-                                  {discount > 0 && (
-                                    <div className="text-amber-400">
-                                      Discount {discount.toLocaleString()}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={booking.status}
-                              onValueChange={(value) =>
-                                handleStatusChange(
-                                  booking._id,
-                                  value as Booking["status"],
-                                )
-                              }
-                              disabled={updatingStatusBookingId === booking._id}
-                            >
-                              <SelectTrigger
-                                className={`w-[165px] min-w-[165px] h-8 text-xs border ${
-                                  booking.status === "confirmed"
-                                    ? "border-[#2DD4BF]/50 text-[#2DD4BF] bg-[#2DD4BF]/10"
-                                    : booking.status === "pending_payment"
-                                      ? "border-yellow-500/50 text-yellow-400 bg-yellow-500/10"
-                                      : booking.status === "cancelled"
-                                        ? "border-red-500/50 text-red-400 bg-red-500/10"
-                                        : booking.status === "completed"
-                                          ? "border-green-500/50 text-green-400 bg-green-500/10"
-                                          : "border-zinc-600 text-zinc-300 bg-zinc-800/50"
-                                }`}
-                              >
-                                <SelectValue />
-                                {updatingStatusBookingId === booking._id && (
-                                  <Loader2 className="w-3 h-3 animate-spin ml-1 shrink-0" />
-                                )}
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending_payment">
-                                  Pending Payment
-                                </SelectItem>
-                                <SelectItem value="confirmed">
-                                  Confirmed
-                                </SelectItem>
-                                <SelectItem value="completed">
-                                  Completed
-                                </SelectItem>
-                                <SelectItem value="cancelled">
-                                  Cancelled
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleViewBooking(booking)}
-                                className="text-zinc-400 hover:text-[#2DD4BF] h-8 w-8"
-                                title="View Details"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditBooking(booking)}
-                                className="text-zinc-400 hover:text-[#2DD4BF] h-8 w-8"
-                                title="Edit"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </Button>
-                              {(booking.status === "confirmed" ||
-                                booking.status === "pending_payment") && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleCancelBooking(booking)}
-                                  className="text-zinc-400 hover:text-red-400 h-8 w-8"
-                                  title="Cancel Booking"
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {isSuperAdmin && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteBooking(booking)}
-                                  className="text-zinc-400 hover:text-red-400 h-8 w-8"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+        <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
+          <Table<Booking>
+            columns={columns}
+            dataSource={sortedBookings}
+            rowKey="_id"
+            loading={isLoading}
+            scroll={{ x: "max-content" }}
+            onChange={handleTableChange}
+            locale={{ emptyText: "No bookings found." }}
+            pagination={false}
+          />
+          <div className="flex flex-col gap-3 border-t border-zinc-800 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <Text type="secondary" className="text-xs">
+              Page <span className="font-mono text-zinc-200">{page}</span> of{" "}
+              <span className="font-mono text-zinc-200">{totalPages}</span>{" "}
+              <span className="ml-2">({totalCount} total)</span>
+            </Text>
+            <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+              <Space size="small">
+                <Text type="secondary" className="text-xs">
+                  Rows per page
+                </Text>
+                <Select
+                  value={pageSize}
+                  onChange={(value) => setPageSize(value)}
+                  options={[10, 20, 50, 100].map((n) => ({
+                    value: n,
+                    label: String(n),
+                  }))}
+                  style={{ width: 80 }}
+                />
+              </Space>
+              <Pagination
+                current={page}
+                pageSize={pageSize}
+                total={totalCount}
+                onChange={(p, ps) => {
+                  setPage(p);
+                  if (ps !== pageSize) setPageSize(ps);
+                }}
+                showSizeChanger={false}
+                disabled={isLoading}
+              />
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-t border-zinc-800">
-              <div className="text-xs text-zinc-400">
-                Page <span className="font-mono text-zinc-200">{page}</span> of{" "}
-                <span className="font-mono text-zinc-200">{totalPages}</span>{" "}
-                <span className="ml-2">({totalCount} total)</span>
-              </div>
-              <div className="flex items-center gap-0 justify-end">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-400">Rows per page</span>
-                  <Select
-                    value={String(pageSize)}
-                    onValueChange={(v) => setPageSize(Number(v))}
-                  >
-                    <SelectTrigger className="h-8 w-[120px] border-zinc-800 bg-zinc-950 text-zinc-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-950">
-                      {[10, 20, 50, 100].map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          {n}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Pagination className="justify-end">
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
-                        aria-disabled={isLoading || page <= 1}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (isLoading || page <= 1) return;
-                          setPage((p) => Math.max(1, p - 1));
-                        }}
-                      />
-                    </PaginationItem>
-
-                    {paginationPages.map((p, idx) => {
-                      if (p === "ellipsis") {
-                        return (
-                          <PaginationItem key={`ellipsis-${idx}`}>
-                            <PaginationEllipsis />
-                          </PaginationItem>
-                        );
-                      }
-
-                      const pageNum = p;
-                      const isActive = pageNum === page;
-
-                      return (
-                        <PaginationItem key={pageNum}>
-                          <PaginationLink
-                            href="#"
-                            isActive={isActive}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (isLoading || isActive) return;
-                              setPage(pageNum);
-                            }}
-                          >
-                            {pageNum}
-                          </PaginationLink>
-                        </PaginationItem>
-                      );
-                    })}
-
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        aria-disabled={isLoading || page >= totalPages}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (isLoading || page >= totalPages) return;
-                          setPage((p) => Math.min(totalPages, p + 1));
-                        }}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            </div>
-          </CardContent>
+          </div>
         </Card>
       </div>
 
-      {/* Booking Details Modal */}
-      <Dialog
+      <Modal
+        title="Booking Details"
         open={showBookingDetailsModal}
-        onOpenChange={setShowBookingDetailsModal}
+        onCancel={closeBookingDetailsModal}
+        footer={<Button onClick={closeBookingDetailsModal}>Close</Button>}
+        width="min(95vw, 768px)"
+        styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}
       >
-        <DialogContent className="bg-zinc-950 border-zinc-800 max-w-[95vw] sm:max-w-2xl text-white max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-white">Booking Details</DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              View complete booking information and QR code
-            </DialogDescription>
-          </DialogHeader>
-          {viewingBooking && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">Booking ID</Label>
-                  <p className="text-white font-mono text-sm">
-                    #{viewingBooking._id.slice(-8)}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">Status</Label>
-                  <Badge
-                    variant="outline"
-                    className={
-                      viewingBooking.status === "confirmed"
-                        ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF]"
-                        : viewingBooking.status === "pending_payment"
-                          ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-400"
-                          : viewingBooking.status === "cancelled"
-                            ? "bg-red-500/20 border-red-500/50 text-red-400"
-                            : viewingBooking.status === "completed"
-                              ? "bg-green-500/20 border-green-500/50 text-green-400"
-                              : "bg-zinc-800 border-zinc-700 text-zinc-300"
-                    }
-                  >
-                    {viewingBooking.status === "pending_payment"
-                      ? "Pending Payment"
-                      : viewingBooking.status.charAt(0).toUpperCase() +
-                        viewingBooking.status.slice(1).replace(/_/g, " ")}
-                  </Badge>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">User Name</Label>
-                  <p className="text-white">{viewingBooking.userName}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">Email</Label>
-                  <p className="text-white text-sm">
-                    {viewingBooking.userEmail}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">Phone</Label>
-                  <p className="text-white">
-                    {viewingBooking.userPhone || "N/A"}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">Court</Label>
-                  <p className="text-white">
-                    {typeof viewingBooking.courtId === "object" &&
-                    viewingBooking.courtId &&
-                    "name" in viewingBooking.courtId
-                      ? (viewingBooking.courtId as Court).name ||
-                        "Unknown Court"
-                      : "Unknown Court"}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">Date</Label>
-                  <p className="text-white">
-                    {new Date(viewingBooking.date).toLocaleDateString("en-US", {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">Time</Label>
-                  <p className="text-white">
-                    {formatTime12(viewingBooking.startTime)} –{" "}
-                    {formatTime12(
-                      (((viewingBooking.startTime + viewingBooking.duration) %
-                        24) +
-                        24) %
-                        24,
-                    )}
-                    {viewingBooking.startTime + viewingBooking.duration > 24
-                      ? " (+1 day)"
-                      : ""}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">Duration</Label>
-                  <p className="text-white">
-                    {viewingBooking.duration} hour
-                    {viewingBooking.duration !== 1 ? "s" : ""}
-                  </p>
-                </div>
-
-                {(viewingBooking.status === "confirmed" ||
-                  viewingBooking.status === "pending_payment") && (
-                  <div className="space-y-2 pt-1">
-                    <Label className="text-zinc-400 text-xs">
-                      Extend Booking
-                    </Label>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          handleCheckExtensionAvailability(viewingBooking._id)
-                        }
-                        disabled={
-                          checkingExtensionBookingId === viewingBooking._id
-                        }
-                        className="border-zinc-700 text-zinc-200 hover:bg-zinc-800/50"
-                      >
-                        {checkingExtensionBookingId === viewingBooking._id ? (
-                          <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
-                        ) : null}
-                        Check availability
-                      </Button>
-
-                      {extensionAvailability?.bookingId ===
-                        viewingBooking._id &&
-                        extensionAvailability.checked && (
-                          <>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                handleExtendBooking(viewingBooking._id, 0.5)
-                              }
-                              disabled={
-                                !extensionAvailability.canExtend30 ||
-                                (extendingBookingId === viewingBooking._id &&
-                                  extendingOption === 0.5)
-                              }
-                              className="border-zinc-700 text-zinc-200 hover:bg-zinc-800/50"
-                            >
-                              {extendingBookingId === viewingBooking._id &&
-                              extendingOption === 0.5 ? (
-                                <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
-                              ) : null}
-                              +30 mins
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                handleExtendBooking(viewingBooking._id, 1)
-                              }
-                              disabled={
-                                !extensionAvailability.canExtend60 ||
-                                (extendingBookingId === viewingBooking._id &&
-                                  extendingOption === 1)
-                              }
-                              className="border-zinc-700 text-zinc-200 hover:bg-zinc-800/50"
-                            >
-                              {extendingBookingId === viewingBooking._id &&
-                              extendingOption === 1 ? (
-                                <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
-                              ) : null}
-                              +60 mins
-                            </Button>
-                          </>
-                        )}
-                    </div>
-                    <p className="text-zinc-500 text-[11px]">
-                      Click check first. Only valid extension options will be
-                      enabled.
-                    </p>
-                  </div>
-                )}
-                {/* Price Breakdown */}
-                {viewingBooking.discountAmount &&
-                viewingBooking.discountAmount > 0 ? (
-                  <div className="col-span-2 space-y-2 bg-zinc-900/50 rounded-lg p-4">
-                    <Label className="text-zinc-400 text-xs">
-                      Price Breakdown
-                    </Label>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-zinc-400 text-sm">Subtotal</span>
-                        <span className="text-zinc-300">
-                          PKR{" "}
-                          {(
-                            viewingBooking.originalPrice ||
-                            viewingBooking.totalPrice +
-                              viewingBooking.discountAmount
-                          ).toLocaleString()}
-                        </span>
-                      </div>
-                      {viewingBooking.discounts?.map((d, idx: number) => (
-                        <div
-                          key={idx}
-                          className="flex justify-between items-center"
-                        >
-                          <span className="text-green-400 text-sm">
-                            {d.name} (
-                            {d.type === "percentage"
-                              ? `${d.value}%`
-                              : `PKR ${d.value}`}
-                            )
-                          </span>
-                          <span className="text-green-400">
-                            -PKR {d.amountSaved.toLocaleString()}
-                          </span>
-                        </div>
-                      ))}
-                      <div className="flex justify-between items-center pt-2 border-t border-zinc-700">
-                        <span className="text-white font-semibold">Total</span>
-                        <span className="text-[#2DD4BF] font-bold">
-                          PKR {viewingBooking.totalPrice.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="bg-green-500/10 border border-green-500/30 rounded px-2 py-1 text-center">
-                        <span className="text-green-400 text-xs">
-                          Saved PKR{" "}
-                          {viewingBooking.discountAmount.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <Label className="text-zinc-400 text-xs">Total Price</Label>
-                    <p className="text-[#2DD4BF] font-semibold">
-                      PKR {viewingBooking.totalPrice.toLocaleString()}
-                    </p>
-                  </div>
-                )}
-                <div className="space-y-1">
-                  <Label className="text-zinc-400 text-xs">
-                    Account received
-                  </Label>
-                  <p className="text-white font-semibold">
-                    PKR{" "}
-                    {(
-                      (viewingBooking.amountReceivedOnline ?? 0) +
-                        (viewingBooking.amountReceivedCash ?? 0) ||
-                      (viewingBooking.amountPaid ?? 0)
-                    ).toLocaleString()}
-                  </p>
-                  {((viewingBooking.amountReceivedOnline ?? 0) > 0 ||
-                    (viewingBooking.amountReceivedCash ?? 0) > 0) && (
-                    <p className="text-zinc-500 text-xs">
-                      Online: PKR{" "}
-                      {(
-                        viewingBooking.amountReceivedOnline ?? 0
-                      ).toLocaleString()}{" "}
-                      · Cash: PKR{" "}
-                      {(
-                        viewingBooking.amountReceivedCash ?? 0
-                      ).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-                {(() => {
-                  const received =
-                    (viewingBooking.amountReceivedOnline ?? 0) +
-                      (viewingBooking.amountReceivedCash ?? 0) ||
-                    (viewingBooking.amountPaid ?? 0);
-                  const discount =
-                    viewingBooking.status === "completed" &&
-                    viewingBooking.totalPrice - received > 0
-                      ? viewingBooking.totalPrice - received
-                      : 0;
-                  return discount > 0 ? (
-                    <div className="space-y-1">
-                      <Label className="text-zinc-400 text-xs">
-                        Discount (total − received)
-                      </Label>
-                      <p className="text-amber-400 font-semibold">
-                        PKR {discount.toLocaleString()}
-                      </p>
-                    </div>
-                  ) : null;
-                })()}
-                {(() => {
-                  const received =
-                    (viewingBooking.amountReceivedOnline ?? 0) +
-                      (viewingBooking.amountReceivedCash ?? 0) ||
-                    (viewingBooking.amountPaid ?? 0);
-                  return received < viewingBooking.totalPrice ? (
-                    <div className="space-y-1">
-                      <Label className="text-zinc-400 text-xs">
-                        Remaining balance
-                      </Label>
-                      <p className="text-yellow-400 font-semibold">
-                        PKR{" "}
-                        {(
-                          viewingBooking.totalPrice - received
-                        ).toLocaleString()}
-                      </p>
-                    </div>
-                  ) : null;
-                })()}
-              </div>
-
-              {/* QR Codes */}
-              <div className="border-t border-zinc-800 pt-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div>
-                    <Label className="text-zinc-400 text-xs mb-4 block">
-                      Entry Verification QR Code
-                    </Label>
-                    <div className="flex justify-center lg:justify-start">
-                      <div className="bg-white p-3 sm:p-4 rounded-xl inline-block">
-                        <QRCode
-                          value={`${typeof window !== "undefined" ? window.location.origin : ""}/booking/verify/${viewingBooking._id}`}
-                          size={160}
-                        />
-                      </div>
-                    </div>
-                    <p className="text-xs text-zinc-500 mt-2 text-center lg:text-left">
-                      Scan to verify booking entry
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label className="text-zinc-400 text-xs mb-4 block">
-                      Feedback QR Code
-                    </Label>
-                    <div className="flex justify-center lg:justify-start">
-                      <div className="bg-white p-3 sm:p-4 rounded-xl inline-block">
-                        <QRCode
-                          value={`${typeof window !== "undefined" ? window.location.origin : ""}/feedback/${viewingBooking._id}`}
-                          size={160}
-                        />
-                      </div>
-                    </div>
-                    <p className="text-xs text-zinc-500 mt-2 text-center lg:text-left">
-                      Share with customer for feedback collection
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setShowBookingDetailsModal(false);
-                setViewingBooking(null);
-                setExtensionAvailability(null);
-              }}
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Cancel Booking Confirmation Modal */}
-      <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
-        <DialogContent className="bg-zinc-950 border-zinc-800 max-w-md text-white">
-          <DialogHeader>
-            <DialogTitle className="text-white">Cancel Booking</DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Are you sure you want to cancel this booking?
-            </DialogDescription>
-          </DialogHeader>
-          {cancellingBooking && (
-            <div className="space-y-4 py-4">
-              <div className="bg-zinc-900/50 rounded-lg p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Booking ID:</span>
-                  <span className="text-white font-mono text-sm">
-                    #{cancellingBooking._id.slice(-8)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">User:</span>
-                  <span className="text-white text-sm">
-                    {cancellingBooking.userName}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Date:</span>
-                  <span className="text-white text-sm">
-                    {formatDisplayDate(cancellingBooking.date)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Time:</span>
-                  <span className="text-white text-sm">
-                    {formatTime12(cancellingBooking.startTime)} –{" "}
-                    {formatTime12(
-                      (((cancellingBooking.startTime +
-                        cancellingBooking.duration) %
-                        24) +
-                        24) %
-                        24,
-                    )}
-                    {cancellingBooking.startTime + cancellingBooking.duration >
-                    24
-                      ? " (+1 day)"
-                      : ""}
-                  </span>
-                </div>
-              </div>
-              <p className="text-zinc-300 text-sm">
-                This action will mark the booking as cancelled. The booking will
-                remain in the system but will be marked as cancelled.
-              </p>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setShowCancelModal(false);
-                setCancellingBooking(null);
-              }}
-              disabled={isCancelling}
-            >
-              No, Keep Booking
-            </Button>
-            <Button
-              onClick={confirmCancelBooking}
-              className="bg-red-500 text-white hover:bg-red-600"
-              disabled={isCancelling}
-            >
-              {isCancelling ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Cancelling...
-                </>
-              ) : (
-                "Yes, Cancel Booking"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Booking Confirmation Modal */}
-      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <DialogContent className="bg-zinc-950 border-zinc-800 max-w-md text-white">
-          <DialogHeader>
-            <DialogTitle className="text-white">Delete Booking</DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Are you sure you want to permanently delete this booking? This
-              action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          {deletingBooking && (
-            <div className="space-y-4 py-4">
-              <div className="bg-zinc-900/50 rounded-lg p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Booking ID:</span>
-                  <span className="text-white font-mono text-sm">
-                    #{deletingBooking._id.slice(-8)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">User:</span>
-                  <span className="text-white text-sm">
-                    {deletingBooking.userName}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Email:</span>
-                  <span className="text-white text-sm">
-                    {deletingBooking.userEmail}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Date:</span>
-                  <span className="text-white text-sm">
-                    {formatDisplayDate(deletingBooking.date)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Time:</span>
-                  <span className="text-white text-sm">
-                    {formatTime12(deletingBooking.startTime)} –{" "}
-                    {formatTime12(
-                      (((deletingBooking.startTime + deletingBooking.duration) %
-                        24) +
-                        24) %
-                        24,
-                    )}
-                    {deletingBooking.startTime + deletingBooking.duration > 24
-                      ? " (+1 day)"
-                      : ""}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Status:</span>
-                  <Badge
-                    variant="outline"
-                    className={
-                      deletingBooking.status === "confirmed"
-                        ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF] text-xs"
-                        : deletingBooking.status === "pending_payment"
-                          ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-400 text-xs"
-                          : deletingBooking.status === "cancelled"
-                            ? "bg-red-500/20 border-red-500/50 text-red-400 text-xs"
-                            : deletingBooking.status === "completed"
-                              ? "bg-green-500/20 border-green-500/50 text-green-400 text-xs"
-                              : "bg-zinc-800 border-zinc-700 text-zinc-300 text-xs"
-                    }
-                  >
-                    {deletingBooking.status === "pending_payment"
-                      ? "Pending Payment"
-                      : deletingBooking.status.charAt(0).toUpperCase() +
-                        deletingBooking.status.slice(1).replace(/_/g, " ")}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Total Price:</span>
-                  <span className="text-[#2DD4BF] font-semibold text-sm">
-                    PKR {deletingBooking.totalPrice.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-                <p className="text-red-400 text-sm">
-                  This will permanently remove the booking from the system. This
-                  action cannot be undone.
+        {viewingBooking && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Text type="secondary" className="text-xs">
+                  Booking ID
+                </Text>
+                <p className="font-mono text-sm text-white">
+                  #{viewingBooking._id.slice(-8)}
                 </p>
               </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setShowDeleteModal(false);
-                setDeletingBooking(null);
-              }}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmDeleteBooking}
-              className="bg-red-500 text-white hover:bg-red-600"
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                "Yes, Delete Booking"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <div className="space-y-1">
+                <Text type="secondary" className="text-xs">
+                  Status
+                </Text>
+                <div>
+                  <Tag color={getStatusTagColor(viewingBooking.status)}>
+                    {formatStatusLabel(viewingBooking.status)}
+                  </Tag>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Text type="secondary" className="text-xs">
+                  User Name
+                </Text>
+                <p className="text-white">{viewingBooking.userName}</p>
+              </div>
+              <div className="space-y-1">
+                <Text type="secondary" className="text-xs">
+                  Email
+                </Text>
+                <p className="text-sm text-white">{viewingBooking.userEmail}</p>
+              </div>
+              <div className="space-y-1">
+                <Text type="secondary" className="text-xs">
+                  Phone
+                </Text>
+                <p className="text-white">{viewingBooking.userPhone || "N/A"}</p>
+              </div>
+              <div className="space-y-1">
+                <Text type="secondary" className="text-xs">
+                  Court
+                </Text>
+                <p className="text-white">{getCourtName(viewingBooking)}</p>
+              </div>
+              <div className="space-y-1">
+                <Text type="secondary" className="text-xs">
+                  Date
+                </Text>
+                <p className="text-white">
+                  {new Date(viewingBooking.date).toLocaleDateString("en-US", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <Text type="secondary" className="text-xs">
+                  Time
+                </Text>
+                <p className="text-white">{getEndTimeLabel(viewingBooking)}</p>
+              </div>
+              <div className="space-y-1">
+                <Text type="secondary" className="text-xs">
+                  Duration
+                </Text>
+                <p className="text-white">
+                  {viewingBooking.duration} hour
+                  {viewingBooking.duration !== 1 ? "s" : ""}
+                </p>
+              </div>
 
-      {/* Custom Range Modal */}
-      <Dialog open={showRangeModal} onOpenChange={setShowRangeModal}>
-        <DialogContent className="bg-zinc-950 border-zinc-800 max-w-xl text-white">
-          <DialogHeader>
-            <DialogTitle className="text-white">
-              Select custom date range
-            </DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Choose a start and end date to filter bookings.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Calendar
-              mode="range"
-              selected={customRange}
-              onSelect={(range) => setCustomRange(range ?? undefined)}
-              numberOfMonths={2}
-              initialFocus
-            />
+              {(viewingBooking.status === "confirmed" ||
+                viewingBooking.status === "pending_payment") && (
+                <div className="space-y-2 pt-1 sm:col-span-2">
+                  <Text type="secondary" className="text-xs">
+                    Extend Booking
+                  </Text>
+                  <Space wrap>
+                    <Button
+                      onClick={() =>
+                        handleCheckExtensionAvailability(viewingBooking._id)
+                      }
+                      loading={
+                        checkingExtensionBookingId === viewingBooking._id
+                      }
+                    >
+                      Check availability
+                    </Button>
+                    {extensionAvailability?.bookingId === viewingBooking._id &&
+                      extensionAvailability.checked && (
+                        <>
+                          <Button
+                            onClick={() =>
+                              handleExtendBooking(viewingBooking._id, 0.5)
+                            }
+                            disabled={!extensionAvailability.canExtend30}
+                            loading={
+                              extendingBookingId === viewingBooking._id &&
+                              extendingOption === 0.5
+                            }
+                          >
+                            +30 mins
+                          </Button>
+                          <Button
+                            onClick={() =>
+                              handleExtendBooking(viewingBooking._id, 1)
+                            }
+                            disabled={!extensionAvailability.canExtend60}
+                            loading={
+                              extendingBookingId === viewingBooking._id &&
+                              extendingOption === 1
+                            }
+                          >
+                            +60 mins
+                          </Button>
+                        </>
+                      )}
+                  </Space>
+                  <Text type="secondary" className="block text-[11px]">
+                    Click check first. Only valid extension options will be
+                    enabled.
+                  </Text>
+                </div>
+              )}
+
+              {viewingBooking.discountAmount &&
+              viewingBooking.discountAmount > 0 ? (
+                <div className="col-span-2 space-y-2 rounded-lg bg-zinc-900/50 p-4">
+                  <Text type="secondary" className="text-xs">
+                    Price Breakdown
+                  </Text>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-zinc-400">Subtotal</span>
+                      <span className="text-zinc-300">
+                        PKR{" "}
+                        {(
+                          viewingBooking.originalPrice ||
+                          viewingBooking.totalPrice +
+                            viewingBooking.discountAmount
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+                    {viewingBooking.discounts?.map((d, idx: number) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="text-sm text-green-400">
+                          {d.name} (
+                          {d.type === "percentage"
+                            ? `${d.value}%`
+                            : `PKR ${d.value}`}
+                          )
+                        </span>
+                        <span className="text-green-400">
+                          -PKR {d.amountSaved.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between border-t border-zinc-700 pt-2">
+                      <span className="font-semibold text-white">Total</span>
+                      <span className="font-bold text-[#2DD4BF]">
+                        PKR {viewingBooking.totalPrice.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="rounded border border-green-500/30 bg-green-500/10 px-2 py-1 text-center">
+                      <span className="text-xs text-green-400">
+                        Saved PKR{" "}
+                        {viewingBooking.discountAmount.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Text type="secondary" className="text-xs">
+                    Total Price
+                  </Text>
+                  <p className="font-semibold text-[#2DD4BF]">
+                    PKR {viewingBooking.totalPrice.toLocaleString()}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <Text type="secondary" className="text-xs">
+                  Account received
+                </Text>
+                <p className="font-semibold text-white">
+                  PKR {viewingReceived.toLocaleString()}
+                </p>
+                {((viewingBooking.amountReceivedOnline ?? 0) > 0 ||
+                  (viewingBooking.amountReceivedCash ?? 0) > 0) && (
+                  <Text type="secondary" className="text-xs">
+                    Online: PKR{" "}
+                    {(viewingBooking.amountReceivedOnline ?? 0).toLocaleString()}{" "}
+                    · Cash: PKR{" "}
+                    {(viewingBooking.amountReceivedCash ?? 0).toLocaleString()}
+                  </Text>
+                )}
+              </div>
+
+              {viewingDiscount > 0 && (
+                <div className="space-y-1">
+                  <Text type="secondary" className="text-xs">
+                    Discount (total − received)
+                  </Text>
+                  <p className="font-semibold text-amber-400">
+                    PKR {viewingDiscount.toLocaleString()}
+                  </p>
+                </div>
+              )}
+
+              {viewingReceived < viewingBooking.totalPrice && (
+                <div className="space-y-1">
+                  <Text type="secondary" className="text-xs">
+                    Remaining balance
+                  </Text>
+                  <p className="font-semibold text-yellow-400">
+                    PKR{" "}
+                    {(viewingBooking.totalPrice - viewingReceived).toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-zinc-800 pt-6">
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div>
+                  <Text type="secondary" className="mb-4 block text-xs">
+                    Entry Verification QR Code
+                  </Text>
+                  <div className="flex justify-center lg:justify-start">
+                    <div className="inline-block rounded-xl bg-white p-3 sm:p-4">
+                      <QRCode
+                        value={`${typeof window !== "undefined" ? window.location.origin : ""}/booking/verify/${viewingBooking._id}`}
+                        size={160}
+                      />
+                    </div>
+                  </div>
+                  <Text type="secondary" className="mt-2 block text-center text-xs lg:text-left">
+                    Scan to verify booking entry
+                  </Text>
+                </div>
+
+                <div>
+                  <Text type="secondary" className="mb-4 block text-xs">
+                    Feedback QR Code
+                  </Text>
+                  <div className="flex justify-center lg:justify-start">
+                    <div className="inline-block rounded-xl bg-white p-3 sm:p-4">
+                      <QRCode
+                        value={`${typeof window !== "undefined" ? window.location.origin : ""}/feedback/${viewingBooking._id}`}
+                        size={160}
+                      />
+                    </div>
+                  </div>
+                  <Text type="secondary" className="mt-2 block text-center text-xs lg:text-left">
+                    Share with customer for feedback collection
+                  </Text>
+                </div>
+              </div>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowRangeModal(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        )}
+      </Modal>
+
+      <Modal
+        title="Cancel Booking"
+        open={showCancelModal}
+        onCancel={() => {
+          if (isCancelling) return;
+          setShowCancelModal(false);
+          setCancellingBooking(null);
+        }}
+        footer={[
+          <Button
+            key="keep"
+            onClick={() => {
+              setShowCancelModal(false);
+              setCancellingBooking(null);
+            }}
+            disabled={isCancelling}
+          >
+            No, Keep Booking
+          </Button>,
+          <Button
+            key="cancel"
+            type="primary"
+            danger
+            loading={isCancelling}
+            onClick={confirmCancelBooking}
+          >
+            Yes, Cancel Booking
+          </Button>,
+        ]}
+      >
+        <Text type="secondary">
+          Are you sure you want to cancel this booking?
+        </Text>
+        {cancellingBooking && (
+          <div className="mt-4 space-y-4">
+            <div className="space-y-2 rounded-lg bg-zinc-900/50 p-4">
+              <div className="flex items-center justify-between">
+                <Text type="secondary" className="text-sm">
+                  Booking ID:
+                </Text>
+                <span className="font-mono text-sm text-white">
+                  #{cancellingBooking._id.slice(-8)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <Text type="secondary" className="text-sm">
+                  User:
+                </Text>
+                <span className="text-sm text-white">
+                  {cancellingBooking.userName}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <Text type="secondary" className="text-sm">
+                  Date:
+                </Text>
+                <span className="text-sm text-white">
+                  {formatDisplayDate(cancellingBooking.date)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <Text type="secondary" className="text-sm">
+                  Time:
+                </Text>
+                <span className="text-sm text-white">
+                  {getEndTimeLabel(cancellingBooking)}
+                </span>
+              </div>
+            </div>
+            <Text className="text-sm">
+              This action will mark the booking as cancelled. The booking will
+              remain in the system but will be marked as cancelled.
+            </Text>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        title="Delete Booking"
+        open={showDeleteModal}
+        onCancel={() => {
+          if (isDeleting) return;
+          setShowDeleteModal(false);
+          setDeletingBooking(null);
+        }}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setShowDeleteModal(false);
+              setDeletingBooking(null);
+            }}
+            disabled={isDeleting}
+          >
+            Cancel
+          </Button>,
+          <Button
+            key="delete"
+            type="primary"
+            danger
+            loading={isDeleting}
+            onClick={confirmDeleteBooking}
+          >
+            Yes, Delete Booking
+          </Button>,
+        ]}
+      >
+        <Text type="secondary">
+          Are you sure you want to permanently delete this booking? This action
+          cannot be undone.
+        </Text>
+        {deletingBooking && (
+          <div className="mt-4 space-y-4">
+            <div className="space-y-2 rounded-lg bg-zinc-900/50 p-4">
+              <div className="flex items-center justify-between">
+                <Text type="secondary" className="text-sm">
+                  Booking ID:
+                </Text>
+                <span className="font-mono text-sm text-white">
+                  #{deletingBooking._id.slice(-8)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <Text type="secondary" className="text-sm">
+                  User:
+                </Text>
+                <span className="text-sm text-white">
+                  {deletingBooking.userName}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <Text type="secondary" className="text-sm">
+                  Email:
+                </Text>
+                <span className="text-sm text-white">
+                  {deletingBooking.userEmail}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <Text type="secondary" className="text-sm">
+                  Date:
+                </Text>
+                <span className="text-sm text-white">
+                  {formatDisplayDate(deletingBooking.date)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <Text type="secondary" className="text-sm">
+                  Time:
+                </Text>
+                <span className="text-sm text-white">
+                  {getEndTimeLabel(deletingBooking)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <Text type="secondary" className="text-sm">
+                  Status:
+                </Text>
+                <Tag color={getStatusTagColor(deletingBooking.status)}>
+                  {formatStatusLabel(deletingBooking.status)}
+                </Tag>
+              </div>
+              <div className="flex items-center justify-between">
+                <Text type="secondary" className="text-sm">
+                  Total Price:
+                </Text>
+                <span className="text-sm font-semibold text-[#2DD4BF]">
+                  PKR {deletingBooking.totalPrice.toLocaleString()}
+                </span>
+              </div>
+            </div>
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+              <Text type="danger" className="text-sm">
+                This will permanently remove the booking from the system. This
+                action cannot be undone.
+              </Text>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        title="Select custom date range"
+        open={showRangeModal}
+        onCancel={() => setShowRangeModal(false)}
+        footer={
+          <Button onClick={() => setShowRangeModal(false)}>Close</Button>
+        }
+      >
+        <Text type="secondary">
+          Choose a start and end date to filter bookings.
+        </Text>
+        <DatePicker.RangePicker
+          value={customRange}
+          onChange={(dates) => setCustomRange(dates)}
+          className="mt-4 w-full"
+        />
+      </Modal>
     </AdminLayout>
   );
 }

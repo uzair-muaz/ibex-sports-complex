@@ -4,58 +4,34 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
-  Plus,
-  Edit2,
-  Trash2,
-  Loader2,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Percent,
-  DollarSign,
-  Calendar,
-  ToggleLeft,
-  ToggleRight,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
+  App,
+  Button,
+  Card,
+  Checkbox,
+  DatePicker,
+  Drawer,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Space,
+  Spin,
+  Switch,
+  Table,
+  Tag,
+  Typography,
+} from "antd";
+import type { ColumnsType, TableProps } from "antd/es/table";
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  CalendarOutlined,
+} from "@ant-design/icons";
+import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Skeleton } from "@/components/ui/skeleton";
-import { DatePicker } from "@/components/ui/date-picker";
 import {
   getDiscounts,
   getDiscountById,
@@ -71,7 +47,6 @@ import {
   formatCourtTypes,
   formatBookingDurationRange,
   formatPricingTierLabel,
-  formatTierDiscountSummary,
   formatDiscountValueSummary,
   isDiscountCurrentlyActive,
   inferDiscountCategory,
@@ -80,7 +55,7 @@ import {
   isValidDayRule,
   DAY_LABELS,
 } from "@/lib/discount-utils";
-import { cn, formatLocalDate } from "@/lib/utils";
+import { formatLocalDate } from "@/lib/utils";
 import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from "@/lib/date-time";
 import type {
   Discount,
@@ -90,6 +65,8 @@ import type {
   TierDiscountMode,
   DayRuleRateMode,
 } from "@/types";
+
+const { Text } = Typography;
 
 const COURT_TYPES: CourtType[] = ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"];
 
@@ -283,6 +260,7 @@ function dayRulesForUpdate(
 }
 
 export default function DiscountsPage() {
+  const { message } = App.useApp();
   const { data: session } = useSession();
   const router = useRouter();
   const [discounts, setDiscounts] = useState<Discount[]>([]);
@@ -353,11 +331,9 @@ export default function DiscountsPage() {
     }
   };
 
-  const handleDiscountSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleDiscountSubmit = async () => {
     if (!discountForm.validFrom || !discountForm.validUntil) {
-      alert("Please select valid from and valid until dates");
+      message.warning("Please select valid from and valid until dates");
       return;
     }
 
@@ -382,21 +358,21 @@ export default function DiscountsPage() {
           };
 
     if (isSplit && !peakSlice && !offPeakSlice) {
-      alert("Add at least one peak or off-peak discount amount");
+      message.warning("Add at least one peak or off-peak discount amount");
       return;
     }
 
     let dayRulesPayload: DayRuleInput[] | null = null;
     if (discountForm.dayScheduleEnabled) {
       if (isSplit) {
-        alert("Day-based rates cannot be combined with peak/off-peak split");
+        message.warning("Day-based rates cannot be combined with peak/off-peak split");
         return;
       }
       dayRulesPayload = discountForm.dayRules
         .map(dayRuleFormToInput)
         .filter((r): r is DayRuleInput => r != null);
       if (dayRulesPayload.length === 0) {
-        alert(
+        message.warning(
           "Add at least one day rule with selected days and a discount amount (uniform or peak/off-peak)",
         );
         return;
@@ -405,7 +381,7 @@ export default function DiscountsPage() {
       for (const rule of dayRulesPayload) {
         for (const d of rule.days) {
           if (seen.has(d)) {
-            alert(`${DAY_LABELS[d]} appears in more than one day rule`);
+            message.warning(`${DAY_LABELS[d]} appears in more than one day rule`);
             return;
           }
           seen.add(d);
@@ -492,7 +468,7 @@ export default function DiscountsPage() {
           resetForm();
           loadData();
         } else {
-          alert(result.error || "Failed to update discount");
+          message.error(result.error || "Failed to update discount");
         }
       } else {
         const commonCreate = {
@@ -550,11 +526,13 @@ export default function DiscountsPage() {
           resetForm();
           loadData();
         } else {
-          alert(result.error || "Failed to create discount");
+          message.error(result.error || "Failed to create discount");
         }
       }
-    } catch (error: any) {
-      alert(error.message || "An error occurred");
+    } catch (error: unknown) {
+      message.error(
+        error instanceof Error ? error.message : "An error occurred",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -626,10 +604,12 @@ export default function DiscountsPage() {
         setDeletingDiscount(null);
         loadData();
       } else {
-        alert(result.error || "Failed to delete discount");
+        message.error(result.error || "Failed to delete discount");
       }
-    } catch (error: any) {
-      alert(error.message || "An error occurred");
+    } catch (error: unknown) {
+      message.error(
+        error instanceof Error ? error.message : "An error occurred",
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -642,10 +622,12 @@ export default function DiscountsPage() {
       if (result.success) {
         loadData();
       } else {
-        alert(result.error || "Failed to toggle discount status");
+        message.error(result.error || "Failed to toggle discount status");
       }
-    } catch (error: any) {
-      alert(error.message || "An error occurred");
+    } catch (error: unknown) {
+      message.error(
+        error instanceof Error ? error.message : "An error occurred",
+      );
     } finally {
       setIsToggling(null);
     }
@@ -660,11 +642,17 @@ export default function DiscountsPage() {
     });
   };
 
-  const handleSort = (column: keyof Discount) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+  const handleTableChange: TableProps<Discount>["onChange"] = (
+    _pagination,
+    _filters,
+    sorter,
+  ) => {
+    const activeSorter = Array.isArray(sorter) ? sorter[0] : sorter;
+    if (activeSorter?.columnKey && activeSorter.order) {
+      setSortColumn(activeSorter.columnKey as keyof Discount);
+      setSortDirection(activeSorter.order === "descend" ? "desc" : "asc");
     } else {
-      setSortColumn(column);
+      setSortColumn(null);
       setSortDirection("asc");
     }
   };
@@ -726,42 +714,24 @@ export default function DiscountsPage() {
     return [...timeBasedDiscountList].sort(compareDiscounts);
   }, [timeBasedDiscountList, sortColumn, compareDiscounts]);
 
-  const SortIcon = ({ column }: { column: keyof Discount }) => {
-    if (sortColumn !== column) {
-      return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
-    }
-    return sortDirection === "asc" ? (
-      <ArrowUp className="w-3 h-3 ml-1 text-[#2DD4BF]" />
-    ) : (
-      <ArrowDown className="w-3 h-3 ml-1 text-[#2DD4BF]" />
-    );
-  };
+  const sortOrderFor = (column: keyof Discount) =>
+    sortColumn === column
+      ? sortDirection === "asc"
+        ? "ascend"
+        : "descend"
+      : null;
 
-  const getStatusBadge = (discount: Discount) => {
+  const getStatusTag = (discount: Discount) => {
     const isCurrentlyActive = isDiscountCurrentlyActive(discount);
-    
+
     if (!discount.isActive) {
-      return (
-        <Badge
-          variant="outline"
-          className="bg-zinc-700/20 border-zinc-600 text-zinc-400 text-xs"
-        >
-          Disabled
-        </Badge>
-      );
+      return <Tag>Disabled</Tag>;
     }
-    
+
     if (isCurrentlyActive) {
-      return (
-        <Badge
-          variant="outline"
-          className="bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF] text-xs"
-        >
-          Live
-        </Badge>
-      );
+      return <Tag color="cyan">Live</Tag>;
     }
-    
+
     const nowKey = toDateKeyInTimezone(new Date(), BUSINESS_TIMEZONE);
     const validFromKey = toDateKeyInTimezone(
       new Date(discount.validFrom),
@@ -769,24 +739,236 @@ export default function DiscountsPage() {
     );
 
     if (nowKey < validFromKey) {
-      return (
-        <Badge
-          variant="outline"
-          className="bg-yellow-500/20 border-yellow-500/50 text-yellow-400 text-xs"
-        >
-          Scheduled
-        </Badge>
-      );
+      return <Tag color="gold">Scheduled</Tag>;
     }
-    
-    return (
-      <Badge
-        variant="outline"
-        className="bg-red-500/20 border-red-500/50 text-red-400 text-xs"
-      >
-        Expired
-      </Badge>
-    );
+
+    return <Tag color="error">Expired</Tag>;
+  };
+
+  const renderTypeTag = (discount: Discount) => {
+    if (usesTierSplitDiscount(discount)) {
+      return <Tag>mixed</Tag>;
+    }
+    return <Tag>{discount.type}</Tag>;
+  };
+
+  const renderActions = (discount: Discount) => (
+    <Space size="small">
+      <Switch
+        size="small"
+        checked={discount.isActive}
+        loading={isToggling === discount._id}
+        onChange={() => handleToggleActive(discount)}
+      />
+      <Button
+        type="text"
+        icon={<EditOutlined />}
+        onClick={() => handleEdit(discount)}
+        title="Edit"
+      />
+      <Button
+        type="text"
+        danger
+        icon={<DeleteOutlined />}
+        onClick={() => handleDelete(discount)}
+        title="Delete"
+      />
+    </Space>
+  );
+
+  const flatColumns: ColumnsType<Discount> = useMemo(
+    () => [
+      {
+        title: "Name",
+        dataIndex: "name",
+        key: "name",
+        sorter: (a, b) => a.name.localeCompare(b.name),
+        sortOrder: sortOrderFor("name"),
+        render: (name: string) => (
+          <span className="font-medium text-white text-sm">{name}</span>
+        ),
+      },
+      {
+        title: "Type",
+        dataIndex: "type",
+        key: "type",
+        sorter: (a, b) => a.type.localeCompare(b.type),
+        sortOrder: sortOrderFor("type"),
+        render: (_: unknown, discount: Discount) => renderTypeTag(discount),
+      },
+      {
+        title: "Value",
+        dataIndex: "value",
+        key: "value",
+        sorter: (a, b) => a.value - b.value,
+        sortOrder: sortOrderFor("value"),
+        render: (_: unknown, discount: Discount) => (
+          <span className="text-[#2DD4BF] font-semibold text-sm">
+            {formatDiscountValueSummary(discount)}
+          </span>
+        ),
+      },
+      {
+        title: "Types",
+        key: "courtTypes",
+        render: (_: unknown, discount: Discount) => (
+          <span className="text-zinc-300 text-sm">
+            {formatCourtTypes(discount.courtTypes)}
+          </span>
+        ),
+      },
+      {
+        title: "Valid Period",
+        key: "validPeriod",
+        render: (_: unknown, discount: Discount) => (
+          <Space size="small">
+            <CalendarOutlined className="text-zinc-500" />
+            <Text type="secondary" className="text-sm">
+              {new Date(discount.validFrom).toLocaleDateString()} -{" "}
+              {new Date(discount.validUntil).toLocaleDateString()}
+            </Text>
+          </Space>
+        ),
+      },
+      {
+        title: "Status",
+        dataIndex: "isActive",
+        key: "isActive",
+        sorter: (a, b) => Number(a.isActive) - Number(b.isActive),
+        sortOrder: sortOrderFor("isActive"),
+        render: (_: unknown, discount: Discount) => getStatusTag(discount),
+      },
+      {
+        title: "Actions",
+        key: "actions",
+        align: "right",
+        render: (_: unknown, discount: Discount) => renderActions(discount),
+      },
+    ],
+    [sortColumn, sortDirection, isToggling],
+  );
+
+  const timeBasedColumns: ColumnsType<Discount> = useMemo(
+    () => [
+      {
+        title: "Name",
+        dataIndex: "name",
+        key: "name",
+        sorter: (a, b) => a.name.localeCompare(b.name),
+        sortOrder: sortOrderFor("name"),
+        render: (name: string) => (
+          <span className="font-medium text-white text-sm">{name}</span>
+        ),
+      },
+      {
+        title: "Type",
+        dataIndex: "type",
+        key: "type",
+        sorter: (a, b) => a.type.localeCompare(b.type),
+        sortOrder: sortOrderFor("type"),
+        render: (_: unknown, discount: Discount) => renderTypeTag(discount),
+      },
+      {
+        title: "Value",
+        dataIndex: "value",
+        key: "value",
+        sorter: (a, b) => a.value - b.value,
+        sortOrder: sortOrderFor("value"),
+        render: (_: unknown, discount: Discount) => (
+          <span className="text-[#2DD4BF] font-semibold text-sm">
+            {formatDiscountValueSummary(discount)}
+          </span>
+        ),
+      },
+      {
+        title: "Types",
+        key: "courtTypes",
+        render: (_: unknown, discount: Discount) => (
+          <span className="text-zinc-300 text-sm">
+            {formatCourtTypes(discount.courtTypes)}
+          </span>
+        ),
+      },
+      {
+        title: "Length",
+        key: "length",
+        render: (_: unknown, discount: Discount) => (
+          <span className="text-zinc-300 text-sm whitespace-nowrap">
+            {formatBookingDurationRange(
+              discount.minBookingHours,
+              discount.maxBookingHours,
+            )}
+          </span>
+        ),
+      },
+      {
+        title: "Tier",
+        key: "tier",
+        render: (_: unknown, discount: Discount) => (
+          <span className="text-zinc-300 text-sm">
+            {usesTierSplitDiscount(discount)
+              ? "Any start (split)"
+              : formatPricingTierLabel(discount.pricingTier)}
+          </span>
+        ),
+      },
+      {
+        title: "Time",
+        key: "time",
+        render: (_: unknown, discount: Discount) => (
+          <span className="text-zinc-300 text-sm">
+            {formatTimeRestriction(
+              discount.allDay,
+              discount.startHour,
+              discount.endHour,
+            )}
+          </span>
+        ),
+      },
+      {
+        title: "Valid Period",
+        key: "validPeriod",
+        render: (_: unknown, discount: Discount) => (
+          <Space size="small">
+            <CalendarOutlined className="text-zinc-500" />
+            <Text type="secondary" className="text-sm">
+              {new Date(discount.validFrom).toLocaleDateString()} -{" "}
+              {new Date(discount.validUntil).toLocaleDateString()}
+            </Text>
+          </Space>
+        ),
+      },
+      {
+        title: "Status",
+        dataIndex: "isActive",
+        key: "isActive",
+        sorter: (a, b) => Number(a.isActive) - Number(b.isActive),
+        sortOrder: sortOrderFor("isActive"),
+        render: (_: unknown, discount: Discount) => getStatusTag(discount),
+      },
+      {
+        title: "Actions",
+        key: "actions",
+        align: "right",
+        render: (_: unknown, discount: Discount) => renderActions(discount),
+      },
+    ],
+    [sortColumn, sortDirection, isToggling],
+  );
+
+  const formatHourOption = (i: number) =>
+    i === 0 ? "12 AM" : i === 12 ? "12 PM" : i < 12 ? `${i} AM` : `${i - 12} PM`;
+
+  const hourOptions = Array.from({ length: 24 }, (_, i) => ({
+    value: i,
+    label: formatHourOption(i),
+  }));
+
+  const closeDiscountDrawer = () => {
+    setShowDiscountDrawer(false);
+    setEditingDiscount(null);
+    setIsLoadingEdit(false);
+    resetForm();
   };
 
   const isFlatForm = discountForm.discountCategory === "flat";
@@ -848,483 +1030,102 @@ export default function DiscountsPage() {
       isLoading={isLoading}
       actionButton={
         <Button
+          type="primary"
+          icon={<PlusOutlined />}
           onClick={() => {
             resetForm();
             setShowDiscountDrawer(true);
           }}
-          className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6] w-full sm:w-auto text-xs sm:text-sm"
         >
-          <Plus className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
           <span className="hidden sm:inline">Add Discount</span>
         </Button>
       }
     >
       <div className="space-y-8">
-        {/* Flat discounts — percentage/fixed without duration, tier, or clock rules */}
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardContent className="p-0">
-            <div className="border-b border-zinc-800 px-4 py-3">
-              <h2 className="text-sm font-semibold text-white">Flat discounts</h2>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                Standard promos (court types + validity). All day, any duration, any tier.
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-zinc-800">
-                    <TableHead
-                      className="min-w-[180px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("name")}
-                    >
-                      <div className="flex items-center">
-                        Name
-                        <SortIcon column="name" />
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("type")}
-                    >
-                      <div className="flex items-center">
-                        Type
-                        <SortIcon column="type" />
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("value")}
-                    >
-                      <div className="flex items-center">
-                        Value
-                        <SortIcon column="value" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="min-w-[120px]">Types</TableHead>
-                    <TableHead className="min-w-[200px]">Valid Period</TableHead>
-                    <TableHead
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("isActive")}
-                    >
-                      <div className="flex items-center">
-                        Status
-                        <SortIcon column="isActive" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-right min-w-[140px]">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <>
-                      {[...Array(3)].map((_, i) => (
-                        <TableRow key={i} className="border-zinc-800">
-                          {[...Array(7)].map((__, j) => (
-                            <TableCell key={j}>
-                              <Skeleton className="h-4 w-20" />
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </>
-                  ) : sortedFlatDiscounts.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        className="text-center text-zinc-400 py-8"
-                      >
-                        No flat discounts yet. Add one or create a rule-only discount below.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    sortedFlatDiscounts.map((discount) => (
-                      <TableRow key={discount._id} className="border-zinc-800">
-                        <TableCell>
-                          <div className="font-medium text-white text-sm">
-                            {discount.name}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className="bg-zinc-900/50 border-zinc-800 text-zinc-200 text-xs"
-                          >
-                            {discount.type === "percentage" ? (
-                              <Percent className="w-3 h-3 mr-1" />
-                            ) : (
-                              <DollarSign className="w-3 h-3 mr-1" />
-                            )}
-                            {discount.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-[#2DD4BF] font-semibold text-sm">
-                            {formatDiscountValueSummary(discount)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-zinc-300 text-sm">
-                            {formatCourtTypes(discount.courtTypes)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-zinc-300 text-sm">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3 text-zinc-500" />
-                              {new Date(discount.validFrom).toLocaleDateString()}{" "}
-                              -{" "}
-                              {new Date(discount.validUntil).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{getStatusBadge(discount)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleToggleActive(discount)}
-                              disabled={isToggling === discount._id}
-                              className="text-zinc-400 hover:text-[#2DD4BF] h-8 w-8"
-                              title={
-                                discount.isActive ? "Disable" : "Enable"
-                              }
-                            >
-                              {isToggling === discount._id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : discount.isActive ? (
-                                <ToggleRight className="w-4 h-4 text-[#2DD4BF]" />
-                              ) : (
-                                <ToggleLeft className="w-4 h-4" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(discount)}
-                              className="text-zinc-400 hover:text-[#2DD4BF] h-8 w-8"
-                              title="Edit"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(discount)}
-                              className="text-zinc-400 hover:text-red-400 h-8 w-8"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
+        <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
+          <div className="border-b border-zinc-800 px-4 py-3">
+            <h2 className="text-sm font-semibold text-white">Flat discounts</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Standard promos (court types + validity). All day, any duration, any tier.
+            </p>
+          </div>
+          <Table<Discount>
+            rowKey="_id"
+            columns={flatColumns}
+            dataSource={sortedFlatDiscounts}
+            loading={isLoading}
+            onChange={handleTableChange}
+            pagination={false}
+            scroll={{ x: "max-content" }}
+            locale={{
+              emptyText:
+                "No flat discounts yet. Add one or create a rule-only discount below.",
+            }}
+          />
         </Card>
 
-        {/* Time-based & rules */}
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardContent className="p-0">
-            <div className="border-b border-zinc-800 px-4 py-3">
-              <h2 className="text-sm font-semibold text-white">
-                Time-based &amp; rules
-              </h2>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                Booking length, peak/off-peak, or restricted hours. Scoped by court type only (same as public booking).
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-zinc-800">
-                    <TableHead
-                      className="min-w-[180px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("name")}
-                    >
-                      <div className="flex items-center">
-                        Name
-                        <SortIcon column="name" />
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("type")}
-                    >
-                      <div className="flex items-center">
-                        Type
-                        <SortIcon column="type" />
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("value")}
-                    >
-                      <div className="flex items-center">
-                        Value
-                        <SortIcon column="value" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="min-w-[120px]">Types</TableHead>
-                    <TableHead className="min-w-[100px]">Length</TableHead>
-                    <TableHead className="min-w-[90px]">Tier</TableHead>
-                    <TableHead className="min-w-[120px]">Time</TableHead>
-                    <TableHead className="min-w-[200px]">Valid Period</TableHead>
-                    <TableHead
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("isActive")}
-                    >
-                      <div className="flex items-center">
-                        Status
-                        <SortIcon column="isActive" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-right min-w-[140px]">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <>
-                      {[...Array(5)].map((_, i) => (
-                        <TableRow key={i} className="border-zinc-800">
-                          <TableCell>
-                            <Skeleton className="h-4 w-32" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-20" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-16" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-24" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-16" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-12" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-24" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-4 w-40" />
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-6 w-16" />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2 justify-end">
-                              <Skeleton className="h-8 w-8" />
-                              <Skeleton className="h-8 w-8" />
-                              <Skeleton className="h-8 w-8" />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </>
-                  ) : sortedTimeBasedDiscounts.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={10}
-                        className="text-center text-zinc-400 py-8"
-                      >
-                        No time-based discounts. Add duration, tier, or hour rules in the drawer.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    sortedTimeBasedDiscounts.map((discount) => (
-                      <TableRow key={discount._id} className="border-zinc-800">
-                        <TableCell>
-                          <div className="font-medium text-white text-sm">
-                            {discount.name}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className="bg-zinc-900/50 border-zinc-800 text-zinc-200 text-xs"
-                          >
-                            {usesTierSplitDiscount(discount) ? (
-                              <>
-                                <Percent className="w-3 h-3 mr-1 opacity-70" />
-                                mixed
-                              </>
-                            ) : discount.type === "percentage" ? (
-                              <>
-                                <Percent className="w-3 h-3 mr-1" />
-                                {discount.type}
-                              </>
-                            ) : (
-                              <>
-                                <DollarSign className="w-3 h-3 mr-1" />
-                                {discount.type}
-                              </>
-                            )}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-[#2DD4BF] font-semibold text-sm">
-                            {formatDiscountValueSummary(discount)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-zinc-300 text-sm">
-                            {formatCourtTypes(discount.courtTypes)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-zinc-300 text-sm whitespace-nowrap">
-                            {formatBookingDurationRange(
-                              discount.minBookingHours,
-                              discount.maxBookingHours
-                            )}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-zinc-300 text-sm">
-                            {usesTierSplitDiscount(discount)
-                              ? "Any start (split)"
-                              : formatPricingTierLabel(discount.pricingTier)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-zinc-300 text-sm">
-                            {formatTimeRestriction(
-                              discount.allDay,
-                              discount.startHour,
-                              discount.endHour
-                            )}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-zinc-300 text-sm">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3 text-zinc-500" />
-                              {new Date(discount.validFrom).toLocaleDateString()}{" "}
-                              -{" "}
-                              {new Date(discount.validUntil).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{getStatusBadge(discount)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleToggleActive(discount)}
-                              disabled={isToggling === discount._id}
-                              className="text-zinc-400 hover:text-[#2DD4BF] h-8 w-8"
-                              title={
-                                discount.isActive ? "Disable" : "Enable"
-                              }
-                            >
-                              {isToggling === discount._id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : discount.isActive ? (
-                                <ToggleRight className="w-4 h-4 text-[#2DD4BF]" />
-                              ) : (
-                                <ToggleLeft className="w-4 h-4" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(discount)}
-                              className="text-zinc-400 hover:text-[#2DD4BF] h-8 w-8"
-                              title="Edit"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(discount)}
-                              className="text-zinc-400 hover:text-red-400 h-8 w-8"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
+        <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
+          <div className="border-b border-zinc-800 px-4 py-3">
+            <h2 className="text-sm font-semibold text-white">
+              Time-based &amp; rules
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Booking length, peak/off-peak, or restricted hours. Scoped by court type only (same as public booking).
+            </p>
+          </div>
+          <Table<Discount>
+            rowKey="_id"
+            columns={timeBasedColumns}
+            dataSource={sortedTimeBasedDiscounts}
+            loading={isLoading}
+            onChange={handleTableChange}
+            pagination={false}
+            scroll={{ x: "max-content" }}
+            locale={{
+              emptyText:
+                "No time-based discounts. Add duration, tier, or hour rules in the drawer.",
+            }}
+          />
         </Card>
       </div>
 
-      {/* Discount drawer */}
-      <Sheet
+      <Drawer
+        title={editingDiscount ? "Edit discount" : "Add discount"}
         open={showDiscountDrawer}
-        onOpenChange={(open) => {
-          setShowDiscountDrawer(open);
-          if (!open) {
-            setEditingDiscount(null);
-            setIsLoadingEdit(false);
-            resetForm();
-          }
-        }}
+        onClose={closeDiscountDrawer}
+        width={672}
+        destroyOnHidden
+        footer={
+          <Space className="flex justify-end">
+            <Button onClick={closeDiscountDrawer}>Cancel</Button>
+            <Button type="primary" loading={isSubmitting} onClick={handleDiscountSubmit}>
+              {editingDiscount ? "Update Discount" : "Create Discount"}
+            </Button>
+          </Space>
+        }
       >
-        <SheetContent className="border-zinc-800 flex w-full flex-col p-0 sm:max-w-xl md:max-w-2xl">
-          <div className="flex flex-1 flex-col min-h-0">
-            <SheetHeader className="border-b border-zinc-800 px-6 py-4 shrink-0">
-              <SheetTitle>
-                {editingDiscount ? "Edit discount" : "Add discount"}
-              </SheetTitle>
-              <SheetDescription>
-                {editingDiscount
-                  ? "Update rules and value."
-                  : "Create a percentage or fixed promotion."}
-              </SheetDescription>
-            </SheetHeader>
-          <form
-            key={editingDiscount?._id ?? "new-discount"}
-            onSubmit={handleDiscountSubmit}
-            className="flex flex-1 flex-col min-h-0"
-          >
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 relative">
-            {isLoadingEdit && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-zinc-950/60 rounded-md">
-                <Loader2 className="w-6 h-6 animate-spin text-[#2DD4BF]" />
-              </div>
-            )}
-            {/* Name & promotion kind */}
+        <Text type="secondary" className="mb-4 block">
+          {editingDiscount
+            ? "Update rules and value."
+            : "Create a percentage or fixed promotion."}
+        </Text>
+
+        <Spin spinning={isLoadingEdit}>
+          <Form layout="vertical" key={editingDiscount?._id ?? "new-discount"}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="discount-name" className="text-zinc-200 text-sm">
-                  Discount Name
-                </Label>
+              <Form.Item label="Discount Name" required>
                 <Input
-                  id="discount-name"
-                  type="text"
-                  required
                   value={discountForm.name}
                   onChange={(e) =>
                     setDiscountForm({ ...discountForm, name: e.target.value })
                   }
                   placeholder="Weekend Special"
-                  className="text-sm"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-zinc-200 text-sm">Promotion kind</Label>
+              </Form.Item>
+              <Form.Item label="Promotion kind">
                 <Select
                   value={discountForm.discountCategory}
-                  onValueChange={(v) => {
+                  onChange={(v) => {
                     const cat = v as DiscountCategory;
                     setDiscountForm((prev) => ({
                       ...prev,
@@ -1339,157 +1140,124 @@ export default function DiscountsPage() {
                         : {}),
                     }));
                   }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="flat">Flat discount</SelectItem>
-                    <SelectItem value="time_based">Time-based discount</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                  options={[
+                    { value: "flat", label: "Flat discount" },
+                    { value: "time_based", label: "Time-based discount" },
+                  ]}
+                />
+              </Form.Item>
             </div>
 
             {isTimeForm && (
-              <div className="space-y-2">
-                <Label className="text-zinc-200 text-sm">
-                  Time-based style
-                </Label>
+              <Form.Item
+                label="Time-based style"
+                extra="Split applies different discounts to peak vs off-peak portions of the booking price."
+              >
                 <Select
                   value={discountForm.tierDiscountMode}
-                  onValueChange={(v) =>
+                  onChange={(v) =>
                     setDiscountForm({
                       ...discountForm,
                       tierDiscountMode: v as TierDiscountMode,
                     })
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="uniform">
-                      Single rate (optional peak/off-peak start filter)
-                    </SelectItem>
-                    <SelectItem value="split">
-                      Separate peak &amp; off-peak amounts
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-zinc-500 text-xs">
-                  Split applies different discounts to peak vs off-peak portions of
-                  the booking price.
-                </p>
-              </div>
+                  options={[
+                    {
+                      value: "uniform",
+                      label: "Single rate (optional peak/off-peak start filter)",
+                    },
+                    {
+                      value: "split",
+                      label: "Separate peak & off-peak amounts",
+                    },
+                  ]}
+                />
+              </Form.Item>
             )}
 
             {(isFlatForm || isUniformTimeForm) && !discountForm.dayScheduleEnabled && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="discount-type" className="text-zinc-200 text-sm">
-                    Discount Type
-                  </Label>
+                <Form.Item label="Discount Type">
                   <Select
                     value={discountForm.type}
-                    onValueChange={(v) =>
+                    onChange={(v) =>
                       setDiscountForm({
                         ...discountForm,
                         type: v as "percentage" | "fixed",
                       })
                     }
-                  >
-                    <SelectTrigger id="discount-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="percentage">Percentage (%)</SelectItem>
-                      <SelectItem value="fixed">Fixed Amount (PKR)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="discount-value" className="text-zinc-200 text-sm">
-                    {discountForm.type === "percentage"
+                    options={[
+                      { value: "percentage", label: "Percentage (%)" },
+                      { value: "fixed", label: "Fixed Amount (PKR)" },
+                    ]}
+                  />
+                </Form.Item>
+                <Form.Item
+                  label={
+                    discountForm.type === "percentage"
                       ? "Discount Percentage"
-                      : "Discount Amount (PKR)"}
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="discount-value"
-                      type="number"
-                      required
-                      min="0.01"
-                      max={discountForm.type === "percentage" ? 100 : undefined}
-                      step="0.01"
-                      value={discountForm.value || ""}
-                      onChange={(e) =>
-                        setDiscountForm({
-                          ...discountForm,
-                          value: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      placeholder={
-                        discountForm.type === "percentage" ? "30" : "1000"
-                      }
-                      className="text-sm pr-12"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">
-                      {discountForm.type === "percentage" ? "%" : "PKR"}
-                    </span>
-                  </div>
-                </div>
+                      : "Discount Amount (PKR)"
+                  }
+                  required
+                >
+                  <InputNumber
+                    className="w-full"
+                    min={0.01}
+                    max={discountForm.type === "percentage" ? 100 : undefined}
+                    step={0.01}
+                    value={discountForm.value || undefined}
+                    onChange={(v) =>
+                      setDiscountForm({
+                        ...discountForm,
+                        value: typeof v === "number" ? v : 0,
+                      })
+                    }
+                    placeholder={discountForm.type === "percentage" ? "30" : "1000"}
+                    addonAfter={discountForm.type === "percentage" ? "%" : "PKR"}
+                  />
+                </Form.Item>
               </div>
             )}
 
             {!isSplitForm && (
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4 space-y-4">
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4 space-y-4 mb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-zinc-200">
                       Different rate by day
                     </div>
-                    <p className="text-xs text-zinc-500 mt-0.5">
+                    <Text type="secondary" className="text-xs">
                       Match court peak/off-peak pricing. e.g. weekdays off-peak
                       PKR 1,500 off and peak PKR 2,500 off — different per day
                       group.
-                    </p>
+                    </Text>
                   </div>
-                  <Button
-                    type="button"
-                    variant={discountForm.dayScheduleEnabled ? "default" : "outline"}
-                    size="sm"
-                    onClick={() =>
-                      setDiscountForm((prev) => {
-                        const enabled = !prev.dayScheduleEnabled;
-                        return {
-                          ...prev,
-                          dayScheduleEnabled: enabled,
-                          dayRules:
-                            enabled && prev.dayRules.length === 0
-                              ? [emptyDayRule()]
-                              : prev.dayRules,
-                        };
-                      })
+                  <Switch
+                    checked={discountForm.dayScheduleEnabled}
+                    checkedChildren="Enabled"
+                    unCheckedChildren="Enable"
+                    onChange={(enabled) =>
+                      setDiscountForm((prev) => ({
+                        ...prev,
+                        dayScheduleEnabled: enabled,
+                        dayRules:
+                          enabled && prev.dayRules.length === 0
+                            ? [emptyDayRule()]
+                            : prev.dayRules,
+                      }))
                     }
-                  >
-                    {discountForm.dayScheduleEnabled ? "Enabled" : "Enable"}
-                  </Button>
+                  />
                 </div>
 
                 {discountForm.dayScheduleEnabled && (
                   <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addDayRule()}
-                      >
-                        <Plus className="w-3.5 h-3.5 mr-1.5" />
-                        Add rule
-                      </Button>
-                    </div>
+                    <Button
+                      size="small"
+                      icon={<PlusOutlined />}
+                      onClick={() => addDayRule()}
+                    >
+                      Add rule
+                    </Button>
 
                     {discountForm.dayRules.map((rule, ruleIndex) => (
                       <div
@@ -1502,18 +1270,16 @@ export default function DiscountsPage() {
                           </span>
                           {discountForm.dayRules.length > 1 && (
                             <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-zinc-500 hover:text-red-400"
+                              type="text"
+                              danger
+                              size="small"
+                              icon={<DeleteOutlined />}
                               onClick={() => removeDayRule(ruleIndex)}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
+                            />
                           )}
                         </div>
 
-                        <div className="flex flex-wrap gap-1.5">
+                        <Space wrap size={[4, 4]}>
                           {DAY_LABELS.map((label, day) => {
                             const claimedElsewhere = getDaysClaimedByOtherRules(
                               discountForm.dayRules,
@@ -1526,107 +1292,82 @@ export default function DiscountsPage() {
                             return (
                               <Button
                                 key={day}
-                                type="button"
-                                variant={isSelected ? "default" : "outline"}
-                                size="sm"
+                                size="small"
+                                type={isSelected ? "primary" : "default"}
                                 disabled={isDisabled}
                                 title={
                                   isDisabled
                                     ? `${label} is already used in another rule`
                                     : undefined
                                 }
-                                className={cn(
-                                  "h-7 px-2 text-xs min-w-[2.5rem]",
-                                  isDisabled &&
-                                    "opacity-40 cursor-not-allowed hover:bg-transparent",
-                                )}
                                 onClick={() => toggleDayInRule(ruleIndex, day)}
                               >
                                 {label}
                               </Button>
                             );
                           })}
-                        </div>
+                        </Space>
 
-                        <div className="space-y-1.5">
-                          <Label className="text-zinc-400 text-xs">
-                            Rate style
-                          </Label>
+                        <Form.Item label="Rate style" className="mb-0">
                           <Select
+                            size="small"
                             value={rule.rateMode}
-                            onValueChange={(v) =>
+                            onChange={(v) =>
                               updateDayRule(ruleIndex, {
                                 rateMode: v as DayRuleRateMode,
                               })
                             }
-                          >
-                            <SelectTrigger className="text-sm h-9">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="uniform">
-                                Same all day
-                              </SelectItem>
-                              <SelectItem value="split">
-                                Peak &amp; off-peak (uses court hours)
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                            options={[
+                              { value: "uniform", label: "Same all day" },
+                              {
+                                value: "split",
+                                label: "Peak & off-peak (uses court hours)",
+                              },
+                            ]}
+                          />
+                        </Form.Item>
 
                         {rule.rateMode === "uniform" ? (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                              <Label className="text-zinc-400 text-xs">Type</Label>
+                            <Form.Item label="Type" className="mb-0">
                               <Select
+                                size="small"
                                 value={rule.type}
-                                onValueChange={(v) =>
+                                onChange={(v) =>
                                   updateDayRule(ruleIndex, {
                                     type: v as "percentage" | "fixed",
                                   })
                                 }
-                              >
-                                <SelectTrigger className="text-sm h-9">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="percentage">
-                                    Percentage (%)
-                                  </SelectItem>
-                                  <SelectItem value="fixed">Fixed (PKR)</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-zinc-400 text-xs">
-                                {rule.type === "percentage"
+                                options={[
+                                  { value: "percentage", label: "Percentage (%)" },
+                                  { value: "fixed", label: "Fixed (PKR)" },
+                                ]}
+                              />
+                            </Form.Item>
+                            <Form.Item
+                              label={
+                                rule.type === "percentage"
                                   ? "Discount %"
-                                  : "Amount off (PKR)"}
-                              </Label>
-                              <div className="relative">
-                                <Input
-                                  type="number"
-                                  min="0.01"
-                                  max={
-                                    rule.type === "percentage" ? 100 : undefined
-                                  }
-                                  step="0.01"
-                                  value={rule.value || ""}
-                                  onChange={(e) =>
-                                    updateDayRule(ruleIndex, {
-                                      value: parseFloat(e.target.value) || 0,
-                                    })
-                                  }
-                                  placeholder={
-                                    rule.type === "percentage" ? "50" : "2500"
-                                  }
-                                  className="text-sm pr-12 h-9"
-                                />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">
-                                  {rule.type === "percentage" ? "%" : "PKR"}
-                                </span>
-                              </div>
-                            </div>
+                                  : "Amount off (PKR)"
+                              }
+                              className="mb-0"
+                            >
+                              <InputNumber
+                                className="w-full"
+                                size="small"
+                                min={0.01}
+                                max={rule.type === "percentage" ? 100 : undefined}
+                                step={0.01}
+                                value={rule.value || undefined}
+                                onChange={(v) =>
+                                  updateDayRule(ruleIndex, {
+                                    value: typeof v === "number" ? v : 0,
+                                  })
+                                }
+                                placeholder={rule.type === "percentage" ? "50" : "2500"}
+                                addonAfter={rule.type === "percentage" ? "%" : "PKR"}
+                              />
+                            </Form.Item>
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1635,96 +1376,82 @@ export default function DiscountsPage() {
                                 Off-peak hours
                               </div>
                               <Select
+                                size="small"
                                 value={rule.offPeakType}
-                                onValueChange={(v) =>
+                                onChange={(v) =>
                                   updateDayRule(ruleIndex, {
                                     offPeakType: v as "percentage" | "fixed",
                                   })
                                 }
-                              >
-                                <SelectTrigger className="text-xs h-8">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="percentage">%</SelectItem>
-                                  <SelectItem value="fixed">PKR</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <div className="relative">
-                                <Input
-                                  type="number"
-                                  min="0.01"
-                                  max={
-                                    rule.offPeakType === "percentage"
-                                      ? 100
-                                      : undefined
-                                  }
-                                  step="0.01"
-                                  value={
-                                    rule.offPeakValue === ""
-                                      ? ""
-                                      : rule.offPeakValue
-                                  }
-                                  onChange={(e) => {
-                                    const raw = e.target.value;
-                                    updateDayRule(ruleIndex, {
-                                      offPeakValue:
-                                        raw === "" ? "" : parseFloat(raw) || 0,
-                                    });
-                                  }}
-                                  placeholder="Optional"
-                                  className="text-sm pr-12 h-8"
-                                />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">
-                                  {rule.offPeakType === "percentage" ? "%" : "PKR"}
-                                </span>
-                              </div>
+                                options={[
+                                  { value: "percentage", label: "%" },
+                                  { value: "fixed", label: "PKR" },
+                                ]}
+                              />
+                              <InputNumber
+                                className="w-full"
+                                size="small"
+                                min={0.01}
+                                max={
+                                  rule.offPeakType === "percentage" ? 100 : undefined
+                                }
+                                step={0.01}
+                                value={
+                                  rule.offPeakValue === ""
+                                    ? undefined
+                                    : Number(rule.offPeakValue)
+                                }
+                                onChange={(v) =>
+                                  updateDayRule(ruleIndex, {
+                                    offPeakValue: v == null ? "" : v,
+                                  })
+                                }
+                                placeholder="Optional"
+                                addonAfter={
+                                  rule.offPeakType === "percentage" ? "%" : "PKR"
+                                }
+                              />
                             </div>
                             <div className="rounded-md border border-zinc-800 bg-zinc-900/40 p-3 space-y-2">
                               <div className="text-xs font-semibold text-zinc-300">
                                 Peak hours
                               </div>
                               <Select
+                                size="small"
                                 value={rule.peakType}
-                                onValueChange={(v) =>
+                                onChange={(v) =>
                                   updateDayRule(ruleIndex, {
                                     peakType: v as "percentage" | "fixed",
                                   })
                                 }
-                              >
-                                <SelectTrigger className="text-xs h-8">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="percentage">%</SelectItem>
-                                  <SelectItem value="fixed">PKR</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <div className="relative">
-                                <Input
-                                  type="number"
-                                  min="0.01"
-                                  max={
-                                    rule.peakType === "percentage" ? 100 : undefined
-                                  }
-                                  step="0.01"
-                                  value={
-                                    rule.peakValue === "" ? "" : rule.peakValue
-                                  }
-                                  onChange={(e) => {
-                                    const raw = e.target.value;
-                                    updateDayRule(ruleIndex, {
-                                      peakValue:
-                                        raw === "" ? "" : parseFloat(raw) || 0,
-                                    });
-                                  }}
-                                  placeholder="Optional"
-                                  className="text-sm pr-12 h-8"
-                                />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">
-                                  {rule.peakType === "percentage" ? "%" : "PKR"}
-                                </span>
-                              </div>
+                                options={[
+                                  { value: "percentage", label: "%" },
+                                  { value: "fixed", label: "PKR" },
+                                ]}
+                              />
+                              <InputNumber
+                                className="w-full"
+                                size="small"
+                                min={0.01}
+                                max={
+                                  rule.peakType === "percentage" ? 100 : undefined
+                                }
+                                step={0.01}
+                                value={
+                                  rule.peakValue === ""
+                                    ? undefined
+                                    : Number(rule.peakValue)
+                                }
+                                onChange={(v) =>
+                                  updateDayRule(ruleIndex, {
+                                    peakValue: v == null ? "" : v,
+                                  })
+                                }
+                                placeholder="Optional"
+                                addonAfter={
+                                  rule.peakType === "percentage" ? "%" : "PKR"
+                                }
+                              />
                             </div>
                           </div>
                         )}
@@ -1736,143 +1463,109 @@ export default function DiscountsPage() {
             )}
 
             {isSplitForm && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4 space-y-3">
                   <div className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">
                     Peak hours
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-zinc-400 text-xs">Type</Label>
+                  <Form.Item label="Type" className="mb-2">
                     <Select
                       value={discountForm.peakType}
-                      onValueChange={(v) =>
+                      onChange={(v) =>
                         setDiscountForm({
                           ...discountForm,
                           peakType: v as "percentage" | "fixed",
                         })
                       }
-                    >
-                      <SelectTrigger className="text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="percentage">Percentage (%)</SelectItem>
-                        <SelectItem value="fixed">Fixed (PKR)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-zinc-400 text-xs">Amount</Label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        min="0.01"
-                        max={
-                          discountForm.peakType === "percentage" ? 100 : undefined
-                        }
-                        step="0.01"
-                        value={
-                          discountForm.peakValue === ""
-                            ? ""
-                            : discountForm.peakValue
-                        }
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          setDiscountForm({
-                            ...discountForm,
-                            peakValue:
-                              raw === "" ? "" : parseFloat(raw) || 0,
-                          });
-                        }}
-                        placeholder="Optional"
-                        className="text-sm pr-12"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">
-                        {discountForm.peakType === "percentage" ? "%" : "PKR"}
-                      </span>
-                    </div>
-                  </div>
+                      options={[
+                        { value: "percentage", label: "Percentage (%)" },
+                        { value: "fixed", label: "Fixed (PKR)" },
+                      ]}
+                    />
+                  </Form.Item>
+                  <Form.Item label="Amount" className="mb-0">
+                    <InputNumber
+                      className="w-full"
+                      min={0.01}
+                      max={
+                        discountForm.peakType === "percentage" ? 100 : undefined
+                      }
+                      step={0.01}
+                      value={
+                        discountForm.peakValue === ""
+                          ? undefined
+                          : Number(discountForm.peakValue)
+                      }
+                      onChange={(v) =>
+                        setDiscountForm({
+                          ...discountForm,
+                          peakValue: v == null ? "" : v,
+                        })
+                      }
+                      placeholder="Optional"
+                      addonAfter={
+                        discountForm.peakType === "percentage" ? "%" : "PKR"
+                      }
+                    />
+                  </Form.Item>
                 </div>
                 <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4 space-y-3">
                   <div className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">
                     Off-peak hours
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-zinc-400 text-xs">Type</Label>
+                  <Form.Item label="Type" className="mb-2">
                     <Select
                       value={discountForm.offPeakType}
-                      onValueChange={(v) =>
+                      onChange={(v) =>
                         setDiscountForm({
                           ...discountForm,
                           offPeakType: v as "percentage" | "fixed",
                         })
                       }
-                    >
-                      <SelectTrigger className="text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="percentage">Percentage (%)</SelectItem>
-                        <SelectItem value="fixed">Fixed (PKR)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-zinc-400 text-xs">Amount</Label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        min="0.01"
-                        max={
-                          discountForm.offPeakType === "percentage"
-                            ? 100
-                            : undefined
-                        }
-                        step="0.01"
-                        value={
-                          discountForm.offPeakValue === ""
-                            ? ""
-                            : discountForm.offPeakValue
-                        }
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          setDiscountForm({
-                            ...discountForm,
-                            offPeakValue:
-                              raw === "" ? "" : parseFloat(raw) || 0,
-                          });
-                        }}
-                        placeholder="Optional"
-                        className="text-sm pr-12"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">
-                        {discountForm.offPeakType === "percentage" ? "%" : "PKR"}
-                      </span>
-                    </div>
-                  </div>
+                      options={[
+                        { value: "percentage", label: "Percentage (%)" },
+                        { value: "fixed", label: "Fixed (PKR)" },
+                      ]}
+                    />
+                  </Form.Item>
+                  <Form.Item label="Amount" className="mb-0">
+                    <InputNumber
+                      className="w-full"
+                      min={0.01}
+                      max={
+                        discountForm.offPeakType === "percentage"
+                          ? 100
+                          : undefined
+                      }
+                      step={0.01}
+                      value={
+                        discountForm.offPeakValue === ""
+                          ? undefined
+                          : Number(discountForm.offPeakValue)
+                      }
+                      onChange={(v) =>
+                        setDiscountForm({
+                          ...discountForm,
+                          offPeakValue: v == null ? "" : v,
+                        })
+                      }
+                      placeholder="Optional"
+                      addonAfter={
+                        discountForm.offPeakType === "percentage" ? "%" : "PKR"
+                      }
+                    />
+                  </Form.Item>
                 </div>
               </div>
             )}
 
-            {/* Court Types */}
-            <div className="space-y-2">
-              <Label className="text-zinc-200 text-sm">
-                Apply to Court Types
-              </Label>
-              <div className="flex flex-wrap gap-2">
+            <Form.Item label="Apply to Court Types">
+              <Space wrap>
                 <Button
-                  type="button"
-                  variant={
-                    discountForm.courtTypes.length === 0 ? "default" : "outline"
-                  }
-                  size="sm"
+                  size="small"
+                  type={discountForm.courtTypes.length === 0 ? "primary" : "default"}
                   onClick={() =>
                     setDiscountForm({ ...discountForm, courtTypes: [] })
-                  }
-                  className={
-                    discountForm.courtTypes.length === 0
-                      ? "bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-                      : ""
                   }
                 >
                   All Courts
@@ -1880,329 +1573,215 @@ export default function DiscountsPage() {
                 {COURT_TYPES.map((ct) => (
                   <Button
                     key={ct}
-                    type="button"
-                    variant={
-                      discountForm.courtTypes.includes(ct) ? "default" : "outline"
+                    size="small"
+                    type={
+                      discountForm.courtTypes.includes(ct) ? "primary" : "default"
                     }
-                    size="sm"
                     onClick={() => handleCourtTypeToggle(ct)}
-                    className={
-                      discountForm.courtTypes.includes(ct)
-                        ? "bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-                        : ""
-                    }
                   >
                     {ct}
                   </Button>
                 ))}
-              </div>
-              <p className="text-zinc-500 text-xs">
+              </Space>
+              <Text type="secondary" className="mt-2 block text-xs">
                 {discountForm.courtTypes.length === 0
                   ? "Discount applies to all court types"
                   : `Discount applies to: ${discountForm.courtTypes.join(", ")}`}
-              </p>
-            </div>
+              </Text>
+            </Form.Item>
 
             {isTimeForm && (
               <>
-                {/* Min booking & optional start-tier filter (uniform only) */}
                 <div
                   className={`grid grid-cols-1 gap-4 ${
                     isUniformTimeForm ? "sm:grid-cols-2" : ""
                   }`}
                 >
-                  <div className="space-y-2">
-                    <Label className="text-zinc-200 text-sm">Min booking (h)</Label>
-                    <Input
-                      type="number"
+                  <Form.Item label="Min booking (h)">
+                    <InputNumber
+                      className="w-full"
                       min={0.5}
                       step={0.5}
                       placeholder="Any"
                       value={
                         discountForm.minBookingHours === ""
-                          ? ""
-                          : discountForm.minBookingHours
+                          ? undefined
+                          : Number(discountForm.minBookingHours)
                       }
-                      onChange={(e) => {
-                        const v = e.target.value;
+                      onChange={(v) =>
                         setDiscountForm({
                           ...discountForm,
-                          minBookingHours: v === "" ? "" : parseFloat(v),
-                        });
-                      }}
-                      className="text-sm"
+                          minBookingHours: v == null ? "" : v,
+                        })
+                      }
                     />
-                  </div>
+                  </Form.Item>
                   {isUniformTimeForm && (
-                    <div className="space-y-2">
-                      <Label className="text-zinc-200 text-sm">
-                        Booking start tier
-                      </Label>
+                    <Form.Item label="Booking start tier">
                       <Select
                         value={discountForm.pricingTier}
-                        onValueChange={(v) =>
+                        onChange={(v) =>
                           setDiscountForm({
                             ...discountForm,
                             pricingTier: v as DiscountPricingTier,
                           })
                         }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="any">Any (ignore tier)</SelectItem>
-                          <SelectItem value="peak">Peak start only</SelectItem>
-                          <SelectItem value="off_peak">
-                            Off-peak start only
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                        options={[
+                          { value: "any", label: "Any (ignore tier)" },
+                          { value: "peak", label: "Peak start only" },
+                          { value: "off_peak", label: "Off-peak start only" },
+                        ]}
+                      />
+                    </Form.Item>
                   )}
                 </div>
 
-                {/* Clock window for when this promo runs */}
-                <div className="space-y-2">
-                  <Label className="text-zinc-200 text-sm">Promo hours</Label>
-                  <div className="flex items-center gap-2 mb-2">
-                    <input
-                      type="checkbox"
-                      id="all-day"
-                      checked={discountForm.allDay}
-                      onChange={(e) =>
-                        setDiscountForm({
-                          ...discountForm,
-                          allDay: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-[#2DD4BF] focus:ring-[#2DD4BF] focus:ring-2 accent-[#2DD4BF] cursor-pointer"
-                    />
-                    <Label
-                      htmlFor="all-day"
-                      className="cursor-pointer text-zinc-200 text-sm"
-                    >
-                      All day (no clock restriction)
-                    </Label>
-                  </div>
+                <Form.Item label="Promo hours">
+                  <Checkbox
+                    checked={discountForm.allDay}
+                    onChange={(e) =>
+                      setDiscountForm({
+                        ...discountForm,
+                        allDay: e.target.checked,
+                      })
+                    }
+                  >
+                    All day (no clock restriction)
+                  </Checkbox>
                   {!discountForm.allDay && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-zinc-400 text-xs">Start Hour</Label>
+                    <div className="mt-3 grid grid-cols-2 gap-4">
+                      <Form.Item label="Start Hour" className="mb-0">
                         <Select
-                          value={discountForm.startHour.toString()}
-                          onValueChange={(v) =>
+                          value={discountForm.startHour}
+                          onChange={(v) =>
                             setDiscountForm({
                               ...discountForm,
-                              startHour: parseInt(v),
+                              startHour: v,
                             })
                           }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Array.from({ length: 24 }, (_, i) => (
-                              <SelectItem key={i} value={i.toString()}>
-                                {i === 0
-                                  ? "12 AM"
-                                  : i === 12
-                                  ? "12 PM"
-                                  : i < 12
-                                  ? `${i} AM`
-                                  : `${i - 12} PM`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-zinc-400 text-xs">End Hour</Label>
+                          options={hourOptions}
+                        />
+                      </Form.Item>
+                      <Form.Item label="End Hour" className="mb-0">
                         <Select
-                          value={discountForm.endHour.toString()}
-                          onValueChange={(v) =>
+                          value={discountForm.endHour}
+                          onChange={(v) =>
                             setDiscountForm({
                               ...discountForm,
-                              endHour: parseInt(v),
+                              endHour: v,
                             })
                           }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Array.from({ length: 24 }, (_, i) => (
-                              <SelectItem key={i} value={i.toString()}>
-                                {i === 0
-                                  ? "12 AM"
-                                  : i === 12
-                                  ? "12 PM"
-                                  : i < 12
-                                  ? `${i} AM`
-                                  : `${i - 12} PM`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                          options={hourOptions}
+                        />
+                      </Form.Item>
                     </div>
                   )}
-                </div>
+                </Form.Item>
               </>
             )}
 
-            {/* Validity Period */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-zinc-200 text-sm">
-                  Valid From
-                </Label>
+              <Form.Item label="Valid From">
                 <DatePicker
-                  date={discountForm.validFrom}
-                  onDateChange={(date) =>
-                    setDiscountForm({ ...discountForm, validFrom: date })
+                  className="w-full"
+                  value={
+                    discountForm.validFrom
+                      ? dayjs(discountForm.validFrom)
+                      : null
                   }
-                  variant="admin"
+                  onChange={(date: Dayjs | null) =>
+                    setDiscountForm({
+                      ...discountForm,
+                      validFrom: date?.toDate(),
+                    })
+                  }
                 />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-zinc-200 text-sm">
-                  Valid Until
-                </Label>
+              </Form.Item>
+              <Form.Item label="Valid Until">
                 <DatePicker
-                  date={discountForm.validUntil}
-                  onDateChange={(date) =>
-                    setDiscountForm({ ...discountForm, validUntil: date })
+                  className="w-full"
+                  value={
+                    discountForm.validUntil
+                      ? dayjs(discountForm.validUntil)
+                      : null
                   }
-                  minDate={discountForm.validFrom}
-                  variant="admin"
+                  onChange={(date: Dayjs | null) =>
+                    setDiscountForm({
+                      ...discountForm,
+                      validUntil: date?.toDate(),
+                    })
+                  }
+                  disabledDate={(current) =>
+                    discountForm.validFrom
+                      ? !!current &&
+                        current.isBefore(dayjs(discountForm.validFrom), "day")
+                      : false
+                  }
                 />
-              </div>
+              </Form.Item>
             </div>
 
-            {/* Active Status */}
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="is-active"
+            <Form.Item className="mb-0">
+              <Checkbox
                 checked={discountForm.isActive}
                 onChange={(e) =>
-                  setDiscountForm({ ...discountForm, isActive: e.target.checked })
+                  setDiscountForm({
+                    ...discountForm,
+                    isActive: e.target.checked,
+                  })
                 }
-                className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-[#2DD4BF] focus:ring-[#2DD4BF] focus:ring-2 accent-[#2DD4BF] cursor-pointer"
-              />
-              <Label
-                htmlFor="is-active"
-                className="cursor-pointer text-zinc-200 text-sm"
               >
                 Active (discount will be applied when conditions match)
-              </Label>
-            </div>
-            </div>
+              </Checkbox>
+            </Form.Item>
+          </Form>
+        </Spin>
+      </Drawer>
 
-            <SheetFooter className="bg-zinc-950 px-6 pb-6 pt-4 shrink-0">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setShowDiscountDrawer(false);
-                  resetForm();
-                  setEditingDiscount(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {editingDiscount ? "Updating..." : "Creating..."}
-                  </>
-                ) : editingDiscount ? (
-                  "Update Discount"
-                ) : (
-                  "Create Discount"
+      <Modal
+        title="Delete Discount"
+        open={showDeleteModal}
+        onCancel={() => {
+          setShowDeleteModal(false);
+          setDeletingDiscount(null);
+        }}
+        onOk={confirmDelete}
+        okText="Yes, Delete Discount"
+        okButtonProps={{ danger: true, loading: isDeleting }}
+        cancelButtonProps={{ disabled: isDeleting }}
+      >
+        <Text type="secondary" className="mb-4 block">
+          Are you sure you want to delete this discount? This action cannot be
+          undone.
+        </Text>
+        {deletingDiscount && (
+          <div className="space-y-2 rounded-lg bg-zinc-900/50 p-4">
+            <div className="flex items-center justify-between">
+              <Text type="secondary">Name:</Text>
+              <Text className="font-medium text-white">
+                {deletingDiscount.name}
+              </Text>
+            </div>
+            <div className="flex items-center justify-between">
+              <Text type="secondary">Value:</Text>
+              <Text>
+                {formatDiscountValue(
+                  deletingDiscount.type,
+                  deletingDiscount.value,
                 )}
-              </Button>
-            </SheetFooter>
-          </form>
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* Delete Confirmation Modal */}
-      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <DialogContent className="bg-zinc-950 border-zinc-800 max-w-md text-white">
-          <DialogHeader>
-            <DialogTitle className="text-white">Delete Discount</DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Are you sure you want to delete this discount? This action cannot
-              be undone.
-            </DialogDescription>
-          </DialogHeader>
-          {deletingDiscount && (
-            <div className="space-y-4 py-4">
-              <div className="bg-zinc-900/50 rounded-lg p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Name:</span>
-                  <span className="text-white text-sm font-medium">
-                    {deletingDiscount.name}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Value:</span>
-                  <span className="text-white text-sm">
-                    {formatDiscountValue(
-                      deletingDiscount.type,
-                      deletingDiscount.value
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Courts:</span>
-                  <span className="text-white text-sm">
-                    {formatCourtTypes(deletingDiscount.courtTypes)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 text-sm">Status:</span>
-                  {getStatusBadge(deletingDiscount)}
-                </div>
-              </div>
+              </Text>
             </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setShowDeleteModal(false);
-                setDeletingDiscount(null);
-              }}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmDelete}
-              className="bg-red-500 text-white hover:bg-red-600"
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                "Yes, Delete Discount"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <div className="flex items-center justify-between">
+              <Text type="secondary">Courts:</Text>
+              <Text>{formatCourtTypes(deletingDiscount.courtTypes)}</Text>
+            </div>
+            <div className="flex items-center justify-between">
+              <Text type="secondary">Status:</Text>
+              {getStatusTag(deletingDiscount)}
+            </div>
+          </div>
+        )}
+      </Modal>
     </AdminLayout>
   );
 }

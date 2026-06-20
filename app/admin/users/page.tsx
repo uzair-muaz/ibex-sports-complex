@@ -3,40 +3,27 @@
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Plus, Edit2, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
+  App,
+  Button,
   Card,
-  CardContent,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
+  Form,
+  Input,
+  Modal,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Table,
+  Tag,
+} from "antd";
+import type { ColumnsType } from "antd/es/table";
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  CaretUpOutlined,
+  CaretDownOutlined,
+  SwapOutlined,
+} from "@ant-design/icons";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   getAllUsers,
   createUser,
@@ -52,9 +39,18 @@ interface User {
   createdAt: string;
 }
 
+type UserFormValues = {
+  email: string;
+  password?: string;
+  name: string;
+  role: "super_admin" | "admin" | "user";
+};
+
 export default function UsersPage() {
   const { data: session } = useSession();
   const router = useRouter();
+  const { message, modal } = App.useApp();
+  const [form] = Form.useForm<UserFormValues>();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -62,12 +58,6 @@ export default function UsersPage() {
   const [isSubmittingUser, setIsSubmittingUser] = useState(false);
   const [sortColumn, setSortColumn] = useState<keyof User | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [userForm, setUserForm] = useState({
-    email: "",
-    password: "",
-    name: "",
-    role: "admin" as "super_admin" | "admin" | "user",
-  });
 
   const userRole = (session?.user as any)?.role;
   const isSuperAdmin = userRole === "super_admin";
@@ -87,39 +77,46 @@ export default function UsersPage() {
     let aValue: any = a[sortColumn];
     let bValue: any = b[sortColumn];
 
-    // Handle date comparison
     if (sortColumn === "createdAt") {
       aValue = new Date(aValue).getTime();
       bValue = new Date(bValue).getTime();
     }
 
-    // Handle string comparison
     if (typeof aValue === "string" && typeof bValue === "string") {
       aValue = aValue.toLowerCase();
       bValue = bValue.toLowerCase();
     }
 
-    // Handle number comparison
     if (typeof aValue === "number" && typeof bValue === "number") {
       return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
     }
 
-    // String comparison
     if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
     if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
     return 0;
   });
 
-  const SortIcon = ({ column }: { column: keyof User }) => {
-    if (sortColumn !== column) {
-      return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
-    }
-    return sortDirection === "asc" ? (
-      <ArrowUp className="w-3 h-3 ml-1 text-[#2DD4BF]" />
-    ) : (
-      <ArrowDown className="w-3 h-3 ml-1 text-[#2DD4BF]" />
-    );
-  };
+  const SortTitle = ({
+    column,
+    label,
+  }: {
+    column: keyof User;
+    label: string;
+  }) => (
+    <span
+      className="inline-flex cursor-pointer items-center gap-1"
+      onClick={() => handleSort(column)}
+    >
+      {label}
+      {sortColumn !== column ? (
+        <SwapOutlined className="opacity-50" />
+      ) : sortDirection === "asc" ? (
+        <CaretUpOutlined className="text-[#2DD4BF]" />
+      ) : (
+        <CaretDownOutlined className="text-[#2DD4BF]" />
+      )}
+    </span>
+  );
 
   useEffect(() => {
     if (session) {
@@ -145,16 +142,15 @@ export default function UsersPage() {
     }
   };
 
-  const handleUserSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUserSubmit = async (values: UserFormValues) => {
     setIsSubmittingUser(true);
 
     try {
       if (editingUser) {
         const result = await updateUser({
           userId: editingUser._id,
-          ...userForm,
-          ...(userForm.password ? {} : { password: undefined }),
+          ...values,
+          ...(values.password ? {} : { password: undefined }),
         });
 
         if (result.success) {
@@ -163,43 +159,42 @@ export default function UsersPage() {
           resetUserForm();
           loadData();
         } else {
-          alert(result.error || "Failed to update user");
+          message.error(result.error || "Failed to update user");
         }
       } else {
-        if (!userForm.password) {
-          alert("Password is required for new users");
+        if (!values.password) {
+          message.error("Password is required for new users");
           return;
         }
-        const result = await createUser(userForm);
+        const result = await createUser({
+          ...values,
+          password: values.password,
+        });
 
         if (result.success) {
           setShowUserModal(false);
           resetUserForm();
           loadData();
         } else {
-          alert(result.error || "Failed to create user");
+          message.error(result.error || "Failed to create user");
         }
       }
     } catch (error: any) {
-      alert(error.message || "An error occurred");
+      message.error(error.message || "An error occurred");
     } finally {
       setIsSubmittingUser(false);
     }
   };
 
   const resetUserForm = () => {
-    setUserForm({
-      email: "",
-      password: "",
-      name: "",
-      role: "admin",
-    });
+    form.resetFields();
+    form.setFieldsValue({ role: "admin" });
     setEditingUser(null);
   };
 
   const handleEditUser = (user: User) => {
     setEditingUser(user);
-    setUserForm({
+    form.setFieldsValue({
       email: user.email,
       password: "",
       name: user.name,
@@ -208,20 +203,83 @@ export default function UsersPage() {
     setShowUserModal(true);
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete this user? This action cannot be undone."
-      )
-    ) {
-      const result = await deleteUser(userId);
-      if (result.success) {
-        loadData();
-      } else {
-        alert(result.error || "Failed to delete user");
-      }
-    }
+  const handleDeleteUser = (userId: string) => {
+    modal.confirm({
+      title: "Delete user",
+      content:
+        "Are you sure you want to delete this user? This action cannot be undone.",
+      okText: "Delete",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        const result = await deleteUser(userId);
+        if (result.success) {
+          loadData();
+        } else {
+          message.error(result.error || "Failed to delete user");
+        }
+      },
+    });
   };
+
+  const columns: ColumnsType<User> = [
+    {
+      title: <SortTitle column="name" label="Name" />,
+      dataIndex: "name",
+      key: "name",
+      minWidth: 120,
+      render: (name: string) => <span className="font-medium">{name}</span>,
+    },
+    {
+      title: <SortTitle column="email" label="Email" />,
+      dataIndex: "email",
+      key: "email",
+      minWidth: 180,
+    },
+    {
+      title: <SortTitle column="role" label="Role" />,
+      dataIndex: "role",
+      key: "role",
+      minWidth: 100,
+      render: (role: User["role"]) => (
+        <Tag color={role === "super_admin" ? "cyan" : "default"}>
+          {role.replace("_", " ").toUpperCase()}
+        </Tag>
+      ),
+    },
+    {
+      title: <SortTitle column="createdAt" label="Created" />,
+      dataIndex: "createdAt",
+      key: "createdAt",
+      minWidth: 100,
+      render: (createdAt: string) =>
+        new Date(createdAt).toLocaleDateString(),
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      align: "right",
+      minWidth: 100,
+      render: (_, user) => (
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            type="text"
+            icon={<EditOutlined />}
+            onClick={() => handleEditUser(user)}
+            aria-label="Edit user"
+          />
+          {user._id !== (session?.user as any)?.id && (
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDeleteUser(user._id)}
+              aria-label="Delete user"
+            />
+          )}
+        </div>
+      ),
+    },
+  ];
 
   if (!isSuperAdmin) {
     return null;
@@ -235,267 +293,126 @@ export default function UsersPage() {
       isLoading={isLoading}
       actionButton={
         <Button
+          type="primary"
+          icon={<PlusOutlined />}
           onClick={() => {
             resetUserForm();
             setShowUserModal(true);
           }}
-          className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6] w-full sm:w-auto text-xs sm:text-sm"
+          className="w-full sm:w-auto"
         >
-          <Plus className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
           <span className="hidden sm:inline">Add User</span>
         </Button>
       }
     >
       <div className="space-y-4">
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-zinc-800">
-                    <TableHead 
-                      className="min-w-[120px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("name")}
-                    >
-                      <div className="flex items-center">
-                        Name
-                        <SortIcon column="name" />
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="min-w-[180px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("email")}
-                    >
-                      <div className="flex items-center">
-                        Email
-                        <SortIcon column="email" />
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("role")}
-                    >
-                      <div className="flex items-center">
-                        Role
-                        <SortIcon column="role" />
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="min-w-[100px] cursor-pointer hover:text-[#2DD4BF] transition-colors"
-                      onClick={() => handleSort("createdAt")}
-                    >
-                      <div className="flex items-center">
-                        Created
-                        <SortIcon column="createdAt" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-right min-w-[100px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <>
-                      {[...Array(5)].map((_, i) => (
-                        <TableRow key={i} className="border-zinc-800">
-                          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                          <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                          <TableCell>
-                            <div className="flex gap-2 justify-end">
-                              <Skeleton className="h-8 w-8 rounded" />
-                              <Skeleton className="h-8 w-8 rounded" />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </>
-                  ) : sortedUsers.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={5}
-                        className="text-center text-zinc-400 py-8"
-                      >
-                        No users found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    sortedUsers.map((user) => (
-                      <TableRow key={user._id} className="border-zinc-800">
-                        <TableCell className="font-medium text-white text-sm">
-                          {user.name}
-                        </TableCell>
-                        <TableCell className="text-zinc-200 text-sm">
-                          {user.email}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              user.role === "super_admin"
-                                ? "bg-[#2DD4BF]/20 border-[#2DD4BF]/50 text-[#2DD4BF] text-xs"
-                                : user.role === "admin"
-                                  ? "bg-zinc-900/50 border-zinc-800 text-zinc-200 text-xs"
-                                  : "bg-zinc-900/50 border-zinc-800 text-zinc-300 text-xs"
-                            }
-                          >
-                            {user.role.replace("_", " ").toUpperCase()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-zinc-400 text-xs">
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditUser(user)}
-                              className="text-zinc-400 hover:text-[#2DD4BF] h-8 w-8"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </Button>
-                            {user._id !== (session?.user as any)?.id && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteUser(user._id)}
-                                className="text-zinc-400 hover:text-zinc-300 h-8 w-8"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
+        <Card styles={{ body: { padding: 0 } }}>
+          <Table<User>
+            rowKey="_id"
+            columns={columns}
+            dataSource={sortedUsers}
+            loading={isLoading}
+            pagination={false}
+            scroll={{ x: true }}
+            locale={{ emptyText: "No users found." }}
+          />
         </Card>
       </div>
 
-      {/* User Modal */}
-      <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
-        <DialogContent className="bg-zinc-950 border-zinc-800 max-w-2xl text-white max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-white">
-              {editingUser ? "Edit User" : "Add New User"}
-            </DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Manage user accounts and permissions
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleUserSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="user-name" className="text-zinc-200 text-sm">
-                  Name
-                </Label>
-                <Input
-                  id="user-name"
-                  type="text"
-                  required
-                  value={userForm.name}
-                  onChange={(e) =>
-                    setUserForm({ ...userForm, name: e.target.value })
-                  }
-                  placeholder="John Doe"
-                  className="text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="user-role" className="text-zinc-200 text-sm">
-                  Role
-                </Label>
-                <Select
-                  value={userForm.role}
-                  onValueChange={(v) =>
-                    setUserForm({ ...userForm, role: v as any })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="super_admin">Super Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="user-email" className="text-zinc-200 text-sm">
-                Email
-              </Label>
-              <Input
-                id="user-email"
-                type="email"
-                required
-                value={userForm.email}
-                onChange={(e) =>
-                  setUserForm({ ...userForm, email: e.target.value })
-                }
-                placeholder="user@ibex.com"
-                className="text-sm"
+      <Modal
+        title={editingUser ? "Edit User" : "Add New User"}
+        open={showUserModal}
+        onCancel={() => {
+          setShowUserModal(false);
+          resetUserForm();
+        }}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setShowUserModal(false);
+              resetUserForm();
+            }}
+          >
+            Cancel
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={isSubmittingUser}
+            onClick={() => form.submit()}
+          >
+            {editingUser ? "Update User" : "Create User"}
+          </Button>,
+        ]}
+        width={672}
+      >
+        <p className="mb-4 text-zinc-400">
+          Manage user accounts and permissions
+        </p>
+        <Form<UserFormValues>
+          form={form}
+          layout="vertical"
+          onFinish={handleUserSubmit}
+          requiredMark={false}
+          initialValues={{ role: "admin" }}
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Form.Item
+              label="Name"
+              name="name"
+              rules={[{ required: true, message: "Name is required" }]}
+            >
+              <Input placeholder="John Doe" />
+            </Form.Item>
+            <Form.Item
+              label="Role"
+              name="role"
+              rules={[{ required: true, message: "Role is required" }]}
+            >
+              <Select
+                options={[
+                  { value: "user", label: "User" },
+                  { value: "admin", label: "Admin" },
+                  { value: "super_admin", label: "Super Admin" },
+                ]}
               />
-            </div>
+            </Form.Item>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="user-password" className="text-zinc-200 text-sm">
+          <Form.Item
+            label="Email"
+            name="email"
+            rules={[
+              { required: true, message: "Email is required" },
+              { type: "email", message: "Please enter a valid email address" },
+            ]}
+          >
+            <Input type="email" placeholder="user@ibex.com" />
+          </Form.Item>
+
+          <Form.Item
+            label={
+              <>
                 Password{" "}
                 {editingUser && (
                   <span className="text-zinc-400">
                     (leave empty to keep current)
                   </span>
                 )}
-              </Label>
-              <Input
-                id="user-password"
-                type="password"
-                required={!editingUser}
-                value={userForm.password}
-                onChange={(e) =>
-                  setUserForm({ ...userForm, password: e.target.value })
-                }
-                placeholder="••••••••"
-                className="text-sm"
-              />
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setShowUserModal(false);
-                  resetUserForm();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-                disabled={isSubmittingUser}
-              >
-                {isSubmittingUser ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {editingUser ? "Updating..." : "Creating..."}
-                  </>
-                ) : (
-                  editingUser ? "Update User" : "Create User"
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+              </>
+            }
+            name="password"
+            rules={
+              editingUser
+                ? []
+                : [{ required: true, message: "Password is required" }]
+            }
+          >
+            <Input.Password placeholder="••••••••" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </AdminLayout>
   );
 }

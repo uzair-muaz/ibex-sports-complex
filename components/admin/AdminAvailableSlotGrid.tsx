@@ -1,11 +1,11 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { CheckOutlined } from "@ant-design/icons";
+import { Skeleton } from "antd";
 import type { AvailableStartTimeQuote } from "@/app/actions/bookings";
 import type { Court } from "@/types";
 import { getPricePerHourForTime } from "@/lib/pricing-utils";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export type AdminAvailableSlotGridProps = {
   quotes: AvailableStartTimeQuote[];
@@ -51,13 +51,13 @@ function QuoteSlotCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        "relative h-28 rounded-3xl border transition-all duration-300 flex flex-col items-start justify-between p-5 overflow-hidden text-left w-full",
+        "relative flex h-28 w-full flex-col items-start justify-between overflow-hidden rounded-3xl border p-5 text-left transition-all duration-300",
         isSelected
-          ? "bg-[#2DD4BF] border-[#2DD4BF] text-black scale-[0.98] shadow-[0_10px_30px_rgba(45,212,191,0.2)]"
-          : "bg-zinc-900/40 border-white/10 hover:border-white/20 active:scale-95",
+          ? "scale-[0.98] border-[#2DD4BF] bg-[#2DD4BF] text-black shadow-[0_10px_30px_rgba(45,212,191,0.2)]"
+          : "border-white/10 bg-zinc-900/40 hover:border-white/20 active:scale-95",
       )}
     >
-      <div className="flex justify-between w-full items-start">
+      <div className="flex w-full items-start justify-between">
         <span
           className={cn(
             "text-[10px] font-black uppercase tracking-tighter",
@@ -66,10 +66,10 @@ function QuoteSlotCard({
         >
           START
         </span>
-        {isSelected ? <Check size={16} className="text-black" /> : null}
+        {isSelected ? <CheckOutlined className="text-black" /> : null}
         {peak && !isSelected ? (
           <div
-            className="w-1.5 h-1.5 rounded-full bg-amber-400 ring-1 ring-amber-400/40 shrink-0"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400 ring-1 ring-amber-400/40"
             title="Peak pricing"
           />
         ) : null}
@@ -77,7 +77,7 @@ function QuoteSlotCard({
       <div className="flex flex-col items-start">
         <span
           className={cn(
-            "text-xl font-black leading-none mb-1 tracking-tighter",
+            "mb-1 text-xl font-black leading-none tracking-tighter",
             isSelected ? "text-black" : "text-white",
           )}
         >
@@ -117,16 +117,7 @@ export function AdminAvailableSlotGrid({
             key={`av-skel-${index}`}
             className="h-28 rounded-3xl border border-white/10 bg-zinc-900/40 p-5"
           >
-            <div className="flex h-full flex-col justify-between">
-              <div className="flex items-start justify-between">
-                <Skeleton className="h-2.5 w-12 bg-zinc-700/60" />
-                <Skeleton className="h-2.5 w-2.5 rounded-full bg-zinc-700/60" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-6 w-24 bg-zinc-700/60" />
-                <Skeleton className="h-2.5 w-20 bg-zinc-700/60" />
-              </div>
-            </div>
+            <Skeleton active paragraph={{ rows: 2 }} title={false} />
           </div>
         ))}
       </div>

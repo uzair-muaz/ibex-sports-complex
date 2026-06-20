@@ -4,33 +4,28 @@ import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
-  DollarSign,
-  Users,
-  TrendingUp,
-  CreditCard,
-  Banknote,
-  Calendar as CalendarIcon,
-} from "lucide-react";
-import type { DateRange } from "react-day-picker";
-import { AdminLayout } from "@/components/admin/AdminLayout";
-import {
   Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
+  Button,
+  Modal,
+  DatePicker,
+  Segmented,
+  Statistic,
+  Tag,
+  Typography,
+  Flex,
+  Space,
+} from "antd";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  DollarOutlined,
+  TeamOutlined,
+  RiseOutlined,
+  CreditCardOutlined,
+  BankOutlined,
+  CalendarOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
+import type { Dayjs } from "dayjs";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import { getAllBookings } from "../../actions/bookings";
 import { getAllCourts } from "../../actions/courts";
 import type { Booking, Court } from "@/types";
@@ -43,18 +38,35 @@ import {
   isDateInRange,
 } from "@/lib/date-range-utils";
 
+const { Text } = Typography;
+
+const formatPkr = (value: number) =>
+  `PKR ${value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+type TimeFilter = "all" | "today" | "week" | "month" | "year" | "range";
+
+const TIME_FILTER_OPTIONS: { label: string; value: TimeFilter }[] = [
+  { label: "All", value: "all" },
+  { label: "Today", value: "today" },
+  { label: "This Week", value: "week" },
+  { label: "This Month", value: "month" },
+  { label: "This Year", value: "year" },
+  { label: "Custom Range", value: "range" },
+];
+
 export default function AnalyticsPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [timeFilter, setTimeFilter] = useState<
-    "all" | "today" | "week" | "month" | "year" | "range"
-  >("month");
-  const [customRange, setCustomRange] = useState<DateRange | undefined>(
-    undefined
-  );
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("month");
+  const [customRange, setCustomRange] = useState<
+    [Dayjs | null, Dayjs | null] | null
+  >(null);
   const [showRangeModal, setShowRangeModal] = useState(false);
 
   const userRole = (session?.user as { role?: string })?.role;
@@ -114,8 +126,8 @@ export default function AnalyticsPage() {
     }
     if (timeFilter === "range") {
       const range = getRangeFromDates(
-        customRange?.from ?? null,
-        customRange?.to ?? null
+        customRange?.[0]?.toDate() ?? null,
+        customRange?.[1]?.toDate() ?? null
       );
       return range;
     }
@@ -123,7 +135,6 @@ export default function AnalyticsPage() {
   };
 
   const calculateStats = () => {
-    // Use actual received amount (online + cash) so analytics match manual sheet
     const getReceivedAmount = (b: Booking) => {
       const online = b.amountReceivedOnline ?? 0;
       const cash = b.amountReceivedCash ?? 0;
@@ -259,12 +270,9 @@ export default function AnalyticsPage() {
   const stats = calculateStats();
   const activeRange = getActiveDateRange();
 
-  const handleTimeFilterChange = (
-    id: "all" | "today" | "week" | "month" | "year" | "range"
-  ) => {
+  const handleTimeFilterChange = (id: TimeFilter) => {
     if (id === "range") {
-      // Start fresh each time user chooses a custom range
-      setCustomRange(undefined);
+      setCustomRange(null);
       setTimeFilter("range");
       setShowRangeModal(true);
     } else {
@@ -273,6 +281,8 @@ export default function AnalyticsPage() {
     }
   };
 
+  const kpiValueStyle = { color: "#2DD4BF", fontSize: 28 };
+
   return (
     <AdminLayout
       title="Analytics Dashboard"
@@ -280,389 +290,281 @@ export default function AnalyticsPage() {
       onRefresh={loadData}
       isLoading={isLoading}
     >
-      {/* Time Filters */}
       <div className="mb-4 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-950 p-1 text-xs sm:text-sm">
-            {[
-              { id: "all", label: "All" },
-              { id: "today", label: "Today" },
-              { id: "week", label: "This Week" },
-              { id: "month", label: "This Month" },
-              { id: "year", label: "This Year" },
-              { id: "range", label: "Custom Range" },
-            ].map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() =>
-                  handleTimeFilterChange(option.id as typeof timeFilter)
-                }
-                className={`px-3 py-1.5 rounded-md transition-colors ${
-                  timeFilter === option.id
-                    ? "bg-[#2DD4BF] text-[#0F172A]"
-                    : "text-zinc-300 hover:bg-zinc-900"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+        <Flex
+          wrap="wrap"
+          gap="middle"
+          align="center"
+          justify="space-between"
+        >
+          <Segmented
+            options={TIME_FILTER_OPTIONS}
+            value={timeFilter}
+            onChange={(value) => handleTimeFilterChange(value as TimeFilter)}
+          />
 
-          <div className="flex items-center gap-2">
+          <Space wrap>
             {timeFilter === "range" && (
               <Button
-                variant="outline"
-                className="h-9 px-3 text-xs sm:text-sm bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800 hover:border-zinc-700 flex items-center gap-2"
+                icon={<CalendarOutlined />}
                 onClick={() => setShowRangeModal(true)}
               >
-                <CalendarIcon className="h-4 w-4 text-zinc-400" />
-                <span>
-                  {customRange?.from && customRange?.to
-                    ? `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`
-                    : "Select date range"}
-                </span>
+                {customRange?.[0] && customRange?.[1]
+                  ? `${customRange[0].format("MMM D, YYYY")} - ${customRange[1].format("MMM D, YYYY")}`
+                  : "Select date range"}
               </Button>
             )}
             {(timeFilter !== "all" || activeRange) && (
               <Button
-                variant="ghost"
-                className="h-9 px-3 text-xs sm:text-sm text-zinc-400 hover:text-white"
+                type="text"
                 onClick={() => {
                   setTimeFilter("all");
-                  setCustomRange(undefined);
+                  setCustomRange(null);
                   setShowRangeModal(false);
                 }}
               >
                 Clear
               </Button>
             )}
-          </div>
-        </div>
+          </Space>
+        </Flex>
 
         {timeFilter === "all" && (
-          <div className="text-xs sm:text-sm text-zinc-300">
-            Showing all time
-          </div>
+          <Text type="secondary">Showing all time</Text>
         )}
         {timeFilter !== "all" && activeRange && (
-          <div className="text-xs sm:text-sm text-zinc-300">
+          <Text type="secondary">
             Showing {activeRange.from} to {activeRange.to}
-          </div>
+          </Text>
         )}
       </div>
 
-      {/* Dashboard Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-[#2DD4BF]" />
-              </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
+        <Card>
+          <Flex justify="space-between" align="start">
+            <Statistic
+              title="Total Revenue"
+              value={stats.totalRevenue}
+              formatter={(value) => formatPkr(Number(value))}
+              valueStyle={kpiValueStyle}
+            />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#2DD4BF]/20">
+              <DollarOutlined className="text-2xl text-[#2DD4BF]" />
             </div>
-            <CardDescription className="text-zinc-400">
-              Total Revenue
-            </CardDescription>
-            <CardTitle className="text-3xl text-[#2DD4BF]">
-              PKR{" "}
-              {stats.totalRevenue.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </CardTitle>
-            <p className="text-xs text-zinc-400 mt-2">
-              {stats.bookingsByStatus.completed} completed ·{" "}
-              {stats.bookingsByStatus.confirmed} confirmed
-            </p>
-          </CardHeader>
+          </Flex>
+          <Text type="secondary" className="text-xs">
+            {stats.bookingsByStatus.completed} completed ·{" "}
+            {stats.bookingsByStatus.confirmed} confirmed
+          </Text>
         </Card>
 
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
-                <Banknote className="w-6 h-6 text-[#2DD4BF]" />
-              </div>
+        <Card>
+          <Flex justify="space-between" align="start">
+            <Statistic
+              title="Cash Received"
+              value={stats.totalCashReceived}
+              formatter={(value) => formatPkr(Number(value))}
+              valueStyle={kpiValueStyle}
+            />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#2DD4BF]/20">
+              <BankOutlined className="text-2xl text-[#2DD4BF]" />
             </div>
-            <CardDescription className="text-zinc-400">
-              Cash Received
-            </CardDescription>
-            <CardTitle className="text-3xl text-[#2DD4BF]">
-              PKR{" "}
-              {stats.totalCashReceived.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </CardTitle>
-            <p className="text-xs text-zinc-400 mt-2">
-              {stats.bookingsByStatus.completed} completed ·{" "}
-              {stats.bookingsByStatus.confirmed} confirmed
-            </p>
-          </CardHeader>
+          </Flex>
+          <Text type="secondary" className="text-xs">
+            {stats.bookingsByStatus.completed} completed ·{" "}
+            {stats.bookingsByStatus.confirmed} confirmed
+          </Text>
         </Card>
 
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
-                <CreditCard className="w-6 h-6 text-[#2DD4BF]" />
-              </div>
+        <Card>
+          <Flex justify="space-between" align="start">
+            <Statistic
+              title="Online Received"
+              value={stats.totalOnlineReceived}
+              formatter={(value) => formatPkr(Number(value))}
+              valueStyle={kpiValueStyle}
+            />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#2DD4BF]/20">
+              <CreditCardOutlined className="text-2xl text-[#2DD4BF]" />
             </div>
-            <CardDescription className="text-zinc-400">
-              Online Received
-            </CardDescription>
-            <CardTitle className="text-3xl text-[#2DD4BF]">
-              PKR{" "}
-              {stats.totalOnlineReceived.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </CardTitle>
-            <p className="text-xs text-zinc-400 mt-2">
-              {stats.bookingsByStatus.completed} completed ·{" "}
-              {stats.bookingsByStatus.confirmed} confirmed
-            </p>
-          </CardHeader>
+          </Flex>
+          <Text type="secondary" className="text-xs">
+            {stats.bookingsByStatus.completed} completed ·{" "}
+            {stats.bookingsByStatus.confirmed} confirmed
+          </Text>
         </Card>
 
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-[#2DD4BF]" />
-              </div>
+        <Card>
+          <Flex justify="space-between" align="start">
+            <Statistic
+              title="Total Bookings"
+              value={stats.totalBookings}
+              valueStyle={kpiValueStyle}
+            />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#2DD4BF]/20">
+              <RiseOutlined className="text-2xl text-[#2DD4BF]" />
             </div>
-            <CardDescription className="text-zinc-400">
-              Total Bookings
-            </CardDescription>
-            <CardTitle className="text-3xl text-[#2DD4BF]">
-              {stats.totalBookings}
-            </CardTitle>
-            <p className="text-xs text-zinc-400 mt-2">
-              {stats.todayBookings} today
-            </p>
-          </CardHeader>
+          </Flex>
+          <Text type="secondary" className="text-xs">
+            {stats.todayBookings} today
+          </Text>
         </Card>
 
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
-                <Users className="w-6 h-6 text-[#2DD4BF]" />
-              </div>
+        <Card>
+          <Flex justify="space-between" align="start">
+            <Statistic
+              title="Active Courts"
+              value={stats.activeCourts}
+              valueStyle={kpiValueStyle}
+            />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#2DD4BF]/20">
+              <TeamOutlined className="text-2xl text-[#2DD4BF]" />
             </div>
-            <CardDescription className="text-zinc-400">
-              Active Courts
-            </CardDescription>
-            <CardTitle className="text-3xl text-[#2DD4BF]">
-              {stats.activeCourts}
-            </CardTitle>
-            <p className="text-xs text-zinc-400 mt-2">
-              {stats.totalCourts} total
-            </p>
-          </CardHeader>
+          </Flex>
+          <Text type="secondary" className="text-xs">
+            {stats.totalCourts} total
+          </Text>
         </Card>
 
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="w-12 h-12 bg-[#2DD4BF]/20 rounded-xl flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-[#2DD4BF]" />
-              </div>
+        <Card>
+          <Flex justify="space-between" align="start">
+            <Statistic
+              title="Avg Booking Value"
+              value={stats.avgBookingValue}
+              formatter={(value) => formatPkr(Number(value))}
+              valueStyle={kpiValueStyle}
+            />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#2DD4BF]/20">
+              <DollarOutlined className="text-2xl text-[#2DD4BF]" />
             </div>
-            <CardDescription className="text-zinc-400">
-              Avg Booking Value
-            </CardDescription>
-            <CardTitle className="text-3xl text-[#2DD4BF]">
-              PKR{" "}
-              {stats.avgBookingValue.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </CardTitle>
-            <p className="text-xs text-zinc-400 mt-2">
-              Per booking
-            </p>
-          </CardHeader>
+          </Flex>
+          <Text type="secondary" className="text-xs">
+            Per booking
+          </Text>
         </Card>
       </div>
 
-      {/* Analytics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardHeader>
-            <CardDescription className="text-zinc-400">
-              This Month Revenue
-            </CardDescription>
-            <CardTitle className="text-2xl text-[#2DD4BF]">
-              PKR{" "}
-              {stats.thisMonthRevenue.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </CardTitle>
-          </CardHeader>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
+        <Card>
+          <Statistic
+            title="This Month Revenue"
+            value={stats.thisMonthRevenue}
+            formatter={(value) => formatPkr(Number(value))}
+            valueStyle={{ ...kpiValueStyle, fontSize: 24 }}
+          />
         </Card>
 
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardHeader>
-            <CardDescription className="text-zinc-400">
-              Most Popular Court
-            </CardDescription>
-            <CardTitle className="text-2xl text-[#2DD4BF]">
-              {stats.mostPopularCourtType}
-            </CardTitle>
-          </CardHeader>
+        <Card>
+          <Statistic
+            title="Most Popular Court"
+            value={stats.mostPopularCourtType}
+            valueStyle={{ ...kpiValueStyle, fontSize: 24 }}
+          />
         </Card>
 
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardHeader>
-            <CardDescription className="text-zinc-400">
-              Bookings by Status
-            </CardDescription>
-            <CardContent className="pt-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-[#2DD4BF]"></div>
-                    <span className="text-sm text-white">Confirmed</span>
-                  </div>
-                  <span className="font-semibold text-white">
-                    {stats.bookingsByStatus.confirmed}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-zinc-500"></div>
-                    <span className="text-sm text-white">Cancelled</span>
-                  </div>
-                  <span className="font-semibold text-white">
-                    {stats.bookingsByStatus.cancelled}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-zinc-400"></div>
-                    <span className="text-sm text-white">Completed</span>
-                  </div>
-                  <span className="font-semibold text-white">
-                    {stats.bookingsByStatus.completed}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </CardHeader>
+        <Card title="Bookings by Status">
+          <div className="space-y-3">
+            <Flex justify="space-between" align="center">
+              <Space>
+                <span className="inline-block h-3 w-3 rounded-full bg-[#2DD4BF]" />
+                <Text>Confirmed</Text>
+              </Space>
+              <Text strong>{stats.bookingsByStatus.confirmed}</Text>
+            </Flex>
+            <Flex justify="space-between" align="center">
+              <Space>
+                <span className="inline-block h-3 w-3 rounded-full bg-zinc-500" />
+                <Text>Cancelled</Text>
+              </Space>
+              <Text strong>{stats.bookingsByStatus.cancelled}</Text>
+            </Flex>
+            <Flex justify="space-between" align="center">
+              <Space>
+                <span className="inline-block h-3 w-3 rounded-full bg-zinc-400" />
+                <Text>Completed</Text>
+              </Space>
+              <Text strong>{stats.bookingsByStatus.completed}</Text>
+            </Flex>
+          </div>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2 text-white">
-              <Users className="w-5 h-5 text-[#2DD4BF]" />
+        <Card
+          title={
+            <Space>
+              <UserOutlined className="text-[#2DD4BF]" />
               Top Users
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {stats.topUsers.length === 0 ? (
-                <p className="text-zinc-400 text-sm">No bookings yet</p>
-              ) : (
-                stats.topUsers.map((user, index) => (
-                  <div
-                    key={user.email}
-                    className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-[#2DD4BF]/20 rounded-full flex items-center justify-center text-[#2DD4BF] font-bold text-sm">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <div className="font-medium text-white text-sm">
-                          {user.name}
-                        </div>
-                        <div className="text-xs text-zinc-500">
-                          {user.email}
-                        </div>
-                      </div>
+            </Space>
+          }
+        >
+          <div className="space-y-3">
+            {stats.topUsers.length === 0 ? (
+              <Text type="secondary">No bookings yet</Text>
+            ) : (
+              stats.topUsers.map((user, index) => (
+                <Flex
+                  key={user.email}
+                  justify="space-between"
+                  align="center"
+                  className="rounded-lg bg-zinc-900/50 p-3"
+                >
+                  <Space>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2DD4BF]/20 text-sm font-bold text-[#2DD4BF]">
+                      {index + 1}
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-semibold text-white">
-                        {user.count} bookings
-                      </div>
-                      <div className="text-xs text-[#2DD4BF]">
-                        PKR {user.revenue.toFixed(2)}
-                      </div>
+                    <div>
+                      <div className="text-sm font-medium">{user.name}</div>
+                      <Text type="secondary" className="text-xs">
+                        {user.email}
+                      </Text>
                     </div>
+                  </Space>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold">
+                      {user.count} bookings
+                    </div>
+                    <Text className="text-xs text-[#2DD4BF]">
+                      PKR {user.revenue.toFixed(2)}
+                    </Text>
                   </div>
-                ))
-              )}
-            </div>
-          </CardContent>
+                </Flex>
+              ))
+            )}
+          </div>
         </Card>
 
-        <Card className="border-zinc-800 bg-zinc-950">
-          <CardHeader>
-            <CardTitle className="text-lg text-white">
-              Revenue by Court Type
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {Object.entries(stats.revenueByType).map(([type, revenue]) => (
-                <div
-                  key={type}
-                  className="flex items-center justify-between"
-                >
-                  <Badge
-                    variant="outline"
-                    className="bg-zinc-900/50 border-zinc-800 text-zinc-200"
-                  >
-                    {type}
-                  </Badge>
-                  <span className="text-[#2DD4BF] font-semibold">
-                    PKR{" "}
-                    {revenue.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
+        <Card title="Revenue by Court Type">
+          <div className="space-y-3">
+            {Object.entries(stats.revenueByType).map(([type, revenue]) => (
+              <Flex key={type} justify="space-between" align="center">
+                <Tag>{type}</Tag>
+                <Text strong className="text-[#2DD4BF]">
+                  {formatPkr(revenue)}
+                </Text>
+              </Flex>
+            ))}
+          </div>
         </Card>
       </div>
 
-      {/* Custom Range Modal */}
-      <Dialog open={showRangeModal} onOpenChange={setShowRangeModal}>
-        <DialogContent className="bg-zinc-950 border-zinc-800 max-w-xl text-white">
-          <DialogHeader>
-            <DialogTitle className="text-white">Select custom date range</DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Choose a start and end date to filter analytics.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Calendar
-              mode="range"
-              selected={customRange}
-              onSelect={(range) => setCustomRange(range ?? undefined)}
-              numberOfMonths={2}
-              initialFocus
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setShowRangeModal(false)}
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal
+        title="Select custom date range"
+        open={showRangeModal}
+        onCancel={() => setShowRangeModal(false)}
+        footer={
+          <Button onClick={() => setShowRangeModal(false)}>Close</Button>
+        }
+      >
+        <Text type="secondary">
+          Choose a start and end date to filter analytics.
+        </Text>
+        <DatePicker.RangePicker
+          value={customRange}
+          onChange={(dates) => setCustomRange(dates)}
+          className="mt-4 w-full"
+        />
+      </Modal>
     </AdminLayout>
   );
 }

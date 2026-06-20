@@ -2,23 +2,14 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeftOutlined } from "@ant-design/icons";
+import { Alert, App, Button, DatePicker, Form, Input, Select } from "antd";
+import type { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminAvailableSlotGrid } from "@/components/admin/AdminAvailableSlotGrid";
-import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/ui/date-picker";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
 import { formatAdminBookingEndLabel } from "@/lib/admin-booking-slots";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
@@ -29,24 +20,38 @@ import {
 } from "@/app/actions/bookings";
 import { getCourts } from "@/app/actions/courts";
 import { COMPLEX_OPENING_DATE, type Court, type CourtType } from "@/types";
-import { toast } from "sonner";
 
 const COURT_TYPES: CourtType[] = ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"];
+
+type BookingFormValues = {
+  courtType: CourtType;
+  userName: string;
+  userEmail: string;
+  userPhone: string;
+};
 
 function dateKeyToLocalDate(key: string): Date {
   const [y, m, d] = key.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
 
+function dateToDayjs(date: Date): Dayjs {
+  return dayjs(date);
+}
+
 export default function AdminNewBookingPage() {
   const { data: session } = useSession();
   const router = useRouter();
+  const { message } = App.useApp();
+  const [form] = Form.useForm<BookingFormValues>();
   const { todayBusinessKey } = useBusinessTime(COMPLEX_OPENING_DATE);
 
   const minPickDate = COMPLEX_OPENING_DATE;
 
   const userRole = (session?.user as { role?: string })?.role;
   const isAdmin = userRole === "admin" || userRole === "super_admin";
+
+  const courtType = Form.useWatch("courtType", form) ?? "PADEL";
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
@@ -71,21 +76,13 @@ export default function AdminNewBookingPage() {
     AvailableStartTimeQuote[]
   >([]);
   const [courts, setCourts] = useState<Court[]>([]);
-
-  const [formData, setFormData] = useState({
-    courtType: "PADEL" as CourtType,
-    durationHours: 1,
-    userName: "",
-    userEmail: "",
-    userPhone: "",
-  });
-
+  const [durationHours, setDurationHours] = useState(1);
   const [selectedQuote, setSelectedQuote] =
     useState<AvailableStartTimeQuote | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const durationPresets = useMemo(() => {
-    if (formData.courtType === "FUTSAL") {
+    if (courtType === "FUTSAL") {
       return [
         { hours: 1.5, label: "1h 30m" },
         { hours: 2, label: "2h" },
@@ -98,30 +95,28 @@ export default function AdminNewBookingPage() {
       { hours: 1.5, label: "1h 30m" },
       { hours: 2, label: "2 hours" },
     ];
-  }, [formData.courtType]);
+  }, [courtType]);
 
   useEffect(() => {
     const first = durationPresets[0]?.hours ?? 1;
-    setFormData((prev) =>
-      prev.durationHours === first ? prev : { ...prev, durationHours: first },
-    );
-  }, [formData.courtType, durationPresets]);
+    setDurationHours((prev) => (prev === first ? prev : first));
+  }, [courtType, durationPresets]);
 
   useEffect(() => {
-    if (!session || !isAdmin || !formData.courtType) return;
+    if (!session || !isAdmin || !courtType) return;
     (async () => {
       try {
-        const result = await getCourts(formData.courtType);
+        const result = await getCourts(courtType);
         if (result.success) setCourts(result.courts as Court[]);
         else setCourts([]);
       } catch {
         setCourts([]);
       }
     })();
-  }, [session, isAdmin, formData.courtType]);
+  }, [session, isAdmin, courtType]);
 
   const fetchQuotes = useCallback(async () => {
-    if (!formData.courtType || !dateStr) {
+    if (!courtType || !dateStr) {
       setQuotableQuotes([]);
       return;
     }
@@ -130,9 +125,9 @@ export default function AdminNewBookingPage() {
     setErrorMessage(null);
     try {
       const result = await getAvailableStartTimes({
-        courtType: formData.courtType,
+        courtType,
         date: dateStr,
-        duration: formData.durationHours,
+        duration: durationHours,
       });
       if (!result.success) {
         setQuotableQuotes([]);
@@ -146,50 +141,37 @@ export default function AdminNewBookingPage() {
     } finally {
       setIsLoadingQuotes(false);
     }
-  }, [formData.courtType, formData.durationHours, dateStr]);
+  }, [courtType, durationHours, dateStr]);
 
   useEffect(() => {
     fetchQuotes();
   }, [fetchQuotes]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (values: BookingFormValues) => {
     setErrorMessage(null);
 
     if (!selectedQuote) {
       setErrorMessage("Please select a start time");
       return;
     }
-    if (!formData.userName.trim()) {
-      setErrorMessage("Please enter the customer name");
-      return;
-    }
-    if (!formData.userEmail.trim()) {
-      setErrorMessage("Please enter the customer email");
-      return;
-    }
-    if (!formData.userPhone.trim()) {
-      setErrorMessage("Please enter the customer phone");
-      return;
-    }
 
     setIsSubmitting(true);
     try {
       const result = await createBooking({
-        courtType: formData.courtType,
+        courtType: values.courtType,
         date: dateStr,
         startTime: selectedQuote.startTime,
-        duration: formData.durationHours,
-        userName: formData.userName.trim(),
-        userEmail: formData.userEmail.trim(),
-        userPhone: formData.userPhone.trim(),
+        duration: durationHours,
+        userName: values.userName.trim(),
+        userEmail: values.userEmail.trim(),
+        userPhone: values.userPhone.trim(),
       });
 
       if (!result.success || !result.booking) {
         throw new Error(result.error || "Failed to create booking");
       }
 
-      toast.success("Booking created successfully");
+      message.success("Booking created successfully");
       const raw = result.booking as { _id?: string; id?: string };
       const id = raw._id ?? raw.id;
       router.push(`/admin/bookings/${id ?? ""}`);
@@ -213,93 +195,89 @@ export default function AdminNewBookingPage() {
     >
       <div className="space-y-8 p-6">
         <Button
-          variant="ghost"
+          type="text"
+          icon={<ArrowLeftOutlined />}
           onClick={() => router.push("/admin/bookings")}
           className="mb-6"
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Bookings
         </Button>
 
         {errorMessage && (
-          <div
-            role="alert"
-            className="flex gap-2 rounded-lg border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-200"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <p>{errorMessage}</p>
-          </div>
+          <Alert
+            type="error"
+            message={errorMessage}
+            showIcon
+            closable
+            onClose={() => setErrorMessage(null)}
+          />
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="courtType" className="text-zinc-300">
-                Court Type
-              </Label>
+        <Form<BookingFormValues>
+          form={form}
+          layout="vertical"
+          requiredMark={false}
+          initialValues={{
+            courtType: "PADEL",
+            userName: "",
+            userEmail: "",
+            userPhone: "",
+          }}
+          onFinish={handleSubmit}
+          className="space-y-6"
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <Form.Item
+              label="Court Type"
+              name="courtType"
+              rules={[{ required: true, message: "Please select a court type" }]}
+            >
               <Select
-                value={formData.courtType}
-                onValueChange={(v) =>
-                  setFormData({
-                    ...formData,
-                    courtType: v as CourtType,
-                  })
-                }
-              >
-                <SelectTrigger
-                  id="courtType"
-                  className="bg-zinc-900 border-zinc-700 text-white"
-                >
-                  <SelectValue placeholder="Select court type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {COURT_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="date" className="text-zinc-300">
-                Date
-              </Label>
-              <DatePicker
-                date={selectedDate}
-                onDateChange={(date) => {
-                  if (date) setSelectedDate(date);
-                }}
-                variant="admin"
-                minDate={minPickDate}
+                options={COURT_TYPES.map((type) => ({
+                  value: type,
+                  label: type,
+                }))}
               />
-            </div>
+            </Form.Item>
 
-            <div className="space-y-2 md:col-span-2">
-              <Label className="text-zinc-300">Duration</Label>
-              <div className="flex flex-wrap gap-2">
-                {durationPresets.map((preset) => (
-                  <button
-                    key={preset.hours}
-                    type="button"
-                    onClick={() =>
-                      setFormData({ ...formData, durationHours: preset.hours })
-                    }
-                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                      formData.durationHours === preset.hours
-                        ? "border-teal-400 bg-teal-500/20 text-teal-200"
-                        : "border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:border-zinc-500"
-                    }`}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
+            <Form.Item label="Date" required>
+              <DatePicker
+                value={selectedDate ? dateToDayjs(selectedDate) : undefined}
+                onChange={(date) => {
+                  if (date) setSelectedDate(date.toDate());
+                }}
+                className="w-full"
+                disabledDate={(current) => {
+                  if (!current) return false;
+                  const min = dayjs(minPickDate).startOf("day");
+                  return current.startOf("day").isBefore(min);
+                }}
+              />
+            </Form.Item>
+
+            <div className="md:col-span-2">
+              <Form.Item label="Duration" required className="mb-0">
+                <div className="flex flex-wrap gap-2">
+                  {durationPresets.map((preset) => (
+                    <button
+                      key={preset.hours}
+                      type="button"
+                      onClick={() => setDurationHours(preset.hours)}
+                      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                        durationHours === preset.hours
+                          ? "border-teal-400 bg-teal-500/20 text-teal-200"
+                          : "border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:border-zinc-500"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </Form.Item>
             </div>
           </div>
 
-          {formData.courtType && dateStr && (
+          {courtType && dateStr && (
             <div className="space-y-3">
               <p className="text-sm text-zinc-400">
                 Available start times (includes past dates and times)
@@ -307,7 +285,7 @@ export default function AdminNewBookingPage() {
               <AdminAvailableSlotGrid
                 quotes={quotableQuotes}
                 selectedQuote={selectedQuote}
-                durationHours={formData.durationHours}
+                durationHours={durationHours}
                 courts={courts}
                 onSelect={(q) => setSelectedQuote(q)}
                 isLoading={isLoadingQuotes}
@@ -321,7 +299,7 @@ export default function AdminNewBookingPage() {
           )}
 
           {selectedQuote && (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-300 space-y-2">
+            <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-300">
               <p className="font-medium text-white">Price preview</p>
               <div className="flex flex-wrap gap-x-6 gap-y-1">
                 <span>
@@ -341,79 +319,50 @@ export default function AdminNewBookingPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="userName" className="text-zinc-300">
-                Customer Name
-              </Label>
-              <Input
-                id="userName"
-                value={formData.userName}
-                onChange={(e) =>
-                  setFormData({ ...formData, userName: e.target.value })
-                }
-                className="bg-zinc-900 border-zinc-700 text-white"
-                placeholder="Full name"
-              />
-            </div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <Form.Item
+              label="Customer Name"
+              name="userName"
+              rules={[{ required: true, message: "Please enter the customer name" }]}
+            >
+              <Input placeholder="Full name" />
+            </Form.Item>
 
-            <div className="space-y-2">
-              <Label htmlFor="userEmail" className="text-zinc-300">
-                Email
-              </Label>
-              <Input
-                id="userEmail"
-                type="email"
-                value={formData.userEmail}
-                onChange={(e) =>
-                  setFormData({ ...formData, userEmail: e.target.value })
-                }
-                className="bg-zinc-900 border-zinc-700 text-white"
-                placeholder="email@example.com"
-              />
-            </div>
+            <Form.Item
+              label="Email"
+              name="userEmail"
+              rules={[
+                { required: true, message: "Please enter the customer email" },
+                { type: "email", message: "Please enter a valid email address" },
+              ]}
+            >
+              <Input type="email" placeholder="email@example.com" />
+            </Form.Item>
 
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="userPhone" className="text-zinc-300">
-                Phone
-              </Label>
-              <Input
-                id="userPhone"
-                type="tel"
-                value={formData.userPhone}
-                onChange={(e) =>
-                  setFormData({ ...formData, userPhone: e.target.value })
-                }
-                className="bg-zinc-900 border-zinc-700 text-white"
-                placeholder="+92 300 1234567"
-              />
-            </div>
+            <Form.Item
+              label="Phone"
+              name="userPhone"
+              className="md:col-span-2"
+              rules={[{ required: true, message: "Please enter the customer phone" }]}
+            >
+              <Input type="tel" placeholder="+92 300 1234567" />
+            </Form.Item>
           </div>
 
-          <div className="flex items-center justify-end gap-4 pt-4 border-t border-zinc-800">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => router.push("/admin/bookings")}
-            >
+          <div className="flex items-center justify-end gap-4 border-t border-zinc-800 pt-4">
+            <Button type="text" onClick={() => router.push("/admin/bookings")}>
               Cancel
             </Button>
             <Button
-              type="submit"
-              className="bg-[#2DD4BF] text-[#0F172A] hover:bg-[#14B8A6]"
-              disabled={isSubmitting || !selectedQuote}
+              type="primary"
+              htmlType="submit"
+              loading={isSubmitting}
+              disabled={!selectedQuote}
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create Booking"
-              )}
+              Create Booking
             </Button>
           </div>
-        </form>
+        </Form>
       </div>
     </AdminLayout>
   );
