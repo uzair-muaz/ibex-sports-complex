@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useRef,
-  useCallback,
-} from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeftOutlined } from "@ant-design/icons";
@@ -19,21 +13,22 @@ import {
   Input,
   InputNumber,
   Select,
-  Spin,
   Typography,
 } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminPageLoader } from "@/components/admin/loaders";
 import { AdminAvailableSlotGrid } from "@/components/admin/AdminAvailableSlotGrid";
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
-import { getCourts } from "@/app/actions/courts";
+import type { AvailableStartTimeQuote } from "@/app/actions/bookings";
 import {
-  getAvailableStartTimes,
-  updateBooking,
-  getAllBookings,
-  type AvailableStartTimeQuote,
-} from "@/app/actions/bookings";
+  getQueryLoadingState,
+  useAllBookings,
+  useAvailableStartTimes,
+  useCourtsByType,
+} from "@/lib/tanstack/hooks/queries";
+import { useUpdateBookingMutation } from "@/lib/tanstack/hooks/mutations";
 import { COMPLEX_OPENING_DATE } from "@/types";
 import type { Court, Booking } from "@/types";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
@@ -79,15 +74,6 @@ export default function EditBookingPage() {
     return COMPLEX_OPENING_DATE > biz ? COMPLEX_OPENING_DATE : biz;
   }, [minSelectableDateKey]);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingBooking, setIsLoadingBooking] = useState(true);
-
-  const [courts, setCourts] = useState<Court[]>([]);
-  const [isLoadingCourts, setIsLoadingCourts] = useState(false);
-  const [quotableQuotes, setQuotableQuotes] = useState<
-    AvailableStartTimeQuote[]
-  >([]);
-  const [isLoadingQuotes, setIsLoadingQuotes] = useState(false);
   const [selectedQuote, setSelectedQuote] =
     useState<AvailableStartTimeQuote | null>(null);
 
@@ -109,6 +95,88 @@ export default function EditBookingPage() {
 
   const userRole = (session?.user as { role?: string })?.role;
   const isAdmin = userRole === "admin" || userRole === "super_admin";
+
+  const {
+    data: allBookings = [],
+    isLoading: isLoadingBookingsQuery,
+    isFetching: isFetchingBookings,
+    isError: isBookingsError,
+  } = useAllBookings({
+    enabled: !!session && isAdmin && !!bookingId,
+  });
+
+  const bookingsLoading = getQueryLoadingState({
+    isLoading: isLoadingBookingsQuery,
+    isFetching: isFetchingBookings,
+  });
+
+  const {
+    data: courts = [],
+    isLoading: isLoadingCourtsQuery,
+    isFetching: isFetchingCourts,
+  } = useCourtsByType(courtType, {
+    enabled: !!session && isAdmin && !!courtType,
+  });
+
+  const courtsLoading = getQueryLoadingState({
+    isLoading: isLoadingCourtsQuery,
+    isFetching: isFetchingCourts,
+  });
+
+  const dateString = selectedDate
+    ? formatLocalDate(selectedDate.toDate())
+    : "";
+
+  const availabilityInput =
+    loadedBooking && courtType && dateString
+      ? {
+          courtType,
+          date: dateString,
+          duration: durationHours,
+          excludeBookingId: bookingId,
+        }
+      : null;
+
+  const {
+    data: rawQuotes = [],
+    isLoading: isLoadingQuotesQuery,
+    isFetching: isFetchingQuotes,
+  } = useAvailableStartTimes(availabilityInput, {
+    enabled: !!session && isAdmin && !!loadedBooking,
+  });
+
+  const quotesLoading = getQueryLoadingState({
+    isLoading: isLoadingQuotesQuery,
+    isFetching: isFetchingQuotes,
+  });
+
+  const isInitialSlotLoading =
+    courtsLoading.isInitialLoading ||
+    (availabilityInput != null && quotesLoading.isInitialLoading);
+
+  const quotableQuotes = useMemo(() => {
+    if (!loadedBooking) return [];
+    let list = rawQuotes;
+    if (dateString === todayBusinessKey) {
+      const sameOriginalSlot = (q: AvailableStartTimeQuote) =>
+        loadedBooking.date === dateString &&
+        q.startTime === loadedBooking.startTime &&
+        durationHours === Number(loadedBooking.duration);
+      list = list.filter(
+        (q) => q.startTime >= nowBusinessHourDecimal || sameOriginalSlot(q),
+      );
+    }
+    return list;
+  }, [
+    rawQuotes,
+    loadedBooking,
+    dateString,
+    todayBusinessKey,
+    durationHours,
+    nowBusinessHourDecimal,
+  ]);
+
+  const updateBookingMutation = useUpdateBookingMutation();
 
   const durationPresets = useMemo(() => {
     let presets: { hours: number; label: string }[];
@@ -144,73 +212,86 @@ export default function EditBookingPage() {
   }, [session, isAdmin, router]);
 
   useEffect(() => {
-    if (session && isAdmin && bookingId) {
-      loadBooking();
-    }
-  }, [session, isAdmin, bookingId]);
+    if (!isBookingsError) return;
+    message.error("Failed to load booking");
+    router.push("/admin/bookings");
+  }, [isBookingsError, message, router]);
 
   useEffect(() => {
-    if (session && isAdmin && courtType) {
-      loadCourts();
+    if (
+      !session ||
+      !isAdmin ||
+      !bookingId ||
+      loadedBooking ||
+      bookingsLoading.isInitialLoading
+    ) {
+      return;
     }
-  }, [session, isAdmin, courtType]);
 
-  const fetchQuotes = useCallback(async () => {
-    if (!loadedBooking || !selectedDate) return;
-    const dateString = formatLocalDate(selectedDate.toDate());
-    setIsLoadingQuotes(true);
-    setSelectedQuote(null);
-    try {
-      const result = await getAvailableStartTimes({
-        courtType,
-        date: dateString,
-        duration: durationHours,
-        excludeBookingId: bookingId,
+    const booking = allBookings.find((b: Booking) => b._id === bookingId);
+    if (booking) {
+      userChangedSlotRef.current = false;
+      setLoadedBooking(booking);
+      setSavedBookingPricing({
+        totalPrice: Number(booking.totalPrice) || 0,
+        originalPrice: booking.originalPrice,
+        discountAmount: booking.discountAmount,
       });
-      if (!result.success) {
-        setQuotableQuotes([]);
-        message.error(result.error ?? "Could not load available times.");
-        return;
-      }
-      let list = result.startTimes ?? [];
-      if (dateString === todayBusinessKey) {
-        const sameOriginalSlot = (q: AvailableStartTimeQuote) =>
-          loadedBooking.date === dateString &&
-          q.startTime === loadedBooking.startTime &&
-          durationHours === Number(loadedBooking.duration);
-        list = list.filter(
-          (q) => q.startTime >= nowBusinessHourDecimal || sameOriginalSlot(q),
-        );
-      }
-      setQuotableQuotes(list);
-    } catch (e) {
-      setQuotableQuotes([]);
-      message.error(e instanceof Error ? e.message : "Failed to load slots.");
-    } finally {
-      setIsLoadingQuotes(false);
+      const resolvedCourtType =
+        typeof booking.courtId === "object" &&
+        booking.courtId &&
+        "type" in booking.courtId
+          ? (booking.courtId as Court).type
+          : "PADEL";
+
+      setCourtType(
+        resolvedCourtType as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
+      );
+
+      const hasNewPaymentFields =
+        booking.amountReceivedOnline != null ||
+        booking.amountReceivedCash != null;
+      const dur = Number(booking.duration);
+      setDurationHours(dur);
+
+      form.setFieldsValue({
+        date: dayjs(booking.date + "T12:00:00"),
+        status: booking.status,
+        userName: booking.userName,
+        userEmail: booking.userEmail,
+        userPhone: booking.userPhone || "",
+        amountReceivedOnline: hasNewPaymentFields
+          ? (booking.amountReceivedOnline ?? 0)
+          : 0,
+        amountReceivedCash: hasNewPaymentFields
+          ? (booking.amountReceivedCash ?? 0)
+          : booking.amountPaid || 0,
+      });
+    } else {
+      message.error("Booking not found");
+      router.push("/admin/bookings");
     }
   }, [
-    loadedBooking,
-    selectedDate,
-    courtType,
-    durationHours,
+    session,
+    isAdmin,
     bookingId,
-    todayBusinessKey,
-    nowBusinessHourDecimal,
+    allBookings,
+    loadedBooking,
+    bookingsLoading.isInitialLoading,
+    form,
     message,
+    router,
   ]);
 
   useEffect(() => {
-    if (!loadedBooking) return;
-    fetchQuotes();
-  }, [loadedBooking, fetchQuotes]);
+    setSelectedQuote(null);
+  }, [selectedDate, courtType, durationHours]);
 
   useEffect(() => {
     if (userChangedSlotRef.current) return;
-    if (!loadedBooking || isLoadingQuotes || quotableQuotes.length === 0)
+    if (!loadedBooking || quotesLoading.isLoading || quotableQuotes.length === 0)
       return;
     if (!selectedDate) return;
-    const dateString = formatLocalDate(selectedDate.toDate());
     if (dateString !== loadedBooking.date) return;
     if (durationHours !== Number(loadedBooking.duration)) return;
     const courtId =
@@ -226,84 +307,11 @@ export default function EditBookingPage() {
   }, [
     loadedBooking,
     quotableQuotes,
-    isLoadingQuotes,
+    quotesLoading.isLoading,
     selectedDate,
+    dateString,
     durationHours,
   ]);
-
-  const loadBooking = async () => {
-    setIsLoadingBooking(true);
-    try {
-      const result = await getAllBookings();
-      if (result.success) {
-        const booking = result.bookings.find(
-          (b: Booking) => b._id === bookingId,
-        );
-        if (booking) {
-          userChangedSlotRef.current = false;
-          setLoadedBooking(booking);
-          setSavedBookingPricing({
-            totalPrice: Number(booking.totalPrice) || 0,
-            originalPrice: booking.originalPrice,
-            discountAmount: booking.discountAmount,
-          });
-          const resolvedCourtType =
-            typeof booking.courtId === "object" &&
-            booking.courtId &&
-            "type" in booking.courtId
-              ? (booking.courtId as Court).type
-              : "PADEL";
-
-          setCourtType(
-            resolvedCourtType as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
-          );
-
-          const hasNewPaymentFields =
-            booking.amountReceivedOnline != null ||
-            booking.amountReceivedCash != null;
-          const dur = Number(booking.duration);
-          setDurationHours(dur);
-
-          form.setFieldsValue({
-            date: dayjs(booking.date + "T12:00:00"),
-            status: booking.status,
-            userName: booking.userName,
-            userEmail: booking.userEmail,
-            userPhone: booking.userPhone || "",
-            amountReceivedOnline: hasNewPaymentFields
-              ? (booking.amountReceivedOnline ?? 0)
-              : 0,
-            amountReceivedCash: hasNewPaymentFields
-              ? (booking.amountReceivedCash ?? 0)
-              : booking.amountPaid || 0,
-          });
-        } else {
-          message.error("Booking not found");
-          router.push("/admin/bookings");
-        }
-      }
-    } catch (error) {
-      console.error(error);
-      message.error("Failed to load booking");
-      router.push("/admin/bookings");
-    } finally {
-      setIsLoadingBooking(false);
-    }
-  };
-
-  const loadCourts = async () => {
-    setIsLoadingCourts(true);
-    try {
-      const result = await getCourts(courtType);
-      if (result.success) {
-        setCourts(result.courts as Court[]);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoadingCourts(false);
-    }
-  };
 
   const handlePaymentChange = () => {
     const online = form.getFieldValue("amountReceivedOnline") ?? 0;
@@ -321,15 +329,13 @@ export default function EditBookingPage() {
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      const dateString = formatLocalDate(values.date.toDate());
+      const submitDateString = formatLocalDate(values.date.toDate());
 
-      const result = await updateBooking({
+      const result = await updateBookingMutation.mutateAsync({
         bookingId,
         courtId: selectedQuote.assignedCourtId,
-        date: dateString,
+        date: submitDateString,
         startTime: selectedQuote.startTime,
         duration: durationHours,
         userName: values.userName,
@@ -344,12 +350,9 @@ export default function EditBookingPage() {
         router.replace("/admin/bookings");
       } else {
         message.error(result.error || "Failed to update booking");
-        setIsSubmitting(false);
       }
     } catch (error: unknown) {
       message.error(error instanceof Error ? error.message : "An error occurred");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -362,18 +365,24 @@ export default function EditBookingPage() {
     return null;
   }
 
-  if (isLoadingBooking) {
+  if (bookingsLoading.isInitialLoading) {
     return (
-      <AdminLayout title="Edit Booking" description="Loading...">
-        <div className="flex items-center justify-center py-24">
-          <Spin size="large" />
-        </div>
+      <AdminLayout title="Edit Booking" description="Loading booking...">
+        <AdminPageLoader label="Loading booking..." />
       </AdminLayout>
     );
   }
 
   return (
-    <AdminLayout title="Edit Booking" description="Update booking details">
+    <AdminLayout
+      title="Edit Booking"
+      description="Update booking details"
+      isLoading={
+        bookingsLoading.isRefreshing ||
+        courtsLoading.isRefreshing ||
+        quotesLoading.isRefreshing
+      }
+    >
       <div className="space-y-6 p-6">
         <Button
           type="text"
@@ -456,10 +465,8 @@ export default function EditBookingPage() {
               </Text>
             </div>
 
-            {isLoadingCourts ? (
-              <div className="flex items-center justify-center py-12">
-                <Spin />
-              </div>
+            {isInitialSlotLoading ? (
+              <AdminPageLoader label="Loading available slots..." />
             ) : courts.length === 0 ? (
               <p className="py-8 text-center text-sm text-zinc-400">
                 No courts available for this court type.
@@ -474,7 +481,7 @@ export default function EditBookingPage() {
                   userChangedSlotRef.current = true;
                   setSelectedQuote(q);
                 }}
-                isLoading={isLoadingQuotes}
+                isLoading={quotesLoading.isRefreshing}
                 emptyMessage="No available slots for this date and duration."
                 formatTime12={formatTime12}
                 formatEndLabel={(start, dur) =>
@@ -614,7 +621,7 @@ export default function EditBookingPage() {
             <Button
               type="primary"
               htmlType="submit"
-              loading={isSubmitting}
+              loading={updateBookingMutation.isPending}
               disabled={!selectedQuote}
             >
               Update Booking

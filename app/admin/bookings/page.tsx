@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
@@ -29,14 +29,18 @@ import {
   CalendarOutlined,
 } from "@ant-design/icons";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminTableSkeleton } from "@/components/admin/loaders";
 import { QRCode } from "@/components/ui/qr-code";
 import {
-  getBookingsPaginated,
-  deleteBooking,
-  updateBooking,
-  extendBooking,
-  checkBookingExtensionAvailability,
-} from "../../actions/bookings";
+  getQueryLoadingState,
+  useBookingsPaginated,
+  useBookingExtensionAvailability,
+} from "@/lib/tanstack/hooks/queries";
+import {
+  useDeleteBookingMutation,
+  useExtendBookingMutation,
+  useUpdateBookingMutation,
+} from "@/lib/tanstack/hooks/mutations";
 import type { Booking, Court } from "@/types";
 import { formatDisplayDate, formatTime12 } from "@/lib/utils";
 import {
@@ -158,13 +162,10 @@ export default function BookingsPage() {
   const { message } = App.useApp();
   const { data: session } = useSession();
   const router = useRouter();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState("");
   const [debouncedFilter, setDebouncedFilter] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [totalCount, setTotalCount] = useState(0);
   const [showBookingDetailsModal, setShowBookingDetailsModal] = useState(false);
   const [viewingBooking, setViewingBooking] = useState<Booking | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -182,15 +183,9 @@ export default function BookingsPage() {
     null,
   );
   const [extendingOption, setExtendingOption] = useState<0.5 | 1 | null>(null);
-  const [checkingExtensionBookingId, setCheckingExtensionBookingId] = useState<
+  const [extensionCheckBookingId, setExtensionCheckBookingId] = useState<
     string | null
   >(null);
-  const [extensionAvailability, setExtensionAvailability] = useState<{
-    bookingId: string;
-    checked: boolean;
-    canExtend30: boolean;
-    canExtend60: boolean;
-  } | null>(null);
   const [sortColumn, setSortColumn] = useState<SortColumn | null>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
@@ -203,7 +198,7 @@ export default function BookingsPage() {
   const isSuperAdmin = userRole === "super_admin";
   const isAdmin = userRole === "admin" || isSuperAdmin;
 
-  const getActiveDateRange = useCallback(() => {
+  const activeRange = useMemo(() => {
     const now = new Date();
     if (dateFilter === "today") return getTodayRange(now);
     if (dateFilter === "week") return getCurrentWeekRange(now);
@@ -217,37 +212,54 @@ export default function BookingsPage() {
     return null;
   }, [dateFilter, customRange]);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const activeRange = getActiveDateRange();
-      const result = await getBookingsPaginated({
-        page,
-        limit: pageSize,
-        dateRange: dateFilter === "all" ? null : activeRange,
-        search: debouncedFilter,
-      });
-      if (result.success) {
-        setBookings(result.bookings);
-        setTotalCount(result.totalCount ?? 0);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    page,
-    pageSize,
-    dateFilter,
-    debouncedFilter,
-    getActiveDateRange,
-  ]);
+  const bookingsInput = useMemo(
+    () => ({
+      page,
+      limit: pageSize,
+      dateRange: dateFilter === "all" ? null : activeRange,
+      search: debouncedFilter,
+    }),
+    [page, pageSize, dateFilter, activeRange, debouncedFilter],
+  );
 
-  useEffect(() => {
-    if (!session) return;
-    loadData();
-  }, [session, loadData]);
+  const bookingsQuery = useBookingsPaginated(bookingsInput, {
+    enabled: !!session,
+  });
+  const { isInitialLoading, isRefreshing } = getQueryLoadingState(bookingsQuery);
+  const bookings = bookingsQuery.data?.bookings ?? [];
+  const totalCount = bookingsQuery.data?.totalCount ?? 0;
+
+  const updateBookingMutation = useUpdateBookingMutation();
+  const deleteBookingMutation = useDeleteBookingMutation();
+  const extendBookingMutation = useExtendBookingMutation();
+
+  const extensionQuery = useBookingExtensionAvailability(
+    extensionCheckBookingId,
+    { enabled: !!extensionCheckBookingId },
+  );
+  const extensionLoading = getQueryLoadingState(extensionQuery);
+
+  const extensionAvailability = useMemo(() => {
+    const result = extensionQuery.data;
+    if (
+      !extensionCheckBookingId ||
+      !result ||
+      !result.success ||
+      extensionLoading.isLoading
+    ) {
+      return null;
+    }
+    return {
+      bookingId: extensionCheckBookingId,
+      checked: true,
+      canExtend30: result.canExtend30 ?? false,
+      canExtend60: result.canExtend60 ?? false,
+    };
+  }, [
+    extensionCheckBookingId,
+    extensionQuery.data,
+    extensionLoading.isLoading,
+  ]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedFilter(filter), 400);
@@ -261,6 +273,42 @@ export default function BookingsPage() {
   useEffect(() => {
     setPage(1);
   }, [pageSize]);
+
+  useEffect(() => {
+    if (bookingsQuery.error) {
+      message.error(
+        bookingsQuery.error instanceof Error
+          ? bookingsQuery.error.message
+          : "Failed to load bookings",
+      );
+    }
+  }, [bookingsQuery.error, message]);
+
+  useEffect(() => {
+    if (
+      !extensionCheckBookingId ||
+      !extensionQuery.isFetched ||
+      extensionQuery.isFetching
+    ) {
+      return;
+    }
+    const result = extensionQuery.data;
+    if (!result) return;
+    if (!result.success) {
+      message.error(result.error || "Failed to check extension availability");
+      return;
+    }
+    if (!result.hasAnyOption) {
+      message.warning("This booking cannot be extended right now.");
+    }
+  }, [
+    extensionCheckBookingId,
+    extensionQuery.data,
+    extensionQuery.dataUpdatedAt,
+    extensionQuery.isFetched,
+    extensionQuery.isFetching,
+    message,
+  ]);
 
   const handleCancelBooking = (booking: Booking) => {
     if (booking.status === "completed") {
@@ -276,7 +324,7 @@ export default function BookingsPage() {
 
     setIsCancelling(true);
     try {
-      const result = await updateBooking({
+      const result = await updateBookingMutation.mutateAsync({
         bookingId: cancellingBooking._id,
         status: "cancelled",
       });
@@ -284,7 +332,6 @@ export default function BookingsPage() {
       if (result.success) {
         setShowCancelModal(false);
         setCancellingBooking(null);
-        loadData();
       } else {
         message.error(result.error || "Failed to cancel booking");
       }
@@ -307,11 +354,12 @@ export default function BookingsPage() {
 
     setIsDeleting(true);
     try {
-      const result = await deleteBooking(deletingBooking._id);
+      const result = await deleteBookingMutation.mutateAsync(
+        deletingBooking._id,
+      );
       if (result.success) {
         setShowDeleteModal(false);
         setDeletingBooking(null);
-        loadData();
       } else {
         message.error(result.error || "Failed to delete booking");
       }
@@ -330,13 +378,11 @@ export default function BookingsPage() {
   ) => {
     setUpdatingStatusBookingId(bookingId);
     try {
-      const result = await updateBooking({ bookingId, status: newStatus });
+      const result = await updateBookingMutation.mutateAsync({
+        bookingId,
+        status: newStatus,
+      });
       if (result.success) {
-        setBookings((prev) =>
-          prev.map((b) =>
-            b._id === bookingId ? { ...b, status: newStatus } : b,
-          ),
-        );
         if (viewingBooking?._id === bookingId) {
           setViewingBooking((prev) =>
             prev ? { ...prev, status: newStatus } : null,
@@ -356,7 +402,7 @@ export default function BookingsPage() {
 
   const handleViewBooking = (booking: Booking) => {
     setViewingBooking(booking);
-    setExtensionAvailability(null);
+    setExtensionCheckBookingId(null);
     setShowBookingDetailsModal(true);
   };
 
@@ -371,11 +417,13 @@ export default function BookingsPage() {
     setExtendingBookingId(bookingId);
     setExtendingOption(extraDuration);
     try {
-      const result = await extendBooking({ bookingId, extraDuration });
+      const result = await extendBookingMutation.mutateAsync({
+        bookingId,
+        extraDuration,
+      });
       if (result.success) {
-        loadData();
         setViewingBooking(result.booking as Booking);
-        setExtensionAvailability(null);
+        setExtensionCheckBookingId(null);
       } else {
         message.error(result.error || "Failed to extend booking");
       }
@@ -389,34 +437,12 @@ export default function BookingsPage() {
     }
   };
 
-  const handleCheckExtensionAvailability = async (bookingId: string) => {
-    setCheckingExtensionBookingId(bookingId);
-    try {
-      const result = await checkBookingExtensionAvailability(bookingId);
-      if (!result.success) {
-        message.error(result.error || "Failed to check extension availability");
-        setExtensionAvailability(null);
-        return;
-      }
-      setExtensionAvailability({
-        bookingId,
-        checked: true,
-        canExtend30: result.canExtend30 ?? false,
-        canExtend60: result.canExtend60 ?? false,
-      });
-      if (!result.hasAnyOption) {
-        message.warning("This booking cannot be extended right now.");
-      }
-    } catch (error: unknown) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to check extension availability",
-      );
-      setExtensionAvailability(null);
-    } finally {
-      setCheckingExtensionBookingId(null);
+  const handleCheckExtensionAvailability = (bookingId: string) => {
+    if (extensionCheckBookingId === bookingId) {
+      void extensionQuery.refetch();
+      return;
     }
+    setExtensionCheckBookingId(bookingId);
   };
 
   const handleCreateBooking = () => {
@@ -449,7 +475,6 @@ export default function BookingsPage() {
     }
   };
 
-  const activeRange = getActiveDateRange();
   const sortedBookings = useMemo(
     () => sortBookings(bookings, sortColumn, sortDirection),
     [bookings, sortColumn, sortDirection],
@@ -643,7 +668,7 @@ export default function BookingsPage() {
   const closeBookingDetailsModal = () => {
     setShowBookingDetailsModal(false);
     setViewingBooking(null);
-    setExtensionAvailability(null);
+    setExtensionCheckBookingId(null);
   };
 
   const viewingReceived =
@@ -664,8 +689,8 @@ export default function BookingsPage() {
     <AdminLayout
       title="Bookings"
       description="Manage all bookings"
-      onRefresh={loadData}
-      isLoading={isLoading}
+      onRefresh={() => bookingsQuery.refetch()}
+      isLoading={isRefreshing}
       actionButton={
         isAdmin && (
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateBooking}>
@@ -723,50 +748,55 @@ export default function BookingsPage() {
         )}
 
         <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
-          <Table<Booking>
-            columns={columns}
-            dataSource={sortedBookings}
-            rowKey="_id"
-            loading={isLoading}
-            scroll={{ x: "max-content" }}
-            onChange={handleTableChange}
-            locale={{ emptyText: "No bookings found." }}
-            pagination={false}
-          />
-          <div className="flex flex-col gap-3 border-t border-zinc-800 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <Text type="secondary" className="text-xs">
-              Page <span className="font-mono text-zinc-200">{page}</span> of{" "}
-              <span className="font-mono text-zinc-200">{totalPages}</span>{" "}
-              <span className="ml-2">({totalCount} total)</span>
-            </Text>
-            <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
-              <Space size="small">
-                <Text type="secondary" className="text-xs">
-                  Rows per page
-                </Text>
-                <Select
-                  value={pageSize}
-                  onChange={(value) => setPageSize(value)}
-                  options={[10, 20, 50, 100].map((n) => ({
-                    value: n,
-                    label: String(n),
-                  }))}
-                  style={{ width: 80 }}
-                />
-              </Space>
-              <Pagination
-                current={page}
-                pageSize={pageSize}
-                total={totalCount}
-                onChange={(p, ps) => {
-                  setPage(p);
-                  if (ps !== pageSize) setPageSize(ps);
-                }}
-                showSizeChanger={false}
-                disabled={isLoading}
+          {isInitialLoading ? (
+            <AdminTableSkeleton rows={8} columns={8} />
+          ) : (
+            <>
+              <Table<Booking>
+                columns={columns}
+                dataSource={sortedBookings}
+                rowKey="_id"
+                scroll={{ x: "max-content" }}
+                onChange={handleTableChange}
+                locale={{ emptyText: "No bookings found." }}
+                pagination={false}
               />
-            </div>
-          </div>
+              <div className="flex flex-col gap-3 border-t border-zinc-800 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <Text type="secondary" className="text-xs">
+                  Page <span className="font-mono text-zinc-200">{page}</span> of{" "}
+                  <span className="font-mono text-zinc-200">{totalPages}</span>{" "}
+                  <span className="ml-2">({totalCount} total)</span>
+                </Text>
+                <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+                  <Space size="small">
+                    <Text type="secondary" className="text-xs">
+                      Rows per page
+                    </Text>
+                    <Select
+                      value={pageSize}
+                      onChange={(value) => setPageSize(value)}
+                      options={[10, 20, 50, 100].map((n) => ({
+                        value: n,
+                        label: String(n),
+                      }))}
+                      style={{ width: 80 }}
+                    />
+                  </Space>
+                  <Pagination
+                    current={page}
+                    pageSize={pageSize}
+                    total={totalCount}
+                    onChange={(p, ps) => {
+                      setPage(p);
+                      if (ps !== pageSize) setPageSize(ps);
+                    }}
+                    showSizeChanger={false}
+                    disabled={isRefreshing}
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </Card>
       </div>
 
@@ -864,7 +894,8 @@ export default function BookingsPage() {
                         handleCheckExtensionAvailability(viewingBooking._id)
                       }
                       loading={
-                        checkingExtensionBookingId === viewingBooking._id
+                        extensionCheckBookingId === viewingBooking._id &&
+                        extensionLoading.isLoading
                       }
                     >
                       Check availability

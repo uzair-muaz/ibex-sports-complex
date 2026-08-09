@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { Spin } from "antd";
 import { AdminAntdProvider } from "@/components/admin/AdminAntdProvider";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 
 function AdminAuthGate({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -44,7 +45,9 @@ export default function AdminRootLayout({
 }) {
   return (
     <AdminAntdProvider>
-      <AdminAuthGate>{children}</AdminAuthGate>
+      <QueryProvider>
+        <AdminAuthGate>{children}</AdminAuthGate>
+      </QueryProvider>
     </AdminAntdProvider>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
@@ -24,20 +24,19 @@ import {
   SwapOutlined,
 } from "@ant-design/icons";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminTableSkeleton } from "@/components/admin/loaders";
 import {
-  getAllUsers,
-  createUser,
-  updateUser,
-  deleteUser,
-} from "../../actions/users";
+  useAllUsers,
+  getQueryLoadingState,
+} from "@/lib/tanstack/hooks/queries";
+import {
+  useCreateUserMutation,
+  useUpdateUserMutation,
+  useDeleteUserMutation,
+} from "@/lib/tanstack/hooks/mutations";
+import type { AdminUser } from "@/lib/tanstack/types/users.types";
 
-interface User {
-  _id: string;
-  email: string;
-  name: string;
-  role: "super_admin" | "admin" | "user";
-  createdAt: string;
-}
+type User = AdminUser;
 
 type UserFormValues = {
   email: string;
@@ -51,16 +50,37 @@ export default function UsersPage() {
   const router = useRouter();
   const { message, modal } = App.useApp();
   const [form] = Form.useForm<UserFormValues>();
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isSubmittingUser, setIsSubmittingUser] = useState(false);
   const [sortColumn, setSortColumn] = useState<keyof User | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as { role?: string })?.role;
   const isSuperAdmin = userRole === "super_admin";
+
+  const usersQuery = useAllUsers({ enabled: !!session && isSuperAdmin });
+  const { isInitialLoading, isRefreshing } = getQueryLoadingState(usersQuery);
+  const users = usersQuery.data ?? [];
+
+  const createUserMutation = useCreateUserMutation();
+  const updateUserMutation = useUpdateUserMutation();
+  const deleteUserMutation = useDeleteUserMutation();
+
+  useEffect(() => {
+    if (!session || isSuperAdmin) return;
+    router.push("/admin/bookings");
+  }, [session, isSuperAdmin, router]);
+
+  useEffect(() => {
+    if (usersQuery.error) {
+      message.error(
+        usersQuery.error instanceof Error
+          ? usersQuery.error.message
+          : "Failed to load users",
+      );
+    }
+  }, [usersQuery.error, message]);
 
   const handleSort = (column: keyof User) => {
     if (sortColumn === column) {
@@ -118,36 +138,12 @@ export default function UsersPage() {
     </span>
   );
 
-  useEffect(() => {
-    if (session) {
-      if (!isSuperAdmin) {
-        router.push("/admin/bookings");
-        return;
-      }
-      loadData();
-    }
-  }, [session, isSuperAdmin, router]);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const result = await getAllUsers();
-      if (result.success) {
-        setUsers(result.users);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleUserSubmit = async (values: UserFormValues) => {
     setIsSubmittingUser(true);
 
     try {
       if (editingUser) {
-        const result = await updateUser({
+        const result = await updateUserMutation.mutateAsync({
           userId: editingUser._id,
           ...values,
           ...(values.password ? {} : { password: undefined }),
@@ -157,7 +153,6 @@ export default function UsersPage() {
           setShowUserModal(false);
           setEditingUser(null);
           resetUserForm();
-          loadData();
         } else {
           message.error(result.error || "Failed to update user");
         }
@@ -166,7 +161,7 @@ export default function UsersPage() {
           message.error("Password is required for new users");
           return;
         }
-        const result = await createUser({
+        const result = await createUserMutation.mutateAsync({
           ...values,
           password: values.password,
         });
@@ -174,13 +169,14 @@ export default function UsersPage() {
         if (result.success) {
           setShowUserModal(false);
           resetUserForm();
-          loadData();
         } else {
           message.error(result.error || "Failed to create user");
         }
       }
-    } catch (error: any) {
-      message.error(error.message || "An error occurred");
+    } catch (error: unknown) {
+      message.error(
+        error instanceof Error ? error.message : "An error occurred",
+      );
     } finally {
       setIsSubmittingUser(false);
     }
@@ -211,12 +207,11 @@ export default function UsersPage() {
       okText: "Delete",
       okButtonProps: { danger: true },
       onOk: async () => {
-        const result = await deleteUser(userId);
+        const result = await deleteUserMutation.mutateAsync(userId);
         if (result.success) {
-          loadData();
-        } else {
-          message.error(result.error || "Failed to delete user");
+          return;
         }
+        message.error(result.error || "Failed to delete user");
       },
     });
   };
@@ -289,8 +284,8 @@ export default function UsersPage() {
     <AdminLayout
       title="User Management"
       description="Manage user accounts"
-      onRefresh={loadData}
-      isLoading={isLoading}
+      onRefresh={() => usersQuery.refetch()}
+      isLoading={isRefreshing}
       actionButton={
         <Button
           type="primary"
@@ -305,19 +300,22 @@ export default function UsersPage() {
         </Button>
       }
     >
-      <div className="space-y-4">
-        <Card styles={{ body: { padding: 0 } }}>
-          <Table<User>
-            rowKey="_id"
-            columns={columns}
-            dataSource={sortedUsers}
-            loading={isLoading}
-            pagination={false}
-            scroll={{ x: true }}
-            locale={{ emptyText: "No users found." }}
-          />
-        </Card>
-      </div>
+      {isInitialLoading ? (
+        <AdminTableSkeleton />
+      ) : (
+        <div className="space-y-4">
+          <Card styles={{ body: { padding: 0 } }}>
+            <Table<User>
+              rowKey="_id"
+              columns={columns}
+              dataSource={sortedUsers}
+              pagination={false}
+              scroll={{ x: true }}
+              locale={{ emptyText: "No users found." }}
+            />
+          </Card>
+        </div>
+      )}
 
       <Modal
         title={editingUser ? "Edit User" : "Add New User"}

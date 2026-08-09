@@ -1,24 +1,20 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { App, Card, Input, Rate, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { getAllFeedback } from "../../actions/feedback";
+import { AdminTableSkeleton } from "@/components/admin/loaders";
+import {
+  useAllFeedback,
+  getQueryLoadingState,
+} from "@/lib/tanstack/hooks/queries";
+import type { AdminFeedback } from "@/lib/tanstack/types/feedback.types";
 
 const { Text } = Typography;
 
-type FeedbackRecord = {
-  _id: string;
-  bookingId: string | { _id: string };
-  userName: string;
-  userEmail: string;
-  rating: number;
-  comment?: string;
-  courtType?: string;
-  createdAt: string;
-};
+type FeedbackRecord = AdminFeedback;
 
 function getBookingIdDisplay(bookingId: FeedbackRecord["bookingId"]): string {
   if (typeof bookingId === "object" && bookingId?._id) {
@@ -45,32 +41,21 @@ function getBookingIdFilterValue(
 export default function FeedbackPage() {
   const { data: session } = useSession();
   const { message } = App.useApp();
-  const [feedbacks, setFeedbacks] = useState<FeedbackRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState("");
 
-  useEffect(() => {
-    if (session) {
-      loadData();
-    }
-  }, [session]);
+  const feedbackQuery = useAllFeedback({ enabled: !!session });
+  const { isInitialLoading, isRefreshing } = getQueryLoadingState(feedbackQuery);
+  const feedbacks = feedbackQuery.data ?? [];
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const result = await getAllFeedback();
-      if (result.success) {
-        setFeedbacks(result.feedbacks);
-      } else {
-        message.error(result.error || "Failed to load feedback");
-      }
-    } catch (error) {
-      console.error(error);
-      message.error("Failed to load feedback");
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    if (feedbackQuery.error) {
+      message.error(
+        feedbackQuery.error instanceof Error
+          ? feedbackQuery.error.message
+          : "Failed to load feedback",
+      );
     }
-  };
+  }, [feedbackQuery.error, message]);
 
   const filteredFeedbacks = useMemo(() => {
     const q = filter.toLowerCase();
@@ -173,34 +158,37 @@ export default function FeedbackPage() {
     <AdminLayout
       title="Feedback"
       description="View customer feedback"
-      onRefresh={loadData}
-      isLoading={isLoading}
+      onRefresh={() => feedbackQuery.refetch()}
+      isLoading={isRefreshing}
     >
-      <div className="space-y-4">
-        <Input.Search
-          placeholder="Search by name, email, booking ID or comment..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          allowClear
-          className="w-full sm:max-w-xl"
-        />
-
-        <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
-          <Table<FeedbackRecord>
-            columns={columns}
-            dataSource={filteredFeedbacks}
-            rowKey="_id"
-            loading={isLoading}
-            pagination={{ pageSize: 20, showSizeChanger: true }}
-            scroll={{ x: "max-content" }}
-            locale={{
-              emptyText: filter
-                ? "No feedback found matching your search."
-                : "No feedback submitted yet.",
-            }}
+      {isInitialLoading ? (
+        <AdminTableSkeleton />
+      ) : (
+        <div className="space-y-4">
+          <Input.Search
+            placeholder="Search by name, email, booking ID or comment..."
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            allowClear
+            className="w-full sm:max-w-xl"
           />
-        </Card>
-      </div>
+
+          <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
+            <Table<FeedbackRecord>
+              columns={columns}
+              dataSource={filteredFeedbacks}
+              rowKey="_id"
+              pagination={{ pageSize: 20, showSizeChanger: true }}
+              scroll={{ x: "max-content" }}
+              locale={{
+                emptyText: filter
+                  ? "No feedback found matching your search."
+                  : "No feedback submitted yet.",
+              }}
+            />
+          </Card>
+        </div>
+      )}
     </AdminLayout>
   );
 }

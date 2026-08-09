@@ -2,24 +2,26 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { Alert, App, Button, DatePicker, Form, Input, Select } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminPageLoader } from "@/components/admin/loaders";
 import { AdminAvailableSlotGrid } from "@/components/admin/AdminAvailableSlotGrid";
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
 import { formatAdminBookingEndLabel } from "@/lib/admin-booking-slots";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
+import type { AvailableStartTimeQuote } from "@/app/actions/bookings";
 import {
-  createBooking,
-  getAvailableStartTimes,
-  type AvailableStartTimeQuote,
-} from "@/app/actions/bookings";
-import { getCourts } from "@/app/actions/courts";
-import { COMPLEX_OPENING_DATE, type Court, type CourtType } from "@/types";
+  getQueryLoadingState,
+  useAvailableStartTimes,
+  useCourtsByType,
+} from "@/lib/tanstack/hooks/queries";
+import { useCreateBookingMutation } from "@/lib/tanstack/hooks/mutations";
+import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 
 const COURT_TYPES: CourtType[] = ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"];
 
@@ -70,16 +72,52 @@ export default function AdminNewBookingPage() {
     }
   }, [session, isAdmin, router]);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingQuotes, setIsLoadingQuotes] = useState(false);
-  const [quotableQuotes, setQuotableQuotes] = useState<
-    AvailableStartTimeQuote[]
-  >([]);
-  const [courts, setCourts] = useState<Court[]>([]);
   const [durationHours, setDurationHours] = useState(1);
   const [selectedQuote, setSelectedQuote] =
     useState<AvailableStartTimeQuote | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const {
+    data: courts = [],
+    isLoading: isLoadingCourtsQuery,
+    isFetching: isFetchingCourts,
+  } = useCourtsByType(courtType, {
+    enabled: !!session && isAdmin,
+  });
+
+  const courtsLoading = getQueryLoadingState({
+    isLoading: isLoadingCourtsQuery,
+    isFetching: isFetchingCourts,
+  });
+
+  const availabilityInput =
+    courtType && dateStr
+      ? {
+          courtType,
+          date: dateStr,
+          duration: durationHours,
+        }
+      : null;
+
+  const {
+    data: quotableQuotes = [],
+    isLoading: isLoadingQuotesQuery,
+    isFetching: isFetchingQuotes,
+    error: quotesError,
+  } = useAvailableStartTimes(availabilityInput, {
+    enabled: !!session && isAdmin,
+  });
+
+  const quotesLoading = getQueryLoadingState({
+    isLoading: isLoadingQuotesQuery,
+    isFetching: isFetchingQuotes,
+  });
+
+  const isInitialSlotLoading =
+    courtsLoading.isInitialLoading ||
+    (availabilityInput != null && quotesLoading.isInitialLoading);
+
+  const createBookingMutation = useCreateBookingMutation();
 
   const durationPresets = useMemo(() => {
     if (courtType === "FUTSAL") {
@@ -103,49 +141,18 @@ export default function AdminNewBookingPage() {
   }, [courtType, durationPresets]);
 
   useEffect(() => {
-    if (!session || !isAdmin || !courtType) return;
-    (async () => {
-      try {
-        const result = await getCourts(courtType);
-        if (result.success) setCourts(result.courts as Court[]);
-        else setCourts([]);
-      } catch {
-        setCourts([]);
-      }
-    })();
-  }, [session, isAdmin, courtType]);
-
-  const fetchQuotes = useCallback(async () => {
-    if (!courtType || !dateStr) {
-      setQuotableQuotes([]);
-      return;
-    }
-    setIsLoadingQuotes(true);
     setSelectedQuote(null);
     setErrorMessage(null);
-    try {
-      const result = await getAvailableStartTimes({
-        courtType,
-        date: dateStr,
-        duration: durationHours,
-      });
-      if (!result.success) {
-        setQuotableQuotes([]);
-        setErrorMessage(result.error ?? "Could not load available times.");
-        return;
-      }
-      setQuotableQuotes(result.startTimes ?? []);
-    } catch (e) {
-      setQuotableQuotes([]);
-      setErrorMessage(e instanceof Error ? e.message : "Failed to load slots.");
-    } finally {
-      setIsLoadingQuotes(false);
-    }
   }, [courtType, durationHours, dateStr]);
 
   useEffect(() => {
-    fetchQuotes();
-  }, [fetchQuotes]);
+    if (!quotesError) return;
+    setErrorMessage(
+      quotesError instanceof Error
+        ? quotesError.message
+        : "Failed to load slots.",
+    );
+  }, [quotesError]);
 
   const handleSubmit = async (values: BookingFormValues) => {
     setErrorMessage(null);
@@ -155,9 +162,8 @@ export default function AdminNewBookingPage() {
       return;
     }
 
-    setIsSubmitting(true);
     try {
-      const result = await createBooking({
+      const result = await createBookingMutation.mutateAsync({
         courtType: values.courtType,
         date: dateStr,
         startTime: selectedQuote.startTime,
@@ -179,8 +185,6 @@ export default function AdminNewBookingPage() {
       setErrorMessage(
         err instanceof Error ? err.message : "Failed to create booking",
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -192,6 +196,7 @@ export default function AdminNewBookingPage() {
     <AdminLayout
       title="Create Booking"
       description="Pick date, duration, and an available start time. Court is assigned automatically."
+      isLoading={courtsLoading.isRefreshing || quotesLoading.isRefreshing}
     >
       <div className="space-y-8 p-6">
         <Button
@@ -282,19 +287,23 @@ export default function AdminNewBookingPage() {
               <p className="text-sm text-zinc-400">
                 Available start times (includes past dates and times)
               </p>
-              <AdminAvailableSlotGrid
-                quotes={quotableQuotes}
-                selectedQuote={selectedQuote}
-                durationHours={durationHours}
-                courts={courts}
-                onSelect={(q) => setSelectedQuote(q)}
-                isLoading={isLoadingQuotes}
-                emptyMessage="No available slots for this date and duration."
-                formatTime12={formatTime12}
-                formatEndLabel={(start, dur) =>
-                  formatAdminBookingEndLabel(start, dur)
-                }
-              />
+              {isInitialSlotLoading ? (
+                <AdminPageLoader label="Loading available slots..." />
+              ) : (
+                <AdminAvailableSlotGrid
+                  quotes={quotableQuotes}
+                  selectedQuote={selectedQuote}
+                  durationHours={durationHours}
+                  courts={courts}
+                  onSelect={(q) => setSelectedQuote(q)}
+                  isLoading={quotesLoading.isRefreshing}
+                  emptyMessage="No available slots for this date and duration."
+                  formatTime12={formatTime12}
+                  formatEndLabel={(start, dur) =>
+                    formatAdminBookingEndLabel(start, dur)
+                  }
+                />
+              )}
             </div>
           )}
 
@@ -356,7 +365,7 @@ export default function AdminNewBookingPage() {
             <Button
               type="primary"
               htmlType="submit"
-              loading={isSubmitting}
+              loading={createBookingMutation.isPending}
               disabled={!selectedQuote}
             >
               Create Booking

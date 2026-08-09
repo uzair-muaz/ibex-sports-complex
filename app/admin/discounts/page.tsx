@@ -32,15 +32,19 @@ import {
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminTableSkeleton } from "@/components/admin/loaders";
 import {
-  getDiscounts,
-  getDiscountById,
-  createDiscount,
-  updateDiscount,
-  deleteDiscount,
-  toggleDiscountActive,
-  type DayRuleInput,
-} from "@/app/actions/discounts";
+  useDiscounts,
+  useDiscountById,
+  getQueryLoadingState,
+} from "@/lib/tanstack/hooks/queries";
+import {
+  useCreateDiscountMutation,
+  useUpdateDiscountMutation,
+  useDeleteDiscountMutation,
+  useToggleDiscountActiveMutation,
+} from "@/lib/tanstack/hooks/mutations";
+import { type DayRuleInput } from "@/app/actions/discounts";
 import {
   formatDiscountValue,
   formatTimeRestriction,
@@ -263,18 +267,32 @@ export default function DiscountsPage() {
   const { message } = App.useApp();
   const { data: session } = useSession();
   const router = useRouter();
-  const [discounts, setDiscounts] = useState<Discount[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const userRole = (session?.user as any)?.role;
+  const isSuperAdmin = userRole === "super_admin";
+  const isAdmin = userRole === "admin" || isSuperAdmin;
+
+  const discountsQuery = useDiscounts({ enabled: !!session && isAdmin });
+  const { isInitialLoading, isRefreshing } = getQueryLoadingState(discountsQuery);
+  const discounts = (discountsQuery.data ?? []) as Discount[];
+
+  const createDiscountMutation = useCreateDiscountMutation();
+  const updateDiscountMutation = useUpdateDiscountMutation();
+  const deleteDiscountMutation = useDeleteDiscountMutation();
+  const toggleDiscountActiveMutation = useToggleDiscountActiveMutation();
+
   const [showDiscountDrawer, setShowDiscountDrawer] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+  const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingDiscount, setDeletingDiscount] = useState<Discount | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isToggling, setIsToggling] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<keyof Discount | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const discountByIdQuery = useDiscountById(editingDiscountId, {
+    enabled: showDiscountDrawer && !!editingDiscountId,
+  });
+  const { isInitialLoading: isLoadingEdit } =
+    getQueryLoadingState(discountByIdQuery);
 
   const [discountForm, setDiscountForm] = useState({
     name: "",
@@ -303,33 +321,35 @@ export default function DiscountsPage() {
     dayRules: [] as DayRuleForm[],
   });
 
-  const userRole = (session?.user as any)?.role;
-  const isSuperAdmin = userRole === "super_admin";
-  const isAdmin = userRole === "admin" || isSuperAdmin;
-
   useEffect(() => {
-    if (session) {
-      if (!isAdmin) {
-        router.push("/admin/bookings");
-        return;
-      }
-      loadData();
+    if (session && !isAdmin) {
+      router.push("/admin/bookings");
     }
   }, [session, isAdmin, router]);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const discountResult = await getDiscounts();
-      if (discountResult.success) {
-        setDiscounts(discountResult.discounts);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    if (discountsQuery.error) {
+      message.error(
+        discountsQuery.error instanceof Error
+          ? discountsQuery.error.message
+          : "Failed to load discounts",
+      );
     }
-  };
+  }, [discountsQuery.error, message]);
+
+  useEffect(() => {
+    if (!discountByIdQuery.data) return;
+    const fresh = discountByIdQuery.data as Discount;
+    setEditingDiscount(fresh);
+    setDiscountForm(discountToFormState(fresh));
+  }, [discountByIdQuery.data]);
+
+  const isSubmitting =
+    createDiscountMutation.isPending || updateDiscountMutation.isPending;
+  const isDeleting = deleteDiscountMutation.isPending;
+  const togglingDiscountId = toggleDiscountActiveMutation.isPending
+    ? (toggleDiscountActiveMutation.variables ?? null)
+    : null;
 
   const handleDiscountSubmit = async () => {
     if (!discountForm.validFrom || !discountForm.validUntil) {
@@ -395,8 +415,6 @@ export default function DiscountsPage() {
       dayRulesPayload,
     );
 
-    setIsSubmitting(true);
-
     const validFrom = formatLocalDate(discountForm.validFrom);
     const validUntil = formatLocalDate(discountForm.validUntil);
 
@@ -423,14 +441,14 @@ export default function DiscountsPage() {
 
         if (isFlat) {
           const primaryRule = dayRulesPayload?.[0];
-          result = await updateDiscount({
+          result = await updateDiscountMutation.mutateAsync({
             ...baseUpdate,
             type: primaryRule?.type ?? discountForm.type,
             value: primaryRule?.value ?? discountForm.value,
             ...(dayRulesUpdate !== undefined ? { dayRules: dayRulesUpdate } : {}),
           });
         } else if (isSplit) {
-          result = await updateDiscount({
+          result = await updateDiscountMutation.mutateAsync({
             ...baseUpdate,
             tierDiscountMode: "split",
             ...(peakSlice || offPeakSlice
@@ -447,7 +465,7 @@ export default function DiscountsPage() {
           });
         } else {
           const primaryRule = dayRulesPayload?.[0];
-          result = await updateDiscount({
+          result = await updateDiscountMutation.mutateAsync({
             ...baseUpdate,
             tierDiscountMode: "uniform",
             type: primaryRule?.type ?? discountForm.type,
@@ -465,8 +483,8 @@ export default function DiscountsPage() {
         if (result.success) {
           setShowDiscountDrawer(false);
           setEditingDiscount(null);
+          setEditingDiscountId(null);
           resetForm();
-          loadData();
         } else {
           message.error(result.error || "Failed to update discount");
         }
@@ -483,7 +501,7 @@ export default function DiscountsPage() {
 
         if (isFlat) {
           const primaryRule = dayRulesPayload?.[0];
-          result = await createDiscount({
+          result = await createDiscountMutation.mutateAsync({
             ...commonCreate,
             discountCategory: "flat",
             type: primaryRule?.type ?? discountForm.type,
@@ -492,7 +510,7 @@ export default function DiscountsPage() {
             dayRules: discountForm.dayScheduleEnabled ? dayRulesPayload ?? undefined : undefined,
           });
         } else if (isSplit) {
-          result = await createDiscount({
+          result = await createDiscountMutation.mutateAsync({
             ...commonCreate,
             discountCategory: "time_based",
             tierDiscountMode: "split",
@@ -506,7 +524,7 @@ export default function DiscountsPage() {
           });
         } else {
           const primaryRule = dayRulesPayload?.[0];
-          result = await createDiscount({
+          result = await createDiscountMutation.mutateAsync({
             ...commonCreate,
             discountCategory: "time_based",
             tierDiscountMode: "uniform",
@@ -524,7 +542,6 @@ export default function DiscountsPage() {
         if (result.success) {
           setShowDiscountDrawer(false);
           resetForm();
-          loadData();
         } else {
           message.error(result.error || "Failed to create discount");
         }
@@ -533,8 +550,6 @@ export default function DiscountsPage() {
       message.error(
         error instanceof Error ? error.message : "An error occurred",
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -567,25 +582,12 @@ export default function DiscountsPage() {
     });
   };
 
-  const handleEdit = async (discount: Discount) => {
+  const handleEdit = (discount: Discount) => {
     const discountId = String(discount._id);
     setEditingDiscount(discount);
+    setEditingDiscountId(discountId);
     setDiscountForm(discountToFormState(discount));
     setShowDiscountDrawer(true);
-    setIsLoadingEdit(true);
-
-    try {
-      const result = await getDiscountById(discountId);
-      if (result.success && result.discount) {
-        const fresh = result.discount as Discount;
-        setEditingDiscount(fresh);
-        setDiscountForm(discountToFormState(fresh));
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoadingEdit(false);
-    }
   };
 
   const handleDelete = (discount: Discount) => {
@@ -596,13 +598,13 @@ export default function DiscountsPage() {
   const confirmDelete = async () => {
     if (!deletingDiscount) return;
 
-    setIsDeleting(true);
     try {
-      const result = await deleteDiscount(deletingDiscount._id);
+      const result = await deleteDiscountMutation.mutateAsync(
+        deletingDiscount._id,
+      );
       if (result.success) {
         setShowDeleteModal(false);
         setDeletingDiscount(null);
-        loadData();
       } else {
         message.error(result.error || "Failed to delete discount");
       }
@@ -610,26 +612,21 @@ export default function DiscountsPage() {
       message.error(
         error instanceof Error ? error.message : "An error occurred",
       );
-    } finally {
-      setIsDeleting(false);
     }
   };
 
   const handleToggleActive = async (discount: Discount) => {
-    setIsToggling(discount._id);
     try {
-      const result = await toggleDiscountActive(discount._id);
-      if (result.success) {
-        loadData();
-      } else {
+      const result = await toggleDiscountActiveMutation.mutateAsync(
+        discount._id,
+      );
+      if (!result.success) {
         message.error(result.error || "Failed to toggle discount status");
       }
     } catch (error: unknown) {
       message.error(
         error instanceof Error ? error.message : "An error occurred",
       );
-    } finally {
-      setIsToggling(null);
     }
   };
 
@@ -757,7 +754,7 @@ export default function DiscountsPage() {
       <Switch
         size="small"
         checked={discount.isActive}
-        loading={isToggling === discount._id}
+        loading={togglingDiscountId === discount._id}
         onChange={() => handleToggleActive(discount)}
       />
       <Button
@@ -845,7 +842,7 @@ export default function DiscountsPage() {
         render: (_: unknown, discount: Discount) => renderActions(discount),
       },
     ],
-    [sortColumn, sortDirection, isToggling],
+    [sortColumn, sortDirection, togglingDiscountId],
   );
 
   const timeBasedColumns: ColumnsType<Discount> = useMemo(
@@ -953,7 +950,7 @@ export default function DiscountsPage() {
         render: (_: unknown, discount: Discount) => renderActions(discount),
       },
     ],
-    [sortColumn, sortDirection, isToggling],
+    [sortColumn, sortDirection, togglingDiscountId],
   );
 
   const formatHourOption = (i: number) =>
@@ -967,7 +964,7 @@ export default function DiscountsPage() {
   const closeDiscountDrawer = () => {
     setShowDiscountDrawer(false);
     setEditingDiscount(null);
-    setIsLoadingEdit(false);
+    setEditingDiscountId(null);
     resetForm();
   };
 
@@ -1026,14 +1023,15 @@ export default function DiscountsPage() {
     <AdminLayout
       title="Discount Management"
       description="Create and manage promotional discounts"
-      onRefresh={loadData}
-      isLoading={isLoading}
+      onRefresh={() => discountsQuery.refetch()}
+      isLoading={isRefreshing}
       actionButton={
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => {
             resetForm();
+            setEditingDiscountId(null);
             setShowDiscountDrawer(true);
           }}
         >
@@ -1041,53 +1039,55 @@ export default function DiscountsPage() {
         </Button>
       }
     >
-      <div className="space-y-8">
-        <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
-          <div className="border-b border-zinc-800 px-4 py-3">
-            <h2 className="text-sm font-semibold text-white">Flat discounts</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
-              Standard promos (court types + validity). All day, any duration, any tier.
-            </p>
-          </div>
-          <Table<Discount>
-            rowKey="_id"
-            columns={flatColumns}
-            dataSource={sortedFlatDiscounts}
-            loading={isLoading}
-            onChange={handleTableChange}
-            pagination={false}
-            scroll={{ x: "max-content" }}
-            locale={{
-              emptyText:
-                "No flat discounts yet. Add one or create a rule-only discount below.",
-            }}
-          />
-        </Card>
+      {isInitialLoading ? (
+        <AdminTableSkeleton columns={7} />
+      ) : (
+        <div className="space-y-8">
+          <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
+            <div className="border-b border-zinc-800 px-4 py-3">
+              <h2 className="text-sm font-semibold text-white">Flat discounts</h2>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Standard promos (court types + validity). All day, any duration, any tier.
+              </p>
+            </div>
+            <Table<Discount>
+              rowKey="_id"
+              columns={flatColumns}
+              dataSource={sortedFlatDiscounts}
+              onChange={handleTableChange}
+              pagination={false}
+              scroll={{ x: "max-content" }}
+              locale={{
+                emptyText:
+                  "No flat discounts yet. Add one or create a rule-only discount below.",
+              }}
+            />
+          </Card>
 
-        <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
-          <div className="border-b border-zinc-800 px-4 py-3">
-            <h2 className="text-sm font-semibold text-white">
-              Time-based &amp; rules
-            </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
-              Booking length, peak/off-peak, or restricted hours. Scoped by court type only (same as public booking).
-            </p>
-          </div>
-          <Table<Discount>
-            rowKey="_id"
-            columns={timeBasedColumns}
-            dataSource={sortedTimeBasedDiscounts}
-            loading={isLoading}
-            onChange={handleTableChange}
-            pagination={false}
-            scroll={{ x: "max-content" }}
-            locale={{
-              emptyText:
-                "No time-based discounts. Add duration, tier, or hour rules in the drawer.",
-            }}
-          />
-        </Card>
-      </div>
+          <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
+            <div className="border-b border-zinc-800 px-4 py-3">
+              <h2 className="text-sm font-semibold text-white">
+                Time-based &amp; rules
+              </h2>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Booking length, peak/off-peak, or restricted hours. Scoped by court type only (same as public booking).
+              </p>
+            </div>
+            <Table<Discount>
+              rowKey="_id"
+              columns={timeBasedColumns}
+              dataSource={sortedTimeBasedDiscounts}
+              onChange={handleTableChange}
+              pagination={false}
+              scroll={{ x: "max-content" }}
+              locale={{
+                emptyText:
+                  "No time-based discounts. Add duration, tier, or hour rules in the drawer.",
+              }}
+            />
+          </Card>
+        </div>
+      )}
 
       <Drawer
         title={editingDiscount ? "Edit discount" : "Add discount"}

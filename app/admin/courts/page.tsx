@@ -13,7 +13,6 @@ import {
   InputNumber,
   Modal,
   Select,
-  Skeleton,
   Space,
   Table,
   Tag,
@@ -26,12 +25,16 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminTableSkeleton } from "@/components/admin/loaders";
 import {
-  getAllCourts,
-  createCourt,
-  updateCourt,
-  deleteCourt,
-} from "../../actions/courts";
+  useAllCourts,
+  getQueryLoadingState,
+} from "@/lib/tanstack/hooks/queries";
+import {
+  useCreateCourtMutation,
+  useUpdateCourtMutation,
+  useDeleteCourtMutation,
+} from "@/lib/tanstack/hooks/mutations";
 import type { Court, CourtPricingPeriod, PricingLabel } from "@/types";
 
 const { Text } = Typography;
@@ -41,8 +44,6 @@ export default function CourtsPage() {
   const { message } = App.useApp();
   const { data: session } = useSession();
   const router = useRouter();
-  const [courts, setCourts] = useState<Court[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [showCourtModal, setShowCourtModal] = useState(false);
   const [editingCourt, setEditingCourt] = useState<Court | null>(null);
   const [isSubmittingCourt, setIsSubmittingCourt] = useState(false);
@@ -72,36 +73,35 @@ export default function CourtsPage() {
   const userRole = (session?.user as { role?: string })?.role;
   const isSuperAdmin = userRole === "super_admin";
 
+  const courtsQuery = useAllCourts({ enabled: !!session && isSuperAdmin });
+  const { isInitialLoading, isRefreshing } = getQueryLoadingState(courtsQuery);
+  const courts = courtsQuery.data ?? [];
+
+  const createCourtMutation = useCreateCourtMutation();
+  const updateCourtMutation = useUpdateCourtMutation();
+  const deleteCourtMutation = useDeleteCourtMutation();
+
   useEffect(() => {
-    if (session) {
-      if (!isSuperAdmin) {
-        router.push("/admin/bookings");
-        return;
-      }
-      loadData();
-    }
+    if (!session || isSuperAdmin) return;
+    router.push("/admin/bookings");
   }, [session, isSuperAdmin, router]);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const result = await getAllCourts();
-      if (result.success) {
-        setCourts(result.courts);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    if (courtsQuery.error) {
+      message.error(
+        courtsQuery.error instanceof Error
+          ? courtsQuery.error.message
+          : "Failed to load courts",
+      );
     }
-  };
+  }, [courtsQuery.error, message]);
 
   const handleCourtSubmit = async () => {
     setIsSubmittingCourt(true);
 
     try {
       if (editingCourt) {
-        const result = await updateCourt({
+        const result = await updateCourtMutation.mutateAsync({
           courtId: editingCourt._id,
           ...courtForm,
         });
@@ -110,12 +110,11 @@ export default function CourtsPage() {
           setShowCourtModal(false);
           setEditingCourt(null);
           resetCourtForm();
-          loadData();
         } else {
           message.error(result.error || "Failed to update court");
         }
       } else {
-        const result = await createCourt({
+        const result = await createCourtMutation.mutateAsync({
           ...courtForm,
           image: "",
         });
@@ -123,7 +122,6 @@ export default function CourtsPage() {
         if (result.success) {
           setShowCourtModal(false);
           resetCourtForm();
-          loadData();
         } else {
           message.error(result.error || "Failed to create court");
         }
@@ -247,11 +245,10 @@ export default function CourtsPage() {
 
     setIsDeleting(true);
     try {
-      const result = await deleteCourt(deletingCourt._id);
+      const result = await deleteCourtMutation.mutateAsync(deletingCourt._id);
       if (result.success) {
         setShowDeleteModal(false);
         setDeletingCourt(null);
-        loadData();
       } else {
         message.error(result.error || "Failed to delete court");
       }
@@ -413,8 +410,8 @@ export default function CourtsPage() {
     <AdminLayout
       title="Court Management"
       description="Manage court settings"
-      onRefresh={loadData}
-      isLoading={isLoading}
+      onRefresh={() => courtsQuery.refetch()}
+      isLoading={isRefreshing}
       actionButton={
         <Button
           type="primary"
@@ -428,28 +425,26 @@ export default function CourtsPage() {
         </Button>
       }
     >
-      <div className="space-y-4">
-        <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
-          {isLoading && courts.length === 0 ? (
-            <div className="p-4">
-              <Skeleton active paragraph={{ rows: 8 }} />
-            </div>
-          ) : (
+      {isInitialLoading ? (
+        <AdminTableSkeleton />
+      ) : (
+        <div className="space-y-4">
+          <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
             <Table<Court>
               rowKey="_id"
               columns={columns}
               dataSource={sortedCourts}
-              loading={isLoading}
               onChange={handleTableChange}
               pagination={false}
               scroll={{ x: "max-content" }}
               locale={{
-                emptyText: "No courts found. Create your first court to get started.",
+                emptyText:
+                  "No courts found. Create your first court to get started.",
               }}
             />
-          )}
-        </Card>
-      </div>
+          </Card>
+        </div>
+      )}
 
       <Modal
         title={editingCourt ? "Edit Court" : "Add New Court"}
