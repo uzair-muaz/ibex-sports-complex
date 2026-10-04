@@ -17,7 +17,8 @@
     "migrate:revert": "tsx scripts/migrate.ts revert",
     "analytics:rebuild": "tsx scripts/rebuild-analytics-recent.ts",
     "db:dump": "bash scripts/mongo-dump.sh",
-    "db:restore": "bash scripts/mongo-restore.sh"
+    "db:restore": "bash scripts/mongo-restore.sh",
+    "deploy:staging": "bash scripts/deploy-staging.sh"
   },
   "dependencies": {
     "@ant-design/icons": "^6.2.5",

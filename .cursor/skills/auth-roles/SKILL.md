@@ -20,8 +20,8 @@ Helpers: `lib/authz.ts` → `isStaffRole`, `isCustomerRole`, `isSuperAdminRole`.
 
 ## Entry points
 
-- Staff credentials: `/admin` (credentials provider rejects non-staff)
-- Customers: `/login` (Google); never elevates role via Google
+- Staff credentials: `/admin` (email/password; layout still role-gates)
+- Customers: `/login` (Google **or** email/password + signup via `POST /api/v1/auth/register`); Google never elevates role
 - Flutter: `POST /api/v1/auth/google` → Bearer JWT
 
 ## Layers (all required)

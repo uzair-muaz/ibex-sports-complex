@@ -59,17 +59,14 @@ export const authOptions = {
           const isPasswordValid = await bcrypt.compare(password, user.password);
           if (!isPasswordValid) return null;
 
-          // Credentials login is for staff only
-          if (user.role !== "super_admin" && user.role !== "admin") {
-            return null;
-          }
-
+          // Email/password works for customers and staff (admin UI still role-gates).
           return {
             id: user._id.toString(),
             email: user.email,
             name: user.name,
             role: user.role,
             image: user.image,
+            phone: user.phone || "",
           };
         } catch (error: unknown) {
           console.error("Authentication error:", error);
@@ -142,6 +139,8 @@ export const authOptions = {
         token.id = user.id;
         token.role = user.role || "user";
         if (user.image) token.picture = user.image;
+        const phone = (user as { phone?: string }).phone;
+        if (typeof phone === "string") token.phone = phone;
       }
 
       if (account?.provider === "google" && token.email) {

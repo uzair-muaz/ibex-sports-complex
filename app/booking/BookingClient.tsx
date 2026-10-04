@@ -9,7 +9,10 @@ import { BookingChipSelector } from "@/components/booking/BookingChipSelector";
 import { BookingDatePickerModal } from "@/components/booking/BookingDatePickerModal";
 import { BookingSlotsLegend } from "@/components/booking/BookingSlotsLegend";
 import { BookingSlotsGrid } from "@/components/booking/BookingSlotsGrid";
-import { BookingCheckoutModal } from "@/components/booking/BookingCheckoutModal";
+import {
+  BookingCheckoutModal,
+  type CheckoutIdentityStep,
+} from "@/components/booking/BookingCheckoutModal";
 import { BookingActionBar } from "@/components/booking/BookingActionBar";
 import { BookingSuccessModal } from "@/components/booking/BookingSuccessModal";
 
@@ -188,6 +191,8 @@ export default function BookingClient() {
   const isLoadingTypes = courtsQuery.isPending;
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [checkoutIdentityStep, setCheckoutIdentityStep] =
+    useState<CheckoutIdentityStep>("choose");
 
   // Form state
   const [formData, setFormData] = useState({ name: "", email: "", phone: "" });
@@ -236,16 +241,6 @@ export default function BookingClient() {
     () => formatLocalDate(quickCheckDate),
     [quickCheckDate],
   );
-
-  // Prefill checkout for customers
-  useEffect(() => {
-    if (!isCustomerLoggedIn || !session?.user) return;
-    setFormData((prev) => ({
-      name: prev.name || session.user.name || "",
-      email: prev.email || session.user.email || "",
-      phone: prev.phone || session.user.phone || "",
-    }));
-  }, [isCustomerLoggedIn, session?.user]);
 
   // Sync courts catalog from TanStack query
   useEffect(() => {
@@ -413,11 +408,21 @@ export default function BookingClient() {
 
   useEffect(() => {
     if (!showCheckoutModal) return;
-    setFormData({ name: "", email: "", phone: "" });
     setFormErrors({});
     setFormStatus("idle");
     setCheckoutError("");
-  }, [showCheckoutModal]);
+    if (isCustomerLoggedIn && session?.user) {
+      setCheckoutIdentityStep("details");
+      setFormData({
+        name: session.user.name || "",
+        email: session.user.email || "",
+        phone: session.user.phone || "",
+      });
+    } else {
+      setCheckoutIdentityStep("choose");
+      setFormData({ name: "", email: "", phone: "" });
+    }
+  }, [showCheckoutModal, isCustomerLoggedIn, session?.user]);
 
   const handleFieldChange = useCallback(
     (field: "name" | "email" | "phone", value: string) => {
@@ -606,10 +611,14 @@ export default function BookingClient() {
             {!isCustomerLoggedIn ? (
               <>
                 {" "}
-                <Link href="/login" className="text-[#2DD4BF] underline">
+                <Link
+                  href="/login?callbackUrl=/booking"
+                  className="text-[#2DD4BF] underline"
+                >
                   Sign in
                 </Link>{" "}
-                to track bookings and earn rewards.
+                to track bookings and earn rewards — or continue as guest at
+                checkout.
               </>
             ) : null}
           </div>
@@ -992,6 +1001,7 @@ export default function BookingClient() {
         formData={formData}
         formErrors={formErrors}
         isLoggedIn={isCustomerLoggedIn}
+        identityStep={checkoutIdentityStep}
         loyaltyBalance={loyaltyBalance}
         maxLoyaltyRedeem={maxLoyaltyRedeem}
         useLoyalty={useLoyalty}
@@ -1006,6 +1016,7 @@ export default function BookingClient() {
         onUseMembershipChange={setUseMembershipHours}
         onUseGuestPassChange={setUseGuestPass}
         onClose={() => setShowCheckoutModal(false)}
+        onContinueAsGuest={() => setCheckoutIdentityStep("details")}
         onFieldChange={handleFieldChange}
         onSubmit={handleSubmit}
       />

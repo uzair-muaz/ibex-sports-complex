@@ -180,6 +180,62 @@ export function getOpenApiDocument(baseUrl?: string) {
           },
         },
       },
+      "/api/v1/auth/register": {
+        post: {
+          tags: ["Auth"],
+          summary: "Register a customer account (email + password)",
+          description:
+            "Creates a role=user account. Does not return a session cookie — web clients should call NextAuth credentials sign-in after success. Never creates staff roles.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name", "email", "password"],
+                  properties: {
+                    name: { type: "string", minLength: 2 },
+                    email: { type: "string", format: "email" },
+                    password: { type: "string", minLength: 6 },
+                    phone: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Created",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      user: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string" },
+                          email: { type: "string" },
+                          name: { type: "string" },
+                          role: { type: "string", example: "user" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Validation error or email already registered",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
       "/api/v1/bookings": {
         post: {
           tags: ["Bookings"],

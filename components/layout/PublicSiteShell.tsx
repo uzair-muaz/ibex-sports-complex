@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { DiscountBanner } from "@/components/DiscountBanner";
-import { Footer } from "@/components/Footer";
+import { ConditionalFooter } from "@/components/ConditionalFooter";
 
 type PublicSiteShellProps = {
   children: React.ReactNode;
@@ -13,7 +13,7 @@ export function PublicSiteShell({ children }: PublicSiteShellProps) {
       <Navbar />
       <DiscountBanner className="fixed left-0 right-0 z-40 top-16 sm:top-17" />
       {children}
-      <Footer />
+      <ConditionalFooter />
     </div>
   );
 }
