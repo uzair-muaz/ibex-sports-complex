@@ -1,0 +1,176 @@
+IBEX Sports Complex — Product Features Overview
+
+For: Client / stakeholders
+Purpose: Clear list of what the platform delivers today
+
+
+1. Overview
+-----------
+
+The platform has three parts:
+
+1. Public website — marketing site and court booking
+2. Customer account — personal dashboard after login
+3. Admin dashboard — staff tools to run the venue
+
+The same backend powers the website and a future mobile app (Flutter), with documented APIs (Swagger).
+
+
+2. Public website & booking
+---------------------------
+
+Website
+- Marketing pages for facilities, amenities, membership, contact
+- Mobile-friendly layout
+
+Court booking
+- Choose sport / court type, date, and duration
+- Live availability of time slots
+- Peak pricing shown clearly
+- Past times hidden so customers only see bookable slots
+- Apply active discounts at checkout
+- Confirmation messaging (including advance payment / 50% policy)
+- Email confirmation support
+
+Guest booking (no login required)
+- Anyone can book with name, email, and phone
+- Booking is saved against their email
+
+Optional sign-in during booking
+- Guests are encouraged to sign in to track bookings and earn rewards
+- Sign-in is optional today — checkout is not blocked
+
+After the visit
+- Booking verification page with QR for venue entry
+- Feedback form after a completed booking
+
+
+3. Customer login & account dashboard
+-------------------------------------
+
+Login
+- Customers sign in with Google
+- After login they land in My Account
+- Mobile apps can use the same Google login via the API
+
+My Account includes
+
+  Profile
+  - View and update name and phone
+  - Email from Google (read-only)
+  - Profile photo when available from Google
+  - Automatic link of past guest bookings made with the same email
+
+  My Bookings
+  - Upcoming and past bookings in separate lists
+  - Booking detail: court, date/time, status, price breakdown
+  - See loyalty or membership used on that booking
+  - Open verify / QR page
+  - Leave feedback when the booking is completed
+  - Cancel online if the booking starts in 4+ hours
+    - Loyalty points and membership hours are refunded when applicable
+
+  Rewards (loyalty)
+  - Points balance and hours played
+  - Earn 10 points per hour when a booking is marked completed
+  - Redeem at checkout: minimum 100 points, 1 point = PKR 1, up to 50% off (after other discounts)
+  - Activity history (earned, redeemed, refunded, adjustments)
+
+  Membership
+  - See active plan, hours remaining, guest passes, and expiry
+  - Browse available membership packages
+  - Purchase today via WhatsApp / offline; venue staff activate the plan
+  - Online self-purchase will come later with a payment gateway
+
+  Support
+  - Common FAQs (payment, loyalty, membership, cancel)
+  - Open a support ticket
+  - Reply on open tickets
+
+
+4. Guest vs logged-in customer (summary)
+----------------------------------------
+
+Capability                          | Guest                    | Logged-in customer
+------------------------------------|--------------------------|--------------------
+Book a court                        | Yes                      | Yes
+My Account dashboard                | No (must sign in)        | Yes
+Earn & redeem loyalty               | No                       | Yes
+Use membership hours                | No                       | Yes
+Cancel from account                 | No                       | Yes (within rules)
+Past bookings linked after signup   | Yes (by email match)     | Already linked
+
+
+5. Admin dashboard (staff)
+--------------------------
+
+Modern staff UI with light and dark mode.
+
+Access
+- Admin / Super Admin only
+- Customers cannot open admin; staff are kept in admin
+
+Features
+- Bookings — list, search, create, edit, extend, manage payments (cash / online received)
+- Courts — manage courts and availability settings
+- Users — manage staff / customer accounts as allowed by role
+- Discounts — create and manage promotional rules
+- Memberships & loyalty — customer roster, activate plans, adjust reward points
+- Support — reply to and manage customer tickets
+- Feedback — view customer ratings and comments
+- Analytics (super admin) — revenue and booking KPIs for chosen date ranges, with clear refresh of stats
+
+
+6. API & Swagger documentation (requirement)
+--------------------------------------------
+
+A single, documented HTTP API is available for the website and mobile app.
+
+- Interactive docs (Swagger UI): available at /docs on the deployed site
+- OpenAPI specification: machine-readable API contract for web and Flutter
+- Coverage: public booking & courts, customer account, admin operations, mobile Google auth
+- Purpose: client and mobile developers can review and test every endpoint without guessing
+
+This meets the requirement for Swagger / OpenAPI documentation of the product API.
+
+
+7. Other product improvements
+-----------------------------
+
+Operations & trust
+- Clear separation of customer vs staff access
+- Secure login for customers (Google) and staff
+- Faster, more reliable booking availability checks
+- Safer handling of membership hours and loyalty points when many people book at once
+
+Analytics
+- Dashboard stats are based on daily summaries (not slow full history scans)
+- Figures update when bookings change and refresh when staff open analytics
+
+Promotions & payments (venue-side)
+- Flexible discount rules
+- Track amount received online vs cash on each booking
+- Admin tools to confirm and adjust bookings
+
+Quality
+- Automated checks and smoke tests to reduce regressions before release
+
+
+8. Coming later (not in current scope)
+--------------------------------------
+
+- Online payment gateway (advance pay / card or local rails)
+- Self-serve membership purchase with automatic activation
+- Require login before booking (if the venue decides guests should not book)
+- Sign in with Apple
+- Referral codes for loyalty
+- Full redesign of the public marketing site into the admin design system (not required; public site stays branded as-is)
+
+
+9. Suggested demo flow for the venue
+------------------------------------
+
+1. Guest: Book a court without logging in → receive confirmation.
+2. Customer: Sign in with Google → see claimed bookings → book again using points or membership → cancel (if allowed).
+3. Staff: Open admin → manage bookings, activate a membership, reply to support, review analytics.
+4. API docs: Open /docs → browse Swagger and try sample API calls.
