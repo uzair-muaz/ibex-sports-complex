@@ -7,72 +7,77 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  claimBookingsRequest,
-  fetchMyProfile,
-  updateMyProfileRequest,
-} from "@/lib/tanstack/requests/account.requests";
+  useClaimBookingsMutation,
+  useUpdateMyProfileMutation,
+} from "@/lib/tanstack/hooks/mutations";
+import { useMyProfile } from "@/lib/tanstack/hooks/queries";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AccountProfilePage() {
   const { update } = useSession();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const profileQuery = useMyProfile();
+  const updateProfile = useUpdateMyProfileMutation();
+  const claimBookings = useClaimBookingsMutation();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [claimedNote, setClaimedNote] = useState("");
+  const [claimedOnce, setClaimedOnce] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [profile, claim] = await Promise.all([
-          fetchMyProfile(),
-          claimBookingsRequest(),
-        ]);
-        if (cancelled) return;
-        const user = profile.user as {
-          name?: string;
-          email?: string;
-          phone?: string;
-          image?: string;
-        };
-        setName(user.name || "");
-        setEmail(user.email || "");
-        setPhone(user.phone || "");
-        setImage(user.image || null);
+    if (!profileQuery.data?.user) return;
+    const user = profileQuery.data.user as {
+      name?: string;
+      email?: string;
+      phone?: string;
+      image?: string;
+    };
+    setName(user.name || "");
+    setEmail(user.email || "");
+    setPhone(user.phone || "");
+    setImage(user.image || null);
+  }, [profileQuery.data]);
+
+  useEffect(() => {
+    if (profileQuery.error) {
+      toast.error(
+        profileQuery.error instanceof Error
+          ? profileQuery.error.message
+          : "Failed to load profile",
+      );
+    }
+  }, [profileQuery.error]);
+
+  useEffect(() => {
+    if (!profileQuery.isSuccess || claimedOnce) return;
+    setClaimedOnce(true);
+    claimBookings.mutate(undefined, {
+      onSuccess: (claim) => {
         if (claim.claimed > 0) {
           setClaimedNote(
             `Linked ${claim.claimed} past booking${claim.claimed === 1 ? "" : "s"} to your account.`,
           );
         }
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Failed to load profile");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      },
+    });
+    // Intentionally omit claimBookings from deps — run once after profile loads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileQuery.isSuccess, claimedOnce]);
 
   const onSave = async () => {
-    setSaving(true);
     try {
-      await updateMyProfileRequest({ name, phone });
+      await updateProfile.mutateAsync({ name, phone });
       await update({ name, phone });
       toast.success("Profile updated");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to save");
-    } finally {
-      setSaving(false);
     }
   };
 
-  if (loading) {
+  if (profileQuery.isPending) {
     return (
       <div className="flex justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
@@ -144,10 +149,12 @@ export default function AccountProfilePage() {
 
       <Button
         onClick={onSave}
-        disabled={saving}
+        disabled={updateProfile.isPending}
         className="rounded-xl bg-[#2DD4BF] text-[#0F172A] font-semibold hover:bg-[#14B8A6]"
       >
-        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        {updateProfile.isPending ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : null}
         Save profile
       </Button>
     </div>

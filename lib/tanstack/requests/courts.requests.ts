@@ -8,6 +8,13 @@ export async function fetchAllCourts() {
   return data.courts;
 }
 
+/** Public catalog (no admin auth). */
+export async function fetchPublicCourts(type?: CourtType) {
+  const qs = type ? `?type=${encodeURIComponent(type)}` : "";
+  const data = await bffFetch<{ courts: Court[] }>(`/api/v1/courts${qs}`);
+  return data.courts;
+}
+
 export async function fetchCourtsByType(type?: CourtType) {
   const qs = type ? `?type=${encodeURIComponent(type)}` : "";
   const data = await bffFetch<{ courts: Court[] }>(

@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import {
-  cancelMyBookingRequest,
-  fetchMyBooking,
-} from "@/lib/tanstack/requests/account.requests";
+import { useCancelMyBookingMutation } from "@/lib/tanstack/hooks/mutations";
+import { useMyBooking } from "@/lib/tanstack/hooks/queries";
 import { Button } from "@/components/ui/button";
 import { PriceBreakdown } from "@/components/PriceBreakdown";
 import { formatTime12 } from "@/lib/utils";
@@ -17,45 +15,31 @@ export default function BookingDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const bookingId = String(params.id);
-  const [loading, setLoading] = useState(true);
-  const [cancelling, setCancelling] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [data, setData] = useState<{
-    booking: any;
-    canCancel: boolean;
-  } | null>(null);
-
-  const load = async () => {
-    try {
-      const result = await fetchMyBooking(bookingId);
-      setData({ booking: result.booking, canCancel: result.canCancel });
-      setLoading(false);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Not found");
-      router.replace("/account/bookings");
-    }
-  };
+  const bookingQuery = useMyBooking(bookingId);
+  const cancelMutation = useCancelMyBookingMutation();
 
   useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId]);
+    if (!bookingQuery.error) return;
+    toast.error(
+      bookingQuery.error instanceof Error
+        ? bookingQuery.error.message
+        : "Not found",
+    );
+    router.replace("/account/bookings");
+  }, [bookingQuery.error, router]);
 
   const onCancel = async () => {
-    setCancelling(true);
     try {
-      await cancelMyBookingRequest(bookingId);
+      await cancelMutation.mutateAsync(bookingId);
       toast.success("Booking cancelled");
       setCancelOpen(false);
-      await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Cancel failed");
-    } finally {
-      setCancelling(false);
     }
   };
 
-  if (loading || !data) {
+  if (bookingQuery.isPending || !bookingQuery.data) {
     return (
       <div className="flex justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
@@ -63,7 +47,24 @@ export default function BookingDetailsPage() {
     );
   }
 
-  const b = data.booking;
+  const b = bookingQuery.data.booking as {
+    _id: string;
+    date: string;
+    startTime: number;
+    duration: number;
+    status: string;
+    originalPrice?: number;
+    discounts?: unknown[];
+    discountAmount?: number;
+    totalPrice: number;
+    loyaltyDiscountPkr?: number;
+    loyaltyPointsRedeemed?: number;
+    usedMembershipHours?: boolean;
+    membershipHoursUsed?: number;
+    usedGuestPass?: boolean;
+    courtId?: { name?: string };
+  };
+  const canCancel = bookingQuery.data.canCancel;
   const court = b.courtId;
 
   return (
@@ -107,31 +108,31 @@ export default function BookingDetailsPage() {
         </div>
 
         <PriceBreakdown
-          originalPrice={b.originalPrice}
-          discounts={b.discounts || []}
+          originalPrice={b.originalPrice ?? b.totalPrice}
+          discounts={(b.discounts || []) as never[]}
           discountAmount={b.discountAmount || 0}
           totalPrice={b.totalPrice}
         />
 
-        {(b.loyaltyDiscountPkr > 0 || b.usedMembershipHours) && (
+        {(Number(b.loyaltyDiscountPkr) > 0 || b.usedMembershipHours) && (
           <div className="text-sm text-zinc-400 space-y-1">
-            {b.loyaltyDiscountPkr > 0 ? (
+            {Number(b.loyaltyDiscountPkr) > 0 ? (
               <p>
-                Loyalty discount: PKR {b.loyaltyDiscountPkr} ({b.loyaltyPointsRedeemed}{" "}
-                pts)
+                Loyalty discount: PKR {b.loyaltyDiscountPkr} (
+                {b.loyaltyPointsRedeemed} pts)
               </p>
             ) : null}
             {b.usedMembershipHours ? (
               <p>
-                Paid with membership hours ({b.membershipHoursUsed || b.duration}
-                h)
+                Paid with membership hours (
+                {b.membershipHoursUsed || b.duration}h)
                 {b.usedGuestPass ? " · guest pass used" : ""}
               </p>
             ) : null}
           </div>
         )}
 
-        {data.canCancel ? (
+        {canCancel ? (
           <div className="space-y-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
             <p className="text-sm text-zinc-400">
               Cancel online until 4 hours before your slot starts. Loyalty points
@@ -142,17 +143,17 @@ export default function BookingDetailsPage() {
                 <Button
                   variant="outline"
                   onClick={() => setCancelOpen(false)}
-                  disabled={cancelling}
+                  disabled={cancelMutation.isPending}
                   className="border-white/20"
                 >
                   Keep booking
                 </Button>
                 <Button
                   onClick={onCancel}
-                  disabled={cancelling}
+                  disabled={cancelMutation.isPending}
                   className="bg-red-600 text-white hover:bg-red-500"
                 >
-                  {cancelling ? (
+                  {cancelMutation.isPending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : null}
                   Confirm cancel

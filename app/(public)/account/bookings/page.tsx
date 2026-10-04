@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { fetchMyBookings } from "@/lib/tanstack/requests/account.requests";
+import { useMyBookings } from "@/lib/tanstack/hooks/queries";
 import { Loader2 } from "lucide-react";
 import { formatTime12 } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -19,22 +19,12 @@ type BookingRow = {
 
 export default function MyBookingsPage() {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
-  const [loading, setLoading] = useState(true);
-  const [upcoming, setUpcoming] = useState<BookingRow[]>([]);
-  const [past, setPast] = useState<BookingRow[]>([]);
-
-  useEffect(() => {
-    (async () => {
-      const result = await fetchMyBookings();
-      setUpcoming(result.upcoming as BookingRow[]);
-      setPast(result.past as BookingRow[]);
-      setLoading(false);
-    })();
-  }, []);
-
+  const bookingsQuery = useMyBookings();
+  const upcoming = (bookingsQuery.data?.upcoming ?? []) as BookingRow[];
+  const past = (bookingsQuery.data?.past ?? []) as BookingRow[];
   const list = tab === "upcoming" ? upcoming : past;
 
-  if (loading) {
+  if (bookingsQuery.isPending) {
     return (
       <div className="flex justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />

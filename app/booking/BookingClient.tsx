@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-import { getCourts } from "../actions/courts";
 import {
   getQuickSlotCourtAvailability,
   type AvailableStartTimeQuote,
@@ -33,11 +32,12 @@ import { formatLocalDate, formatTime12 } from "@/lib/utils";
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
 import { useBookingAvailability } from "@/components/booking/hooks/useBookingAvailability";
 import Link from "next/link";
+import { useCreatePublicBookingMutation } from "@/lib/tanstack/hooks/mutations";
 import {
-  createPublicBookingRequest,
-  fetchMyLoyalty,
-  fetchMyMembership,
-} from "@/lib/tanstack/requests/account.requests";
+  useMyLoyalty,
+  useMyMembership,
+  usePublicCourts,
+} from "@/lib/tanstack/hooks/queries";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
 type CheckoutFormErrors = {
@@ -147,13 +147,23 @@ export default function BookingClient() {
 
   const [useLoyalty, setUseLoyalty] = useState(false);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
-  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [useMembershipHours, setUseMembershipHours] = useState(false);
   const [useGuestPass, setUseGuestPass] = useState(false);
-  const [membershipHoursRemaining, setMembershipHoursRemaining] = useState(0);
-  const [guestPassesRemaining, setGuestPassesRemaining] = useState(0);
-  const [hasMembership, setHasMembership] = useState(false);
   const canQuickCheck = userRole === "admin" || userRole === "super_admin";
+
+  const courtsQuery = usePublicCourts();
+  const createBookingMutation = useCreatePublicBookingMutation();
+  const loyaltyQuery = useMyLoyalty({ enabled: isCustomerLoggedIn });
+  const membershipQuery = useMyMembership({ enabled: isCustomerLoggedIn });
+
+  const loyaltyBalance = loyaltyQuery.data?.balance ?? 0;
+  const membership = membershipQuery.data?.membership as
+    | { hoursRemaining?: number; guestPassesRemaining?: number }
+    | null
+    | undefined;
+  const hasMembership = !!membership;
+  const membershipHoursRemaining = membership?.hoursRemaining || 0;
+  const guestPassesRemaining = membership?.guestPassesRemaining || 0;
 
   // Default to opening date if today is before it
   const getInitialDate = () => {
@@ -170,13 +180,12 @@ export default function BookingClient() {
   const [selectedQuote, setSelectedQuote] =
     useState<AvailableStartTimeQuote | null>(null);
 
-  const [isLoadingTypes, setIsLoadingTypes] = useState(true);
-
   const [activeCourtTypes, setActiveCourtTypes] = useState<CourtType[]>([]);
   const [allCourts, setAllCourts] = useState<CourtRecord[]>([]);
   const [selectedTypeCourts, setSelectedTypeCourts] = useState<CourtRecord[]>(
     [],
   );
+  const isLoadingTypes = courtsQuery.isPending;
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
@@ -228,7 +237,7 @@ export default function BookingClient() {
     [quickCheckDate],
   );
 
-  // Prefill checkout + load loyalty/membership for customers
+  // Prefill checkout for customers
   useEffect(() => {
     if (!isCustomerLoggedIn || !session?.user) return;
     setFormData((prev) => ({
@@ -236,29 +245,32 @@ export default function BookingClient() {
       email: prev.email || session.user.email || "",
       phone: prev.phone || session.user.phone || "",
     }));
-    void (async () => {
-      const [loyalty, membership] = await Promise.all([
-        fetchMyLoyalty().catch(() => null),
-        fetchMyMembership().catch(() => null),
-      ]);
-      if (loyalty) {
-        setLoyaltyBalance(loyalty.balance);
-      }
-      const mem = membership?.membership as
-        | { hoursRemaining?: number; guestPassesRemaining?: number }
-        | null
-        | undefined;
-      if (mem) {
-        setHasMembership(true);
-        setMembershipHoursRemaining(mem.hoursRemaining || 0);
-        setGuestPassesRemaining(mem.guestPassesRemaining || 0);
-      } else {
-        setHasMembership(false);
-        setMembershipHoursRemaining(0);
-        setGuestPassesRemaining(0);
-      }
-    })();
   }, [isCustomerLoggedIn, session?.user]);
+
+  // Sync courts catalog from TanStack query
+  useEffect(() => {
+    const courts = (courtsQuery.data ?? []) as CourtRecord[];
+    if (courts.length === 0) return;
+    setAllCourts(courts);
+    const types = [
+      ...new Set(courts.map((c: CourtRecord) => c.type).filter(Boolean)),
+    ] as CourtType[];
+    setActiveCourtTypes(types);
+    setSelectedCourtType((prev) => {
+      if (prev) return prev;
+      return types[0] ?? null;
+    });
+  }, [courtsQuery.data]);
+
+  useEffect(() => {
+    if (!selectedCourtType) {
+      setSelectedTypeCourts([]);
+      return;
+    }
+    setSelectedTypeCourts(
+      allCourts.filter((c) => c.type === selectedCourtType),
+    );
+  }, [selectedCourtType, allCourts]);
 
   const maxLoyaltyRedeem = useMemo(() => {
     if (!selectedQuote) return 0;
@@ -281,53 +293,6 @@ export default function BookingClient() {
       setLoyaltyPointsToRedeem(0);
     }
   }, [useMembershipHours]);
-
-  // Load court types on mount
-  useEffect(() => {
-    const loadTypes = async () => {
-      setIsLoadingTypes(true);
-      try {
-        const result = await getCourts();
-        if (result.success && result.courts.length > 0) {
-          const courts = result.courts as CourtRecord[];
-          setAllCourts(courts);
-
-          const types = [
-            ...new Set(courts.map((c: CourtRecord) => c.type)),
-          ] as CourtType[];
-          setActiveCourtTypes(types);
-
-          // Default to the first court type, and derive courts locally from the
-          // already-fetched list to avoid a second network call.
-          if (!selectedCourtType && types.length > 0) {
-            const firstType = types[0];
-            setSelectedCourtType(firstType);
-            setSelectedTypeCourts(courts.filter((c) => c.type === firstType));
-          }
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setIsLoadingTypes(false);
-      }
-    };
-    loadTypes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!selectedCourtType) {
-      setSelectedTypeCourts([]);
-      return;
-    }
-
-    // If we don't have courts cached yet, keep current state until `loadTypes` finishes.
-    if (allCourts.length === 0) return;
-
-    setSelectedTypeCourts(
-      allCourts.filter((c) => c.type === selectedCourtType),
-    );
-  }, [selectedCourtType, allCourts]);
 
   const { availableStartTimes, isLoadingAvailability, refreshAvailability } =
     useBookingAvailability({
@@ -570,7 +535,7 @@ export default function BookingClient() {
     setFormStatus("loading");
     setCheckoutError("");
     try {
-      const result = await createPublicBookingRequest({
+      const result = await createBookingMutation.mutateAsync({
         courtType: selectedCourtType,
         date: dateString,
         startTime: selectedQuote.startTime,

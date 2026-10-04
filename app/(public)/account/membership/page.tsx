@@ -1,32 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchMyMembership } from "@/lib/tanstack/requests/account.requests";
+import { useMyMembership } from "@/lib/tanstack/hooks/queries";
 import { Button } from "@/components/ui/button";
 import { Loader2, MessageCircle } from "lucide-react";
 
 const WHATSAPP_URL = "https://wa.me/923255429429";
 
 export default function MembershipPage() {
-  const [loading, setLoading] = useState(true);
-  const [membership, setMembership] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  const [plans, setPlans] = useState<any[]>([]);
+  const membershipQuery = useMyMembership();
+  const membership = membershipQuery.data?.membership as {
+    planId?: { name?: string };
+    hoursRemaining?: number;
+    guestPassesRemaining?: number;
+    validUntil?: string;
+  } | null;
+  const history = (membershipQuery.data?.history ?? []) as Array<{
+    _id: string;
+    planId?: { name?: string };
+    status: string;
+    validFrom: string;
+    validUntil: string;
+  }>;
+  const plans = (membershipQuery.data?.plans ?? []) as Array<{
+    _id: string;
+    name: string;
+    price: number;
+    hours: number;
+    weekdayOnly?: boolean;
+    guestPassesPerPeriod?: number;
+  }>;
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await fetchMyMembership();
-        setMembership(data.membership);
-        setHistory(data.history as any[]);
-        setPlans(data.plans as any[]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  if (loading) {
+  if (membershipQuery.isPending) {
     return (
       <div className="flex justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
@@ -54,7 +58,10 @@ export default function MembershipPage() {
               remaining · Guest passes: {membership.guestPassesRemaining}
             </p>
             <p className="text-sm text-zinc-500">
-              Valid until {new Date(membership.validUntil).toLocaleDateString()}
+              Valid until{" "}
+              {membership.validUntil
+                ? new Date(membership.validUntil).toLocaleDateString()
+                : "—"}
             </p>
           </div>
         ) : (

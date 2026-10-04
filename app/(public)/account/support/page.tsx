@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
-  createSupportTicketRequest,
-  fetchMySupportTickets,
-  replySupportTicketRequest,
-} from "@/lib/tanstack/requests/account.requests";
+  useCreateSupportTicketMutation,
+  useReplySupportTicketMutation,
+} from "@/lib/tanstack/hooks/mutations";
+import { useMySupportTickets } from "@/lib/tanstack/hooks/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,38 +32,28 @@ const FAQS = [
 ];
 
 export default function SupportPage() {
-  const [loading, setLoading] = useState(true);
-  const [tickets, setTickets] = useState<any[]>([]);
+  const ticketsQuery = useMySupportTickets();
+  const createTicket = useCreateSupportTicketMutation();
+  const replyTicket = useReplySupportTicketMutation();
+  const tickets = (ticketsQuery.data?.tickets ?? []) as Array<{
+    _id: string;
+    topic: string;
+    status: string;
+    messages?: Array<{ authorType: string; body: string }>;
+  }>;
+
   const [topic, setTopic] = useState("");
   const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
 
-  const load = async () => {
-    try {
-      const result = await fetchMySupportTickets();
-      setTickets(result.tickets as any[]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void load();
-  }, []);
-
   const onCreate = async () => {
-    setSubmitting(true);
     try {
-      await createSupportTicketRequest({ topic, message });
+      await createTicket.mutateAsync({ topic, message });
       setTopic("");
       setMessage("");
       toast.success("Ticket submitted");
-      await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -71,15 +61,14 @@ export default function SupportPage() {
     const body = replyDrafts[ticketId]?.trim();
     if (!body) return;
     try {
-      await replySupportTicketRequest(ticketId, body);
+      await replyTicket.mutateAsync({ ticketId, message: body });
       setReplyDrafts((d) => ({ ...d, [ticketId]: "" }));
-      await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     }
   };
 
-  if (loading) {
+  if (ticketsQuery.isPending) {
     return (
       <div className="flex justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
@@ -125,10 +114,12 @@ export default function SupportPage() {
         </div>
         <Button
           onClick={onCreate}
-          disabled={submitting}
+          disabled={createTicket.isPending}
           className="rounded-xl bg-[#2DD4BF] text-[#0F172A] font-semibold"
         >
-          {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {createTicket.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : null}
           Submit
         </Button>
       </div>
@@ -148,7 +139,7 @@ export default function SupportPage() {
                 <span className="text-xs uppercase text-zinc-500">{t.status}</span>
               </div>
               <ul className="space-y-2">
-                {t.messages?.map((m: any, idx: number) => (
+                {t.messages?.map((m, idx: number) => (
                   <li key={idx} className="text-sm">
                     <span className="text-zinc-500">
                       {m.authorType === "admin" ? "Support" : "You"}:{" "}
@@ -174,6 +165,7 @@ export default function SupportPage() {
                     type="button"
                     onClick={() => onReply(t._id)}
                     className="rounded-xl"
+                    disabled={replyTicket.isPending}
                   >
                     Send
                   </Button>

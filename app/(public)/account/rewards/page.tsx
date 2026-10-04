@@ -1,53 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { fetchMyLoyalty } from "@/lib/tanstack/requests/account.requests";
+import { useMyLoyalty } from "@/lib/tanstack/hooks/queries";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 export default function RewardsPage() {
-  const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState<{
-    balance: number;
-    hoursPlayed: number;
-    pointsPerHour: number;
-    minRedeem: number;
-    transactions: Array<{
-      _id: string;
-      type: string;
-      points: number;
-      balanceAfter: number;
-      note?: string;
-      createdAt: string;
-    }>;
-  } | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const result = await fetchMyLoyalty();
-        setSummary({
-          balance: result.balance,
-          hoursPlayed: result.hoursPlayed,
-          pointsPerHour: result.pointsPerHour,
-          minRedeem: result.minRedeem,
-          transactions: result.transactions as Array<{
-            _id: string;
-            type: string;
-            points: number;
-            balanceAfter: number;
-            note?: string;
-            createdAt: string;
-          }>,
-        });
-      } finally {
-        setLoading(false);
+  const loyaltyQuery = useMyLoyalty();
+  const summary = loyaltyQuery.data
+    ? {
+        balance: loyaltyQuery.data.balance,
+        hoursPlayed: loyaltyQuery.data.hoursPlayed,
+        pointsPerHour: loyaltyQuery.data.pointsPerHour,
+        minRedeem: loyaltyQuery.data.minRedeem,
+        transactions: loyaltyQuery.data.transactions as Array<{
+          _id: string;
+          type: string;
+          points: number;
+          balanceAfter: number;
+          note?: string;
+          createdAt: string;
+        }>,
       }
-    })();
-  }, []);
+    : null;
 
-  if (loading || !summary) {
+  if (loyaltyQuery.isPending || !summary) {
     return (
       <div className="flex justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
