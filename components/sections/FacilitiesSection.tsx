@@ -21,7 +21,7 @@ const SPORTS = [
     tagColor: "bg-white/20 text-white",
     name: "Pickleball",
     description:
-      "The fastest growing sport in the world has found its home at Ibex. Perfect for all ages and skill levels.",
+      "The fastest growing sport in the world has found its home at IBEX. Perfect for all ages and skill levels.",
     image: "/images/pickleball.jpg",
   },
   {

@@ -17,6 +17,16 @@ export async function updateMyProfileRequest(input: {
   );
 }
 
+export async function setMyPasswordRequest(input: {
+  currentPassword?: string;
+  newPassword: string;
+}) {
+  return bffFetch<{ hasPassword: boolean }>("/api/v1/account/password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function claimBookingsRequest() {
   return bffFetch<{ claimed: number }>("/api/v1/account/claim-bookings", {
     method: "POST",

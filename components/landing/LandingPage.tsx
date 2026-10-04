@@ -78,7 +78,7 @@ export function LandingPage() {
               <section className="relative z-10 py-12 sm:py-20 md:py-28 lg:py-36 overflow-hidden">
                 <div className="px-4 sm:px-6 mb-10 sm:mb-14 md:mb-20 lg:mb-28 max-w-7xl mx-auto">
                   <p className="text-[#2DD4BF] font-mono text-xs uppercase tracking-[0.25em] mb-3 sm:mb-5">
-                    Life at Ibex
+                    Life at IBEX
                   </p>
                   <h2 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight gradient-text">
                     Lifestyle

@@ -9,6 +9,8 @@ export interface IUser extends Document {
   phone?: string;
   googleId?: string;
   emailVerified?: Date | null;
+  passwordResetTokenHash?: string | null;
+  passwordResetExpires?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,6 +58,18 @@ const UserSchema: Schema = new Schema(
       type: Date,
       required: false,
       default: null,
+    },
+    passwordResetTokenHash: {
+      type: String,
+      required: false,
+      default: null,
+      select: false,
+    },
+    passwordResetExpires: {
+      type: Date,
+      required: false,
+      default: null,
+      select: false,
     },
   },
   {

@@ -180,6 +180,57 @@ export function getOpenApiDocument(baseUrl?: string) {
           },
         },
       },
+      "/api/v1/auth/forgot-password": {
+        post: {
+          tags: ["Auth"],
+          summary: "Request a password reset email",
+          description:
+            "Always returns a generic success message. Sends a 1-hour reset link when a customer account exists for the email (including Google-only accounts).",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["email"],
+                  properties: {
+                    email: { type: "string", format: "email" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Accepted" },
+            "400": { description: "Missing email" },
+          },
+        },
+      },
+      "/api/v1/auth/reset-password": {
+        post: {
+          tags: ["Auth"],
+          summary: "Reset password with email token",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["token", "newPassword"],
+                  properties: {
+                    token: { type: "string" },
+                    newPassword: { type: "string", minLength: 6 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Password updated" },
+            "400": { description: "Invalid or expired token" },
+          },
+        },
+      },
       "/api/v1/auth/register": {
         post: {
           tags: ["Auth"],
@@ -192,12 +243,15 @@ export function getOpenApiDocument(baseUrl?: string) {
               "application/json": {
                 schema: {
                   type: "object",
-                  required: ["name", "email", "password"],
+                  required: ["name", "email", "password", "phone"],
                   properties: {
                     name: { type: "string", minLength: 2 },
                     email: { type: "string", format: "email" },
                     password: { type: "string", minLength: 6 },
-                    phone: { type: "string" },
+                    phone: {
+                      type: "string",
+                      description: "Pakistani mobile, e.g. 03XXXXXXXXX",
+                    },
                   },
                 },
               },
@@ -364,6 +418,35 @@ export function getOpenApiDocument(baseUrl?: string) {
           },
           responses: {
             "200": { description: "OK" },
+            "401": { description: "Unauthorized" },
+          },
+        },
+      },
+      "/api/v1/account/password": {
+        post: {
+          tags: ["Account"],
+          summary: "Set or change my password",
+          description:
+            "Google-only accounts can set a password without currentPassword. Accounts that already have a password must send currentPassword.",
+          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["newPassword"],
+                  properties: {
+                    currentPassword: { type: "string" },
+                    newPassword: { type: "string", minLength: 6 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Password updated" },
+            "400": { description: "Validation error" },
             "401": { description: "Unauthorized" },
           },
         },

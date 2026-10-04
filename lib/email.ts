@@ -6,7 +6,7 @@
  */
 
 import { Resend } from 'resend';
-import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
+import { SESClient, SendEmailCommand, SendRawEmailCommand } from '@aws-sdk/client-ses';
 import { generateBookingConfirmationEmail, BookingEmailData, AppliedDiscountEmail } from './email-templates/booking-confirmation';
 
 // QR Code generation
@@ -353,4 +353,51 @@ export async function sendBookingConfirmationEmail(
   
   // Default to Resend
   return sendViaResend(data);
+}
+
+/**
+ * Generic HTML email (password reset, transactional notices).
+ */
+export async function sendHtmlEmail(input: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<{ success: boolean; message?: string; emailId?: string }> {
+  const to = input.to?.trim().toLowerCase();
+  if (!to || !to.includes("@")) {
+    return { success: false, message: "Invalid email address" };
+  }
+
+  try {
+    if (EMAIL_PROVIDER === "ses") {
+      const response = await sesClient.send(
+        new SendEmailCommand({
+          Source: sesFromEmail,
+          Destination: { ToAddresses: [to] },
+          Message: {
+            Subject: { Data: input.subject, Charset: "UTF-8" },
+            Body: { Html: { Data: input.html, Charset: "UTF-8" } },
+          },
+        }),
+      );
+      return { success: true, emailId: response.MessageId };
+    }
+
+    const response = await resend.emails.send({
+      from: resendFromEmail,
+      to,
+      subject: input.subject,
+      html: input.html,
+    });
+    if (response.error) {
+      return { success: false, message: response.error.message };
+    }
+    return { success: true, emailId: response.data?.id };
+  } catch (error: unknown) {
+    console.error("sendHtmlEmail error:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to send email",
+    };
+  }
 }

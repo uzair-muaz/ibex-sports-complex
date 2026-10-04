@@ -7,6 +7,7 @@ import {
   claimBookingsRequest,
   createSupportTicketRequest,
   replySupportTicketRequest,
+  setMyPasswordRequest,
   updateMyProfileRequest,
 } from "@/lib/tanstack/requests/account.requests";
 
@@ -33,6 +34,14 @@ export function useUpdateMyProfileMutation() {
   const invalidate = useInvalidateAccount();
   return useMutation({
     mutationFn: updateMyProfileRequest,
+    onSuccess: () => invalidate.profile(),
+  });
+}
+
+export function useSetMyPasswordMutation() {
+  const invalidate = useInvalidateAccount();
+  return useMutation({
+    mutationFn: setMyPasswordRequest,
     onSuccess: () => invalidate.profile(),
   });
 }

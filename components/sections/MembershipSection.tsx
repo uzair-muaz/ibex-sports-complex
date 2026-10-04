@@ -60,7 +60,7 @@ export const MembershipSection = () => {
               Get Started
             </DialogTitle>
             <DialogDescription className="text-zinc-400 text-base leading-relaxed">
-              Sign in to your Ibex account, then message us on WhatsApp. Our team
+              Sign in to your IBEX account, then message us on WhatsApp. Our team
               activates your membership hours after payment.
             </DialogDescription>
           </DialogHeader>
@@ -114,7 +114,7 @@ export const MembershipSection = () => {
               transition={{ duration: 0.7, delay: 0.1 }}
               className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight gradient-text"
             >
-              Join the Ibex Community
+              Join the IBEX Community
             </motion.h2>
             <motion.p
               initial={{ opacity: 0, y: 16 }}

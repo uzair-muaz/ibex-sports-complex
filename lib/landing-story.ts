@@ -24,7 +24,7 @@ export interface Chapter {
 export const LANDING_CHAPTERS: Chapter[] = [
   {
     id: "hero",
-    headline: "The Ibex Spirit",
+    headline: "The IBEX Spirit",
     subline:
       "Where peak performance meets premium leisure. Experience the finest paddle, pickleball, and futsal in the heart of the capital.",
     theme: "dark",
@@ -54,7 +54,7 @@ export const LANDING_CHAPTERS: Chapter[] = [
   },
   {
     id: "membership",
-    headline: "Join the Ibex Community",
+    headline: "Join the IBEX Community",
     subline:
       "Choose the way you play. From flexible hourly bookings to comprehensive monthly memberships.",
     theme: "dark",

@@ -4,9 +4,14 @@ import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { registerCustomerRequest } from "@/lib/tanstack/requests/auth.requests";
+import {
+  AuthField,
+  AuthShell,
+  authInputClassName,
+  authPrimaryButtonClassName,
+} from "@/components/auth/AuthShell";
 
 type Mode = "signin" | "signup";
 
@@ -89,11 +94,16 @@ function LoginContent() {
 
     try {
       if (mode === "signup") {
+        if (!phone.trim()) {
+          setError("Phone number is required.");
+          setLoadingEmail(false);
+          return;
+        }
         await registerCustomerRequest({
           name: name.trim(),
           email: email.trim().toLowerCase(),
           password,
-          phone: phone.trim() || undefined,
+          phone: phone.trim(),
         });
       }
 
@@ -117,16 +127,14 @@ function LoginContent() {
       router.replace(safeCallback);
       router.refresh();
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong.";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Something went wrong.");
       setLoadingEmail(false);
     }
   };
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-[#050505]">
         <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
       </div>
     );
@@ -135,212 +143,191 @@ function LoginContent() {
   const busy = loadingGoogle || loadingEmail;
 
   return (
-    <div className="relative w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/10 bg-zinc-950/90 shadow-[0_40px_120px_rgba(0,0,0,0.65)]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(45,212,191,0.18),_transparent_55%),radial-gradient(ellipse_at_bottom_right,_rgba(255,255,255,0.04),_transparent_45%)]"
-      />
-      <div className="relative space-y-8 p-8 sm:p-10">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="relative h-16 w-16 overflow-hidden rounded-2xl ring-1 ring-white/15 shadow-lg shadow-teal-500/10">
-            <Image
-              src="/logo.png"
-              alt="Ibex"
-              width={64}
-              height={64}
-              className="h-full w-full object-cover"
-              priority
-            />
-          </div>
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#2DD4BF]">
-              Ibex Sports Complex
-            </p>
-            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-[1.65rem]">
-              {mode === "signin" ? "Welcome back" : "Create your account"}
-            </h1>
-            <p className="text-sm leading-relaxed text-zinc-400">
-              {mode === "signin"
-                ? "Sign in to track bookings, earn rewards, and manage membership."
-                : "Save your bookings and unlock loyalty rewards in one step."}
-            </p>
-          </div>
-        </div>
+    <AuthShell
+      eyebrow="Member access"
+      title={mode === "signin" ? "Welcome back" : "Join IBEX"}
+      description={
+        mode === "signin"
+          ? "Sign in to track bookings, earn rewards, and manage your membership."
+          : "Create an account to save bookings and unlock loyalty rewards."
+      }
+    >
+      <div className="mb-8">
+        <h2 className="text-2xl font-semibold tracking-tight text-white">
+          {mode === "signin" ? "Sign in" : "Create account"}
+        </h2>
+        <p className="mt-2 text-sm text-zinc-400">
+          {mode === "signin"
+            ? "Google or email — your choice"
+            : "Fill in your details to get started"}
+        </p>
+      </div>
 
-        {error ? (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-3 text-sm text-red-300">
-            {error}
+      {error ? (
+        <div className="mb-5 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={handleGoogle}
+        disabled={busy}
+        className="mb-5 flex h-11 w-full items-center justify-center gap-3 rounded-xl bg-white text-sm font-semibold text-zinc-900 transition hover:bg-zinc-100 disabled:opacity-60"
+      >
+        {loadingGoogle ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <GoogleIcon className="h-5 w-5" />
+        )}
+        Continue with Google
+      </button>
+
+      <div className="mb-5 flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+        <div className="h-px flex-1 bg-white/10" />
+        <span>or email</span>
+        <div className="h-px flex-1 bg-white/10" />
+      </div>
+
+      <form onSubmit={handleEmailSubmit} className="space-y-4">
+        {mode === "signup" ? (
+          <>
+            <AuthField label="Full name">
+              <input
+                required
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+                placeholder="Your name"
+                className={authInputClassName}
+              />
+            </AuthField>
+            <AuthField label="Phone">
+              <input
+                required
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                autoComplete="tel"
+                inputMode="numeric"
+                placeholder="03XXXXXXXXX"
+                className={authInputClassName}
+              />
+            </AuthField>
+          </>
+        ) : null}
+
+        <AuthField label="Email">
+          <input
+            required
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            placeholder="you@example.com"
+            className={authInputClassName}
+          />
+        </AuthField>
+
+        <AuthField label="Password">
+          <input
+            required
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete={
+              mode === "signup" ? "new-password" : "current-password"
+            }
+            minLength={6}
+            placeholder={
+              mode === "signup" ? "At least 6 characters" : "Your password"
+            }
+            className={authInputClassName}
+          />
+        </AuthField>
+
+        {mode === "signin" ? (
+          <div className="-mt-1 text-right">
+            <Link
+              href="/forgot-password"
+              className="text-xs font-medium text-[#2DD4BF] hover:underline"
+            >
+              Forgot password?
+            </Link>
           </div>
         ) : null}
 
         <button
-          type="button"
-          onClick={handleGoogle}
+          type="submit"
           disabled={busy}
-          className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/15 bg-white font-semibold text-zinc-900 transition hover:bg-zinc-100 disabled:opacity-60"
+          className={authPrimaryButtonClassName}
         >
-          {loadingGoogle ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <GoogleIcon className="h-5 w-5" />
-          )}
-          Continue with Google
+          {loadingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {mode === "signin" ? "Continue" : "Create account"}
         </button>
+      </form>
 
-        <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
-          <div className="h-px flex-1 bg-white/10" />
-          <span>or email</span>
-          <div className="h-px flex-1 bg-white/10" />
-        </div>
-
-        <form onSubmit={handleEmailSubmit} className="space-y-4">
-          {mode === "signup" ? (
-            <>
-              <label className="block space-y-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                  Full name
-                </span>
-                <input
-                  required
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoComplete="name"
-                  placeholder="Your name"
-                  className="h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900/80 px-3.5 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-[#2DD4BF]/70 focus:ring-2 focus:ring-[#2DD4BF]/15"
-                />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                  Phone (optional)
-                </span>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  autoComplete="tel"
-                  placeholder="03XXXXXXXXX"
-                  className="h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900/80 px-3.5 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-[#2DD4BF]/70 focus:ring-2 focus:ring-[#2DD4BF]/15"
-                />
-              </label>
-            </>
-          ) : null}
-
-          <label className="block space-y-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-              Email
-            </span>
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              placeholder="you@example.com"
-              className="h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900/80 px-3.5 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-[#2DD4BF]/70 focus:ring-2 focus:ring-[#2DD4BF]/15"
-            />
-          </label>
-
-          <label className="block space-y-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-              Password
-            </span>
-            <input
-              required
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={
-                mode === "signup" ? "new-password" : "current-password"
-              }
-              minLength={6}
-              placeholder={
-                mode === "signup" ? "At least 6 characters" : "Your password"
-              }
-              className="h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900/80 px-3.5 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-[#2DD4BF]/70 focus:ring-2 focus:ring-[#2DD4BF]/15"
-            />
-          </label>
-
-          <button
-            type="submit"
-            disabled={busy}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2DD4BF] text-sm font-semibold text-[#0F172A] transition hover:bg-[#14B8A6] disabled:opacity-60"
-          >
-            {loadingEmail ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : null}
-            {mode === "signin" ? "Sign in with email" : "Create account"}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-zinc-400">
-          {mode === "signin" ? (
-            <>
-              New here?{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("signup");
-                  setError("");
-                }}
-                className="font-medium text-[#2DD4BF] hover:underline"
-              >
-                Create an account
-              </button>
-            </>
-          ) : (
-            <>
-              Already have an account?{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("signin");
-                  setError("");
-                }}
-                className="font-medium text-[#2DD4BF] hover:underline"
-              >
-                Sign in
-              </button>
-            </>
-          )}
-        </p>
-
-        <div className="space-y-3 border-t border-white/10 pt-6 text-center text-xs text-zinc-500">
-          <p>
-            Prefer not to sign up?{" "}
-            <Link
-              href={guestHref}
-              className="font-medium text-zinc-300 hover:text-[#2DD4BF] hover:underline"
+      <p className="mt-6 text-sm text-zinc-400">
+        {mode === "signin" ? (
+          <>
+            New here?{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                setError("");
+              }}
+              className="font-medium text-[#2DD4BF] hover:underline"
             >
-              Continue as guest
-            </Link>
-          </p>
-          <p>
-            Staff?{" "}
-            <Link href="/admin" className="text-[#2DD4BF] hover:underline">
-              Admin login
-            </Link>
-          </p>
-        </div>
+              Create an account
+            </button>
+          </>
+        ) : (
+          <>
+            Already have an account?{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signin");
+                setError("");
+              }}
+              className="font-medium text-[#2DD4BF] hover:underline"
+            >
+              Sign in
+            </button>
+          </>
+        )}
+      </p>
+
+      <div className="mt-6 space-y-2 border-t border-white/10 pt-5 text-xs text-zinc-500">
+        <p>
+          Prefer not to sign up?{" "}
+          <Link href={guestHref} className="text-zinc-300 hover:text-[#2DD4BF]">
+            Continue as guest
+          </Link>
+        </p>
+        <p>
+          Staff?{" "}
+          <Link href="/admin" className="text-[#2DD4BF] hover:underline">
+            Admin login
+          </Link>
+        </p>
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center overflow-hidden px-4 py-24 sm:py-28 md:py-32">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_rgba(45,212,191,0.12),_transparent_40%),radial-gradient(circle_at_80%_0%,_rgba(255,255,255,0.05),_transparent_35%)]"
-      />
-      <Suspense
-        fallback={
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#050505]">
           <Loader2 className="h-8 w-8 animate-spin text-[#2DD4BF]" />
-        }
-      >
-        <LoginContent />
-      </Suspense>
-    </div>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }

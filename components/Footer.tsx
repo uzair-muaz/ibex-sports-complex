@@ -16,7 +16,7 @@ export const Footer = () => {
               className="w-full h-full"
             />
           </div>
-          <span>Ibex sports Complex</span>
+          <span>IBEX Sports Complex</span>
         </Link>
         
         <div className="flex gap-8">
@@ -24,7 +24,7 @@ export const Footer = () => {
         </div>
 
         <div>
-            © {new Date().getFullYear()} Ibex sports Complex.
+            © {new Date().getFullYear()} IBEX Sports Complex.
         </div>
       </div>
     </footer>

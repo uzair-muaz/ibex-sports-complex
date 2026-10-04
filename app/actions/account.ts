@@ -1,5 +1,6 @@
 "use server";
 
+import bcrypt from "bcryptjs";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import Booking from "@/models/Booking";
@@ -15,13 +16,23 @@ export async function getMyProfile(opts?: {
 
   await connectDB();
   const user = await User.findById(gate.userId).select(
-    "name email phone image role createdAt",
+    "name email phone image role createdAt password googleId",
   );
   if (!user) return { success: false as const, error: "User not found" };
 
+  const plain = user.toObject();
+  const hasPassword = !!plain.password;
+  const hasGoogleAuth = !!plain.googleId;
+  delete plain.password;
+  delete plain.googleId;
+
   return {
     success: true as const,
-    user: JSON.parse(JSON.stringify(user)),
+    user: {
+      ...JSON.parse(JSON.stringify(plain)),
+      hasPassword,
+      hasGoogleAuth,
+    },
   };
 }
 
@@ -54,6 +65,60 @@ export async function updateMyProfile(
   return {
     success: true as const,
     user: JSON.parse(JSON.stringify(user)),
+  };
+}
+
+/**
+ * Set or change the signed-in customer's password.
+ * Google-only accounts (no password yet) can set one without a current password.
+ * Accounts that already have a password must provide the current one.
+ */
+export async function setMyPassword(
+  input: {
+    currentPassword?: string;
+    newPassword: string;
+  },
+  opts?: { actorUserId?: string; trustedApiActor?: boolean },
+) {
+  const gate = await resolveCustomerActor(opts);
+  if (!gate.ok) return { success: false as const, error: gate.error };
+
+  const newPassword = input.newPassword || "";
+  if (newPassword.length < 6) {
+    return {
+      success: false as const,
+      error: "New password must be at least 6 characters.",
+    };
+  }
+
+  await connectDB();
+  const user = await User.findById(gate.userId).select("password");
+  if (!user) return { success: false as const, error: "User not found" };
+
+  if (user.password) {
+    const current = input.currentPassword || "";
+    if (!current) {
+      return {
+        success: false as const,
+        error: "Current password is required.",
+      };
+    }
+    const ok = await bcrypt.compare(current, user.password);
+    if (!ok) {
+      return {
+        success: false as const,
+        error: "Current password is incorrect.",
+      };
+    }
+  }
+
+  user.password = await bcrypt.hash(newPassword, 12);
+  await user.save();
+
+  revalidatePath("/account");
+  return {
+    success: true as const,
+    hasPassword: true,
   };
 }
 

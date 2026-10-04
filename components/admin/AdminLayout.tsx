@@ -3,6 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import {
   Layout,
   Menu,
@@ -10,6 +11,7 @@ import {
   Typography,
   theme,
   Tooltip,
+  Space,
 } from "antd";
 import {
   BarChartOutlined,
@@ -22,7 +24,6 @@ import {
   MenuUnfoldOutlined,
   ReloadOutlined,
   LogoutOutlined,
-  DashboardOutlined,
   CustomerServiceOutlined,
   GiftOutlined,
   BulbOutlined,
@@ -129,28 +130,26 @@ export function AdminLayout({
   const sidebar = (
     <div className="flex h-full flex-col">
       <div
-        className="flex items-center gap-3 border-b px-4 py-5"
-        style={{ borderColor: token.colorBorder }}
+        className="flex items-center gap-3 px-4 py-5"
+        style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}
       >
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-lg"
-          style={{
-            background: token.colorPrimary,
-            color: mode === "dark" ? "rgba(15,23,42,1)" : "#ffffff",
-          }}
-        >
-          <DashboardOutlined style={{ fontSize: 20 }} />
-        </div>
+        <Image
+          src="/logo.png"
+          alt="IBEX"
+          width={36}
+          height={36}
+          className="h-9 w-9 shrink-0 rounded-full object-cover"
+        />
         {!collapsed && (
-          <div>
+          <div className="min-w-0">
             <div
-              className="font-semibold"
+              className="truncate text-sm font-semibold tracking-tight"
               style={{ color: token.colorText }}
             >
-              Admin Panel
+              IBEX Admin
             </div>
-            <Text type="secondary" className="text-xs">
-              {isSuperAdmin ? "Super Admin" : "Admin"}
+            <Text type="secondary" className="text-[11px]">
+              {isSuperAdmin ? "Super admin" : "Staff"}
             </Text>
           </div>
         )}
@@ -162,18 +161,21 @@ export function AdminLayout({
         selectedKeys={[selectedKey]}
         items={menuItems}
         onClick={({ key }) => handleNavigate(key)}
-        className="flex-1 border-none px-2 py-3"
+        className="flex-1 border-none !px-2 !py-3"
         style={{ background: "transparent" }}
       />
 
-      <div className="border-t p-4" style={{ borderColor: token.colorBorder }}>
+      <div
+        className="space-y-2 p-3"
+        style={{ borderTop: `1px solid ${token.colorBorderSecondary}` }}
+      >
         {!collapsed && (
           <div
-            className="mb-3 rounded-lg px-3 py-2"
-            style={{ background: token.colorBgElevated }}
+            className="rounded-xl px-3 py-2.5"
+            style={{ background: token.colorFillQuaternary }}
           >
-            <Text type="secondary" className="text-xs">
-              Logged in as
+            <Text type="secondary" className="text-[11px]">
+              Signed in
             </Text>
             <div
               className="truncate text-sm font-medium"
@@ -188,32 +190,29 @@ export function AdminLayout({
           icon={<LogoutOutlined />}
           onClick={() => signOut({ callbackUrl: "/admin" })}
           block
-          className="justify-start"
+          className="!justify-start"
           style={{ color: token.colorTextSecondary }}
         >
-          {!collapsed && "Logout"}
+          {!collapsed && "Sign out"}
         </Button>
       </div>
     </div>
   );
 
   return (
-    <Layout
-      className="min-h-screen"
-      style={{ background: token.colorBgBase }}
-    >
+    <Layout className="min-h-screen" style={{ background: token.colorBgBase }}>
       <Sider
-        width={256}
+        width={248}
         collapsed={collapsed}
         collapsedWidth={72}
         breakpoint="lg"
         onBreakpoint={(broken) => {
           if (broken) setCollapsed(true);
         }}
-        className="!fixed !left-0 !top-0 !bottom-0 !z-50 hidden lg:!block"
+        className="!fixed !bottom-0 !left-0 !top-0 !z-50 hidden lg:!block"
         style={{
           background: token.colorBgContainer,
-          borderRight: `1px solid ${token.colorBorder}`,
+          borderRight: `1px solid ${token.colorBorderSecondary}`,
         }}
       >
         {sidebar}
@@ -221,17 +220,19 @@ export function AdminLayout({
 
       {mobileOpen && (
         <>
-          <div
+          <button
+            type="button"
+            aria-label="Close sidebar"
             className="fixed inset-0 z-40 lg:hidden"
             style={{ background: "rgba(0,0,0,0.45)" }}
             onClick={() => setMobileOpen(false)}
           />
           <Sider
             width={280}
-            className="!fixed !left-0 !top-0 !bottom-0 !z-50 lg:!hidden"
+            className="!fixed !bottom-0 !left-0 !top-0 !z-50 lg:!hidden"
             style={{
               background: token.colorBgContainer,
-              borderRight: `1px solid ${token.colorBorder}`,
+              borderRight: `1px solid ${token.colorBorderSecondary}`,
             }}
           >
             {sidebar}
@@ -239,22 +240,20 @@ export function AdminLayout({
         </>
       )}
 
-      <Layout className="min-h-screen" style={{ background: token.colorBgBase }}>
+      <Layout style={{ background: token.colorBgBase }}>
         <div
-          className={`flex min-h-screen flex-col transition-all duration-300 ml-0 ${collapsed ? "lg:ml-[72px]" : "lg:ml-64"}`}
+          className={`flex min-h-screen flex-col transition-all duration-300 ${collapsed ? "lg:ml-[72px]" : "lg:ml-[248px]"}`}
         >
           <Header
-            className="!sticky !top-0 z-30 flex items-center justify-between px-4 sm:px-6"
+            className="!sticky !top-0 z-30 flex !h-auto items-center justify-between !px-4 !py-3.5 sm:!px-6"
             style={{
-              background: token.colorBgContainer,
-              borderBottom: `1px solid ${token.colorBorder}`,
-              height: "auto",
+              background: `${token.colorBgContainer}cc`,
+              backdropFilter: "blur(12px)",
+              borderBottom: `1px solid ${token.colorBorderSecondary}`,
               lineHeight: "normal",
-              paddingTop: 16,
-              paddingBottom: 16,
             }}
           >
-            <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <Button
                 type="text"
                 icon={
@@ -274,21 +273,23 @@ export function AdminLayout({
               <div className="min-w-0">
                 <Title
                   level={4}
-                  className="!mb-0 truncate"
+                  className="!mb-0 truncate !text-lg !font-semibold sm:!text-xl"
                   style={{ color: token.colorText }}
                 >
                   {title}
                 </Title>
-                {description && (
+                {description ? (
                   <Text type="secondary" className="hidden text-sm sm:block">
                     {description}
                   </Text>
-                )}
+                ) : null}
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <Space size={8} wrap className="justify-end">
               <Tooltip
-                title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                title={
+                  mode === "dark" ? "Switch to light mode" : "Switch to dark mode"
+                }
               >
                 <Button
                   type="text"
@@ -297,7 +298,7 @@ export function AdminLayout({
                   onClick={toggleMode}
                 />
               </Tooltip>
-              {onRefresh && (
+              {onRefresh ? (
                 <Button
                   icon={<ReloadOutlined spin={isLoading} />}
                   onClick={onRefresh}
@@ -305,16 +306,25 @@ export function AdminLayout({
                 >
                   <span className="hidden sm:inline">Refresh</span>
                 </Button>
-              )}
+              ) : null}
               {actionButton}
-            </div>
+            </Space>
           </Header>
 
           <Content
-            className="flex-1 p-4 sm:p-6"
+            className="relative flex-1 p-4 sm:p-6"
             style={{ background: token.colorBgBase }}
           >
-            {children}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-40"
+              style={{
+                background: `radial-gradient(ellipse 60% 80% at 100% 0%, ${token.colorPrimary}12, transparent)`,
+              }}
+            />
+            <div className="relative mx-auto w-full max-w-[1400px]">
+              {children}
+            </div>
           </Content>
         </div>
       </Layout>

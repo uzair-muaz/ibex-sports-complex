@@ -4,10 +4,9 @@ import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { App, Button, Card, Form, Input, Spin, Typography } from "antd";
-import { HomeOutlined, LockOutlined } from "@ant-design/icons";
-
-const { Title, Text } = Typography;
+import Image from "next/image";
+import { App, Button, Form, Input, Spin, theme } from "antd";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 
 type LoginFormValues = {
   email: string;
@@ -20,6 +19,7 @@ function AdminLoginForm() {
   const [form] = Form.useForm<LoginFormValues>();
   const [submitting, setSubmitting] = useState(false);
   const { message } = App.useApp();
+  const { token } = theme.useToken();
 
   useEffect(() => {
     if (session?.user) {
@@ -57,72 +57,160 @@ function AdminLoginForm() {
 
   if (status === "loading" || session) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--ant-color-bg-base)]">
+      <div
+        className="flex min-h-screen items-center justify-center"
+        style={{ background: token.colorBgBase }}
+      >
         <Spin size="large" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--ant-color-bg-base)] px-4">
-      <Card className="w-full max-w-sm border-[var(--ant-color-border)]" styles={{ body: { paddingTop: 8 } }}>
-        <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#2DD4BF]">
-            <LockOutlined className="text-xl text-[rgba(15,23,42,1)]" />
-          </div>
-          <Title level={3} className="!mb-1 !text-[var(--ant-color-text)]">
-            Admin Access
-          </Title>
-          <Text type="secondary">Sign in to manage court bookings</Text>
-        </div>
+    <div
+      className="relative flex min-h-screen overflow-hidden"
+      style={{ background: token.colorBgBase, color: token.colorText }}
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: `
+            radial-gradient(ellipse 50% 40% at 15% 20%, ${token.colorPrimary}22, transparent),
+            radial-gradient(ellipse 40% 35% at 85% 80%, ${token.colorPrimary}14, transparent)
+          `,
+        }}
+      />
 
-        <Form<LoginFormValues>
-          form={form}
-          layout="vertical"
-          onFinish={onFinish}
-          requiredMark={false}
-        >
-          <Form.Item
-            label="Email"
-            name="email"
-            rules={[
-              { required: true, message: "Email is required" },
-              { type: "email", message: "Please enter a valid email address" },
-            ]}
+      <div className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col lg:flex-row">
+        {/* Brand panel */}
+        <aside className="flex flex-1 flex-col justify-between px-8 py-10 sm:px-12 lg:py-14">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm transition-opacity hover:opacity-80"
+            style={{ color: token.colorTextSecondary }}
           >
-            <Input placeholder="admin@ibex.com" size="large" />
-          </Form.Item>
+            <ArrowLeftOutlined />
+            Back to site
+          </Link>
 
-          <Form.Item
-            label="Password"
-            name="password"
-            rules={[
-              { required: true, message: "Password is required" },
-              { min: 6, message: "Password must be at least 6 characters" },
-            ]}
-          >
-            <Input.Password placeholder="Password" size="large" />
-          </Form.Item>
-
-          <Form.Item className="mb-0">
-            <Button
-              type="primary"
-              htmlType="submit"
-              block
-              size="large"
-              loading={submitting}
+          <div className="my-16 max-w-md lg:my-0">
+            <div className="mb-6 flex items-center gap-3">
+              <Image
+                src="/logo.png"
+                alt="IBEX"
+                width={48}
+                height={48}
+                className="h-12 w-12 rounded-full object-cover"
+                priority
+              />
+              <div>
+                <p
+                  className="text-lg font-semibold tracking-tight"
+                  style={{ color: token.colorText }}
+                >
+                  IBEX Sports Complex
+                </p>
+                <p
+                  className="text-xs uppercase tracking-[0.18em]"
+                  style={{ color: token.colorPrimary }}
+                >
+                  Operations
+                </p>
+              </div>
+            </div>
+            <h1
+              className="text-4xl font-semibold tracking-tight sm:text-5xl"
+              style={{ color: token.colorText }}
             >
-              Sign In
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
+              Staff console
+            </h1>
+            <p
+              className="mt-4 max-w-sm text-base leading-relaxed"
+              style={{ color: token.colorTextSecondary }}
+            >
+              Manage bookings, courts, memberships, and support from one place.
+            </p>
+          </div>
 
-      <Link href="/" className="mt-4 block w-full max-w-sm">
-        <Button block icon={<HomeOutlined />} size="large">
-          Go to Home
-        </Button>
-      </Link>
+          <p className="hidden text-xs lg:block" style={{ color: token.colorTextSecondary }}>
+            Authorized staff only
+          </p>
+        </aside>
+
+        {/* Form panel */}
+        <main className="flex flex-1 items-center justify-center px-6 pb-16 lg:px-12 lg:pb-0">
+          <div className="w-full max-w-sm">
+            <div className="mb-8">
+              <h2
+                className="text-2xl font-semibold tracking-tight"
+                style={{ color: token.colorText }}
+              >
+                Sign in
+              </h2>
+              <p
+                className="mt-2 text-sm"
+                style={{ color: token.colorTextSecondary }}
+              >
+                Use your staff email and password
+              </p>
+            </div>
+
+            <Form<LoginFormValues>
+              form={form}
+              layout="vertical"
+              onFinish={onFinish}
+              requiredMark={false}
+              size="large"
+            >
+              <Form.Item
+                label="Email"
+                name="email"
+                rules={[
+                  { required: true, message: "Email is required" },
+                  {
+                    type: "email",
+                    message: "Please enter a valid email address",
+                  },
+                ]}
+              >
+                <Input
+                  placeholder="admin@ibex.com"
+                  autoComplete="email"
+                  variant="filled"
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Password"
+                name="password"
+                rules={[
+                  { required: true, message: "Password is required" },
+                  { min: 6, message: "Password must be at least 6 characters" },
+                ]}
+              >
+                <Input.Password
+                  placeholder="Password"
+                  autoComplete="current-password"
+                  variant="filled"
+                />
+              </Form.Item>
+
+              <Form.Item className="mb-0 pt-1">
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  block
+                  loading={submitting}
+                  className="!h-11 !font-semibold"
+                >
+                  Continue
+                </Button>
+              </Form.Item>
+            </Form>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

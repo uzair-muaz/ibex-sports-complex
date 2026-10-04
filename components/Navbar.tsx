@@ -1,311 +1,368 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { Menu, X, ArrowRight, User } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "./ui/button";
+import { Menu, X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+
+const NAV_LINKS = [
+  { name: "Home", path: "/" },
+  { name: "Book Now", path: "/booking" },
+] as const;
+
+function UserAvatar({
+  name,
+  image,
+  className,
+}: {
+  name?: string | null;
+  image?: string | null;
+  className?: string;
+}) {
+  const initials = (name || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
+
+  if (image) {
+    return (
+      <Image
+        src={image}
+        alt={name || "Account"}
+        width={36}
+        height={36}
+        className={cn("h-9 w-9 rounded-full object-cover", className)}
+      />
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#2DD4BF]/20 text-xs font-bold text-[#2DD4BF] ring-1 ring-[#2DD4BF]/30",
+        className,
+      )}
+    >
+      {initials || "?"}
+    </span>
+  );
+}
 
 export const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const { data: session, status } = useSession();
+
   const isCustomer =
     status === "authenticated" &&
     session?.user?.role !== "admin" &&
     session?.user?.role !== "super_admin";
   const isStaff =
     status === "authenticated" &&
-    (session?.user?.role === "admin" || session?.user?.role === "super_admin");
+    (session?.user?.role === "admin" ||
+      session?.user?.role === "super_admin");
+  const isLoggedIn = status === "authenticated";
+
+  const accountHref = isStaff
+    ? "/admin/bookings"
+    : isCustomer
+      ? "/account"
+      : "/login";
 
   useEffect(() => {
-    if (isMobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    document.body.style.overflow = isMobileMenuOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
   }, [isMobileMenuOpen]);
 
-  const navLinks = [{ name: "Home", path: "/" }];
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+    setAccountOpen(false);
+  }, [pathname]);
 
   return (
-    <motion.nav
-      initial={{ y: -100, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed top-0 left-0 right-0 z-100 isolate transition-all duration-500 bg-zinc-950/80 border-b border-white/8 backdrop-blur-xl"
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 h-16 sm:h-17 md:h-17 flex items-center justify-between">
-        <Link href="/" className="relative group z-10 shrink-0">
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="flex items-center gap-2.5 sm:gap-3"
-          >
-            <div className="relative w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-xl overflow-hidden ring-1 ring-white/10">
-              <Image
-                src="/logo.png"
-                alt="Ibex Sports Complex"
-                width={44}
-                height={44}
-                className="w-full h-full object-cover"
-                priority
-              />
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-base sm:text-lg md:text-xl font-bold tracking-tight text-white">
-                Ibex
-              </span>
-              <span className="hidden sm:block text-[10px] sm:text-xs font-medium tracking-wide text-zinc-400">
-                Sports Complex
-              </span>
-            </div>
-          </motion.div>
-        </Link>
+    <>
+      <header
+        className={cn(
+          "fixed inset-x-0 top-0 z-100 transition-all duration-500",
+          scrolled
+            ? "bg-[#050505]/75 backdrop-blur-md"
+            : "bg-transparent",
+        )}
+      >
+        <div
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/45 to-transparent transition-opacity duration-500",
+            scrolled ? "opacity-100" : "opacity-70",
+          )}
+        />
 
-        <div className="hidden md:flex items-center gap-1">
-          {navLinks.map((link, index) => {
-            const isActive = pathname === link.path;
-            return (
-              <motion.div
-                key={link.path}
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 + 0.2 }}
-              >
+        <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5 sm:h-[4.5rem] sm:px-8">
+          {/* Left: logo */}
+          <Link href="/" className="flex min-w-0 items-center gap-2.5">
+            <Image
+              src="/logo.png"
+              alt="IBEX Sports Complex"
+              width={36}
+              height={36}
+              className="h-9 w-9 shrink-0 rounded-full object-cover"
+              priority
+            />
+            <span className="truncate text-sm font-bold tracking-tight text-white sm:text-[15px]">
+              IBEX Sports Complex
+            </span>
+          </Link>
+
+          {/* Right: nav links + Sign in / avatar / mobile menu */}
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <nav className="hidden items-center gap-1 md:flex">
+              {NAV_LINKS.map((link) => {
+                const active =
+                  link.path === "/"
+                    ? pathname === "/"
+                    : pathname === link.path ||
+                      pathname.startsWith(`${link.path}/`);
+                return (
+                  <Link
+                    key={link.path}
+                    href={link.path}
+                    className={cn(
+                      "relative rounded-full px-3.5 py-2 text-sm font-medium tracking-wide transition-colors",
+                      active
+                        ? "text-white"
+                        : "text-white/50 hover:text-white/90",
+                    )}
+                  >
+                    {link.name}
+                    {active ? (
+                      <motion.span
+                        layoutId="nav-line"
+                        className="absolute inset-x-3.5 -bottom-0.5 h-px bg-[#2DD4BF]"
+                        transition={{
+                          type: "spring",
+                          stiffness: 380,
+                          damping: 32,
+                        }}
+                      />
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            <div className="hidden items-center md:flex">
+              {!isLoggedIn ? (
                 <Link
-                  href={link.path}
-                  className={`relative flex items-center px-4 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 ${
-                    isActive
-                      ? "text-white"
-                      : "text-zinc-300 hover:text-white hover:bg-white/5"
-                  }`}
+                  href="/login"
+                  className="inline-flex h-9 items-center rounded-full bg-[#2DD4BF] px-5 text-sm font-semibold text-[#0F172A] transition hover:bg-[#14B8A6]"
                 >
-                  {link.name}
-                  {isActive && (
-                    <motion.div
-                      layoutId="navbarIndicator"
-                      className="absolute inset-0 rounded-xl bg-white/10 -z-10"
-                      initial={false}
-                      transition={{
-                        type: "spring",
-                        stiffness: 400,
-                        damping: 30,
-                      }}
-                    />
-                  )}
+                  Sign In
                 </Link>
-              </motion.div>
-            );
-          })}
+              ) : (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAccountOpen((v) => !v)}
+                    className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 transition hover:bg-white/5"
+                    aria-expanded={accountOpen}
+                    aria-haspopup="menu"
+                  >
+                    <UserAvatar
+                      name={session?.user?.name}
+                      image={session?.user?.image}
+                    />
+                    <span className="max-w-[140px] truncate text-sm font-medium text-white/85">
+                      {session?.user?.name?.split(" ")[0] || "Account"}
+                    </span>
+                  </button>
 
-          <div className="flex items-center gap-2 ml-2 pl-2 border-l border-white/10">
-            {isCustomer ? (
-              <Link href="/account">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-xl border-white/15 bg-transparent text-white hover:bg-white/10 h-10"
-                >
-                  <User className="w-4 h-4 mr-1.5" />
-                  Account
-                </Button>
-              </Link>
-            ) : isStaff ? (
-              <Link href="/admin/bookings">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-xl border-white/15 bg-transparent text-white hover:bg-white/10 h-10"
-                >
-                  Admin
-                </Button>
-              </Link>
-            ) : (
-              <Link href="/login">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-xl border-white/15 bg-transparent text-white hover:bg-white/10 h-10"
-                >
-                  Sign in
-                </Button>
-              </Link>
-            )}
-            <Link href="/booking">
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Button
-                  size="sm"
-                  className="rounded-xl bg-[#2DD4BF] text-[#0F172A] font-semibold px-5 py-2.5 h-10 border-0 shadow-lg shadow-[#2DD4BF]/20 hover:bg-[#14B8A6] hover:shadow-[#2DD4BF]/30 transition-all duration-200 cursor-pointer"
-                >
-                  <span className="flex items-center gap-2">
-                    Book Now
-                    <ArrowRight className="w-4 h-4" />
-                  </span>
-                </Button>
-              </motion.div>
-            </Link>
+                  <AnimatePresence>
+                    {accountOpen ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 6 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute right-0 top-full mt-2 min-w-[180px] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 py-1 shadow-2xl backdrop-blur-xl"
+                        role="menu"
+                      >
+                        <Link
+                          href={accountHref}
+                          className="block px-4 py-2.5 text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
+                          role="menuitem"
+                          onClick={() => setAccountOpen(false)}
+                        >
+                          {isStaff ? "Admin dashboard" : "My account"}
+                        </Link>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setAccountOpen(false);
+                            void signOut({ callbackUrl: "/" });
+                          }}
+                          className="block w-full px-4 py-2.5 text-left text-sm text-white/50 transition hover:bg-white/5 hover:text-white"
+                        >
+                          Sign out
+                        </button>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="inline-flex h-10 w-10 items-center justify-center text-white/80 transition hover:text-white md:hidden"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" strokeWidth={1.5} />
+            </button>
           </div>
         </div>
-
-        <div className="md:hidden flex items-center gap-2">
-          <Link href="/booking">
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              className="flex items-center gap-2 min-h-10 px-4 rounded-xl bg-[#2DD4BF] text-[#0F172A] font-semibold text-sm shadow-lg shadow-[#2DD4BF]/20 active:bg-[#14B8A6] transition-colors"
-            >
-              <span>Book Now</span>
-              <ArrowRight className="w-4 h-4" />
-            </motion.button>
-          </Link>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            className="flex items-center justify-center min-h-10 min-w-10 rounded-xl bg-white/10 active:bg-white/15 transition-colors"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
-          >
-            <AnimatePresence mode="wait">
-              {isMobileMenuOpen ? (
-                <motion.div
-                  key="close"
-                  initial={{ rotate: -90, opacity: 0 }}
-                  animate={{ rotate: 0, opacity: 1 }}
-                  exit={{ rotate: 90, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <X className="w-5 h-5" />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="menu"
-                  initial={{ rotate: 90, opacity: 0 }}
-                  animate={{ rotate: 0, opacity: 1 }}
-                  exit={{ rotate: -90, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Menu className="w-5 h-5" />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.button>
-        </div>
-      </div>
+      </header>
 
       {typeof document !== "undefined" &&
         createPortal(
           <AnimatePresence>
-            {isMobileMenuOpen && (
-              <>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="fixed inset-0 z-110 bg-black/60 backdrop-blur-sm md:hidden"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  aria-hidden
-                />
-                <motion.div
-                  initial={{ x: "100%" }}
-                  animate={{ x: 0 }}
-                  exit={{ x: "100%" }}
-                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                  className="fixed top-0 right-0 bottom-0 z-120 w-full max-w-sm shadow-2xl md:hidden flex flex-col bg-zinc-900 border-l border-white/10"
-                >
-                  <div className="flex items-center justify-between h-16 shrink-0 px-5 border-b border-white/10">
-                    <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">
-                      Menu
+            {isMobileMenuOpen ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="fixed inset-0 z-120 flex flex-col bg-[#050505]/95 backdrop-blur-xl md:hidden"
+              >
+                <div className="flex h-16 items-center justify-between px-5">
+                  <Link
+                    href="/"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-2.5"
+                  >
+                    <Image
+                      src="/logo.png"
+                      alt=""
+                      width={32}
+                      height={32}
+                      className="h-8 w-8 rounded-full object-cover"
+                    />
+                    <span className="text-sm font-bold text-white">
+                      IBEX Sports Complex
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center justify-center w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
-                      aria-label="Close menu"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="inline-flex h-10 w-10 items-center justify-center text-white/70"
+                    aria-label="Close menu"
+                  >
+                    <X className="h-5 w-5" strokeWidth={1.5} />
+                  </button>
+                </div>
 
-                  <nav className="flex-1 overflow-y-auto py-4 px-4 flex flex-col gap-1">
-                    {navLinks.map((link, index) => {
-                      const isActive = pathname === link.path;
-                      return (
-                        <motion.div
-                          key={link.path}
-                          initial={{ opacity: 0, x: 12 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.04 + 0.08 }}
+                <nav className="flex flex-1 flex-col justify-center gap-1 px-8">
+                  {NAV_LINKS.map((link, i) => {
+                    const active =
+                      link.path === "/"
+                        ? pathname === "/"
+                        : pathname.startsWith(link.path);
+                    return (
+                      <motion.div
+                        key={link.path}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.05 + i * 0.05 }}
+                      >
+                        <Link
+                          href={link.path}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={cn(
+                            "block py-3 text-4xl font-light tracking-tight",
+                            active ? "text-[#2DD4BF]" : "text-white/90",
+                          )}
                         >
-                          <Link
-                            href={link.path}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                            className={`flex items-center py-3.5 px-4 rounded-xl text-base font-medium transition-colors ${
-                              isActive
-                                ? "text-[#2DD4BF] bg-[#2DD4BF]/10"
-                                : "text-white active:bg-white/10"
-                            }`}
-                          >
-                            {link.name}
-                          </Link>
-                        </motion.div>
-                      );
-                    })}
+                          {link.name}
+                        </Link>
+                      </motion.div>
+                    );
+                  })}
 
-                    <Link
-                      href={
-                        isCustomer
-                          ? "/account"
-                          : isStaff
-                            ? "/admin/bookings"
-                            : "/login"
-                      }
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center py-3.5 px-4 rounded-xl text-base font-medium text-white active:bg-white/10"
-                    >
-                      {isCustomer ? "Account" : isStaff ? "Admin" : "Sign in"}
-                    </Link>
-
-                    {isCustomer ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMobileMenuOpen(false);
-                          void signOut({ callbackUrl: "/" });
-                        }}
-                        className="flex items-center py-3.5 px-4 rounded-xl text-base font-medium text-zinc-400"
-                      >
-                        Sign out
-                      </button>
-                    ) : null}
-
-                    <motion.div
-                      initial={{ opacity: 0, x: 12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.16 }}
-                    >
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.18 }}
+                    className="mt-10 border-t border-white/10 pt-8"
+                  >
+                    {!isLoggedIn ? (
                       <Link
-                        href="/booking"
+                        href="/login"
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center justify-center gap-2 w-full py-3.5 px-4 rounded-xl bg-[#2DD4BF] text-[#0F172A] font-semibold text-base shadow-lg shadow-[#2DD4BF]/20 active:bg-[#14B8A6] transition-colors mt-2"
+                        className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#2DD4BF] text-base font-semibold text-[#0F172A]"
                       >
-                        <span>Book a Court</span>
-                        <ArrowRight className="w-4 h-4 shrink-0" />
+                        Sign In
                       </Link>
-                    </motion.div>
-                  </nav>
-                </motion.div>
-              </>
-            )}
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <UserAvatar
+                            name={session?.user?.name}
+                            image={session?.user?.image}
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-base font-semibold text-white">
+                              {session?.user?.name || "Account"}
+                            </p>
+                            <p className="truncate text-sm text-white/45">
+                              {session?.user?.email}
+                            </p>
+                          </div>
+                        </div>
+                        <Link
+                          href={accountHref}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className="inline-flex h-11 w-full items-center justify-center rounded-full border border-white/20 text-base font-semibold text-white"
+                        >
+                          {isStaff ? "Admin dashboard" : "My account"}
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMobileMenuOpen(false);
+                            void signOut({ callbackUrl: "/" });
+                          }}
+                          className="w-full py-2 text-center text-base text-white/45"
+                        >
+                          Sign out
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                </nav>
+              </motion.div>
+            ) : null}
           </AnimatePresence>,
           document.body,
         )}
-    </motion.nav>
+    </>
   );
 };

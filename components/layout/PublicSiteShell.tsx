@@ -1,19 +1,14 @@
-import { Navbar } from "@/components/Navbar";
-import { DiscountBanner } from "@/components/DiscountBanner";
-import { ConditionalFooter } from "@/components/ConditionalFooter";
+import { ConditionalPublicChrome } from "@/components/layout/ConditionalPublicChrome";
 
 type PublicSiteShellProps = {
   children: React.ReactNode;
 };
 
-/** Server shell — client islands live in Navbar / DiscountBanner. */
+/** Server shell — marketing vs app chrome is decided client-side by path. */
 export function PublicSiteShell({ children }: PublicSiteShellProps) {
   return (
     <div className="min-h-screen bg-[#050505] text-white overflow-x-hidden">
-      <Navbar />
-      <DiscountBanner className="fixed left-0 right-0 z-40 top-16 sm:top-17" />
-      {children}
-      <ConditionalFooter />
+      <ConditionalPublicChrome>{children}</ConditionalPublicChrome>
     </div>
   );
 }

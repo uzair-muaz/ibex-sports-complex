@@ -18,11 +18,15 @@ export async function POST(request: Request) {
       return apiError("Invalid JSON body", 400, request);
     }
 
+    if (!body.phone?.trim()) {
+      return apiError("Phone number is required", 400, request);
+    }
+
     const result = await registerCustomer({
       name: body.name || "",
       email: body.email || "",
       password: body.password || "",
-      phone: body.phone,
+      phone: body.phone.trim(),
     });
 
     if (!result.success) {

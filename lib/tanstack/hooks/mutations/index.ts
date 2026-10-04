@@ -15,6 +15,7 @@ export { useDeleteDiscountMutation } from "./use-delete-discount.mutation";
 export { useToggleDiscountActiveMutation } from "./use-toggle-discount-active.mutation";
 export {
   useUpdateMyProfileMutation,
+  useSetMyPasswordMutation,
   useClaimBookingsMutation,
   useCancelMyBookingMutation,
   useCreateSupportTicketMutation,

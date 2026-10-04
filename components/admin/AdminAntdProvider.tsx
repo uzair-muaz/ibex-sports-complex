@@ -36,8 +36,10 @@ const sharedToken = {
   colorPrimary: "#0D9488",
   colorInfo: "#0D9488",
   colorSuccess: "#0D9488",
-  borderRadius: 12,
+  borderRadius: 14,
   fontFamily: "inherit",
+  controlHeight: 40,
+  controlHeightLG: 44,
 } as const;
 
 function buildTheme(mode: AdminThemeMode): ThemeConfig {
@@ -50,6 +52,7 @@ function buildTheme(mode: AdminThemeMode): ThemeConfig {
         colorBgContainer: "#ffffff",
         colorBgElevated: "#ffffff",
         colorBorder: "#e4e4e7",
+        colorBorderSecondary: "#f0f0f2",
         colorText: "#18181b",
         colorTextSecondary: "#71717a",
       },
@@ -61,6 +64,8 @@ function buildTheme(mode: AdminThemeMode): ThemeConfig {
         },
         Menu: {
           itemBg: "transparent",
+          itemBorderRadius: 10,
+          itemMarginInline: 4,
           itemSelectedBg: "rgba(13, 148, 136, 0.12)",
           itemSelectedColor: "#0D9488",
           itemHoverBg: "rgba(0,0,0,0.04)",
@@ -68,6 +73,17 @@ function buildTheme(mode: AdminThemeMode): ThemeConfig {
         Table: {
           headerBg: "#fafafa",
           rowHoverBg: "rgba(0,0,0,0.02)",
+          borderColor: "#f0f0f2",
+        },
+        Card: {
+          colorBorderSecondary: "#f0f0f2",
+        },
+        Button: {
+          borderRadius: 10,
+          primaryShadow: "0 8px 24px rgba(13, 148, 136, 0.22)",
+        },
+        Input: {
+          borderRadius: 10,
         },
       },
     };
@@ -80,32 +96,46 @@ function buildTheme(mode: AdminThemeMode): ThemeConfig {
       colorPrimary: "#2DD4BF",
       colorInfo: "#2DD4BF",
       colorSuccess: "#2DD4BF",
-      colorBgBase: "#000000",
-      colorBgContainer: "#09090b",
-      colorBgElevated: "#18181b",
-      colorBorder: "#27272a",
+      colorBgBase: "#050505",
+      colorBgContainer: "#0c0c0e",
+      colorBgElevated: "#141416",
+      colorBorder: "#232326",
+      colorBorderSecondary: "#1a1a1d",
       colorText: "#fafafa",
       colorTextSecondary: "#a1a1aa",
     },
     components: {
       Layout: {
-        siderBg: "#09090b",
-        headerBg: "#09090b",
-        bodyBg: "#000000",
+        siderBg: "#0c0c0e",
+        headerBg: "#0c0c0e",
+        bodyBg: "#050505",
       },
       Menu: {
+        itemBorderRadius: 10,
+        itemMarginInline: 4,
         darkItemBg: "transparent",
-        darkItemSelectedBg: "rgba(45, 212, 191, 0.15)",
+        darkItemSelectedBg: "rgba(45, 212, 191, 0.14)",
         darkItemSelectedColor: "#2DD4BF",
-        darkItemHoverBg: "rgba(255,255,255,0.05)",
+        darkItemHoverBg: "rgba(255,255,255,0.04)",
       },
       Table: {
-        headerBg: "#18181b",
+        headerBg: "#141416",
         rowHoverBg: "rgba(255,255,255,0.03)",
+        borderColor: "#1a1a1d",
       },
       Modal: {
-        contentBg: "#18181b",
-        headerBg: "#18181b",
+        contentBg: "#141416",
+        headerBg: "#141416",
+      },
+      Card: {
+        colorBorderSecondary: "#1a1a1d",
+      },
+      Button: {
+        borderRadius: 10,
+        primaryShadow: "0 8px 24px rgba(45, 212, 191, 0.2)",
+      },
+      Input: {
+        borderRadius: 10,
       },
     },
   };

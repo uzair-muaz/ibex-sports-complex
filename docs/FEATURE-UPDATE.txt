@@ -22,6 +22,7 @@ The same backend powers the website and a future mobile app (Flutter), with docu
 Website
 - Marketing pages for facilities, amenities, membership, contact
 - Mobile-friendly layout
+- Site navigation: logo left; Home, Book Now, and Sign In (or account avatar) on the right
 
 Court booking
 - Choose sport / court type, date, and duration
@@ -35,10 +36,12 @@ Court booking
 Guest booking (no login required)
 - Anyone can book with name, email, and phone
 - Booking is saved against their email
+- Checkout offers optional sign-in / create account without blocking the booking
 
 Optional sign-in during booking
 - Guests are encouraged to sign in to track bookings and earn rewards
 - Sign-in is optional today — checkout is not blocked
+- “Continue as guest” remains available from the login page when booking
 
 After the visit
 - Booking verification page with QR for venue entry
@@ -48,17 +51,24 @@ After the visit
 3. Customer login & account dashboard
 -------------------------------------
 
-Login
-- Customers sign in with Google
-- After login they land in My Account
-- Mobile apps can use the same Google login via the API
+Sign in / sign up (member access)
+- Customers can sign in with Google or email + password
+- New customers can create an account with name, email, phone (required), and password
+- Forgot password: request a one-hour email reset link (works for Google accounts too, so they can set a password)
+- Reset password page completes the link and returns the customer to sign in
+- Google-only users can later set a password from My Account so email login works too
+- Auth pages use a full-screen branded layout (brand panel + form), with the public navbar; no marketing footer on those pages
+- After login, customers land in My Account (staff are redirected to admin)
 
-My Account includes
+My Account (sidebar dashboard)
+- Dedicated account shell (sidebar + content) — separate from the marketing site chrome
+- Sections: Profile, My Bookings, Rewards, Membership, Support
 
   Profile
   - View and update name and phone
-  - Email from Google (read-only)
+  - Email (from Google or registration)
   - Profile photo when available from Google
+  - Set or change password (including for accounts that started with Google only)
   - Automatic link of past guest bookings made with the same email
 
   My Bookings
@@ -94,11 +104,13 @@ My Account includes
 Capability                          | Guest                    | Logged-in customer
 ------------------------------------|--------------------------|--------------------
 Book a court                        | Yes                      | Yes
+Sign up / sign in (Google or email) | Can create account       | Already signed in
 My Account dashboard                | No (must sign in)        | Yes
 Earn & redeem loyalty               | No                       | Yes
 Use membership hours                | No                       | Yes
 Cancel from account                 | No                       | Yes (within rules)
 Past bookings linked after signup   | Yes (by email match)     | Already linked
+Forgot / reset password             | N/A                      | Yes (email link)
 
 
 5. Admin dashboard (staff)
@@ -109,6 +121,7 @@ Modern staff UI with light and dark mode.
 Access
 - Admin / Super Admin only
 - Customers cannot open admin; staff are kept in admin
+- Staff sign-in page: branded split layout (Operations / Staff console), email + password only
 
 Features
 - Bookings — list, search, create, edit, extend, manage payments (cash / online received)
@@ -128,7 +141,8 @@ A single, documented HTTP API is available for the website and mobile app.
 
 - Interactive docs (Swagger UI): available at /docs on the deployed site
 - OpenAPI specification: machine-readable API contract for web and Flutter
-- Coverage: public booking & courts, customer account, admin operations, mobile Google auth
+- Coverage: public booking & courts, customer account, admin operations, mobile Google auth,
+  customer register, forgot/reset password, and account password update
 - Purpose: client and mobile developers can review and test every endpoint without guessing
 
 This meets the requirement for Swagger / OpenAPI documentation of the product API.
@@ -139,7 +153,8 @@ This meets the requirement for Swagger / OpenAPI documentation of the product AP
 
 Operations & trust
 - Clear separation of customer vs staff access
-- Secure login for customers (Google) and staff
+- Customer login: Google and email/password; staff: email/password
+- Password recovery by email (secure one-hour reset link)
 - Faster, more reliable booking availability checks
 - Safer handling of membership hours and loyalty points when many people book at once
 
@@ -171,6 +186,8 @@ Quality
 ------------------------------------
 
 1. Guest: Book a court without logging in → receive confirmation.
-2. Customer: Sign in with Google → see claimed bookings → book again using points or membership → cancel (if allowed).
-3. Staff: Open admin → manage bookings, activate a membership, reply to support, review analytics.
-4. API docs: Open /docs → browse Swagger and try sample API calls.
+2. Customer: Create an account (email + phone) or Sign in with Google → see claimed bookings →
+   book again using points or membership → cancel (if allowed).
+3. Password recovery: Forgot password → open email link → set new password → sign in.
+4. Staff: Open admin → manage bookings, activate a membership, reply to support, review analytics.
+5. API docs: Open /docs → browse Swagger and try sample API calls.

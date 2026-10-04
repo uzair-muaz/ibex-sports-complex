@@ -34,7 +34,7 @@ export default function MyBookingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2">
+      <div className="inline-flex gap-1 rounded-2xl border border-white/10 bg-zinc-950/80 p-1">
         {(
           [
             ["upcoming", `Upcoming (${upcoming.length})`],
@@ -46,10 +46,10 @@ export default function MyBookingsPage() {
             type="button"
             onClick={() => setTab(key)}
             className={cn(
-              "rounded-xl px-4 py-2 text-sm font-medium",
+              "rounded-xl px-4 py-2 text-sm font-medium transition-colors",
               tab === key
                 ? "bg-[#2DD4BF] text-[#0F172A]"
-                : "bg-white/5 text-zinc-300",
+                : "text-zinc-400 hover:text-white",
             )}
           >
             {label}
@@ -58,7 +58,7 @@ export default function MyBookingsPage() {
       </div>
 
       {list.length === 0 ? (
-        <div className="rounded-3xl border border-white/10 bg-zinc-900/60 p-10 text-center text-zinc-400">
+        <div className="rounded-2xl border border-dashed border-white/15 bg-zinc-950/60 px-6 py-14 text-center text-zinc-400">
           No {tab} bookings.{" "}
           <Link href="/booking" className="text-[#2DD4BF] hover:underline">
             Book a slot
@@ -73,7 +73,7 @@ export default function MyBookingsPage() {
               <li key={b._id}>
                 <Link
                   href={`/account/bookings/${b._id}`}
-                  className="flex flex-col gap-1 rounded-2xl border border-white/10 bg-zinc-900/60 px-5 py-4 transition-colors hover:border-[#2DD4BF]/40 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-1 rounded-2xl border border-white/10 bg-zinc-950/80 px-5 py-4 shadow-sm transition-colors hover:border-[#2DD4BF]/40 hover:bg-zinc-900/80 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
                     <p className="font-medium text-white">
