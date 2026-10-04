@@ -8,7 +8,7 @@ import {
   AnimatedClockIcon,
   AnimatedInstagramIcon,
   AnimatedFacebookIcon,
-} from "@/components/ui/LottieIcon";
+} from "@/components/ui/AnimatedIcons";
 
 export const GetInTouchSection = () => {
   const mapUrl = "https://maps.app.goo.gl/4SJSmPKZHhHhF3tMA?g_st=ic";

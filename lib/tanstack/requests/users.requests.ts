@@ -1,29 +1,30 @@
-import {
-  createUser,
-  deleteUser,
-  getAllUsers,
-  updateUser,
-  type CreateUserInput,
-  type UpdateUserInput,
-} from "@/app/actions/users";
+import { bffFetch } from "@/lib/bff/client";
+import type { CreateUserInput, UpdateUserInput } from "@/app/actions/users";
 import type { AdminUser } from "@/lib/tanstack/types/users.types";
+import type { ActionResult } from "@/lib/tanstack/requests/bookings.requests";
 
 export async function fetchAllUsers() {
-  const result = await getAllUsers();
-  if (!result.success) {
-    throw new Error(result.error ?? "Failed to fetch users");
-  }
-  return result.users as AdminUser[];
+  const data = await bffFetch<{ users: AdminUser[] }>("/api/v1/admin/users");
+  return data.users;
 }
 
 export async function requestCreateUser(input: CreateUserInput) {
-  return createUser(input);
+  return bffFetch<ActionResult<{ user?: AdminUser }>>("/api/v1/admin/users", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function requestUpdateUser(input: UpdateUserInput) {
-  return updateUser(input);
+  return bffFetch<ActionResult<{ user?: AdminUser }>>("/api/v1/admin/users", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function requestDeleteUser(userId: string) {
-  return deleteUser(userId);
+  return bffFetch<ActionResult>(
+    `/api/v1/admin/users?userId=${encodeURIComponent(userId)}`,
+    { method: "DELETE" },
+  );
 }

@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "skills": {
+    "accessibility-auditing": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/accessibility-auditing/SKILL.md",
+      "computedHash": "75ae5e48601a97cc5c71c6bf8fc926d5e2d2da0429c63a99efd3a07bb6ce949d"
+    },
+    "adding-api-docs": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/adding-api-docs/SKILL.md",
+      "computedHash": "de4a3a532f613bea87818ff3cc81197164717c3e196104865ae52c96dd355926"
+    },
+    "api-smoke-testing": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/api-smoke-testing/SKILL.md",
+      "computedHash": "8f931d8c54e71db19e37c794e5bed420181121ac87b15eadbf2ee728292cb35b"
+    },
+    "auditing-security": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/auditing-security/SKILL.md",
+      "computedHash": "a9da2b16a234fadd1cbda895fbae971d06e997a38e57a7aa6eb59b47bb52b7a8"
+    },
+    "auto-type-checking": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/auto-type-checking/SKILL.md",
+      "computedHash": "2f10b5f6a982490679c9d357b997763faeb10f62508836eee9dc3727eb6e3f68"
+    },
+    "babysitting-pr": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/babysitting-pr/SKILL.md",
+      "computedHash": "7be8c3a3bc7309e51f041fcb7650191ff9455d1b5e25c0a79f4fd623cb363abf"
+    },
+    "best-of-n-solving": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/best-of-n-solving/SKILL.md",
+      "computedHash": "eda09276b64cd5d6b363f6d82c6c9a7d5e15cc9cb33ffc5f5426ce68ae7e8c30"
+    },
+    "building-skills-from-patterns": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/building-skills-from-patterns/SKILL.md",
+      "computedHash": "9c3a97daabf42387c850d7cd4ae730d98d18258dc5093ace30128eaaace2665c"
+    },
+    "codebase-onboarding": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/codebase-onboarding/SKILL.md",
+      "computedHash": "2cdeb094404ec0138c95607dc2187323676ee55090564d09a90da1a1f2889869"
+    },
+    "creating-pr": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/creating-pr/SKILL.md",
+      "computedHash": "e6adeaebb3bc0070a16747b31f0801c63f3896c4cac2fff7292ff7914f056df2"
+    },
+    "dark-mode-testing": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/dark-mode-testing/SKILL.md",
+      "computedHash": "cf0b018bba8005746d36d8f3c6efbf4e6852a673377709b220d066b2ae505b8e"
+    },
+    "detecting-port-conflicts": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/detecting-port-conflicts/SKILL.md",
+      "computedHash": "e71e7026b536cfffe7f616eed350b5761fe9d176f2af3abae3c582caac7857cd"
+    },
+    "finding-dev-server-url": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/finding-dev-server-url/SKILL.md",
+      "computedHash": "cca75ea59238f7036c0475e79c3061a046ceab1dcefd3557cfc6f0601678874e"
+    },
+    "form-testing": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/form-testing/SKILL.md",
+      "computedHash": "0e44cad6f7ece6a57694b9086804a690f0570c23aa9a976f29b4b09626cbffde"
+    },
+    "grinding-until-pass": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/grinding-until-pass/SKILL.md",
+      "computedHash": "0f19fd2326f6ed387def061f954369612eae543e490f47ccc8136852766969f8"
+    },
+    "monitoring-terminal-errors": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/monitoring-terminal-errors/SKILL.md",
+      "computedHash": "b5d28c9ebd28471f8c0de4c9549b0e58c7bb19f662a78d051c2739e712c59956"
+    },
+    "parallel-exploring": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/parallel-exploring/SKILL.md",
+      "computedHash": "a546786e7696e143e87df8d8f882ff6092d8b260dee3da9b0f57968942b758b6"
+    },
+    "responsive-testing": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/responsive-testing/SKILL.md",
+      "computedHash": "483ac60fc6d971389c62f026d19e870cd10e8c5cd5f50e16b28244a728528a42"
+    },
+    "reviewing-code": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/reviewing-code/SKILL.md",
+      "computedHash": "849ffd33cf1072d21af988bbf98d3701637640d86d33d5b4db16c5c35339b549"
+    },
+    "suggesting-cursor-rules": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/suggesting-cursor-rules/SKILL.md",
+      "computedHash": "dd458479fdfb56d9624949888f0b1de9343c5428ef701455958dd9060f207463"
+    },
+    "systematic-debugging": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/systematic-debugging/SKILL.md",
+      "computedHash": "bc589d8370a294e47999250d33647c5a37c911d809b4afb39b34a7f069010eda"
+    },
+    "vercel-composition-patterns": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/composition-patterns/SKILL.md",
+      "computedHash": "575757e3e25761c8c562d6e395d29f0b76c98b1273c0bd72d88e6ab1bc9c7d42"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "ca7b0c0c6e5f2750043f7f0cd72d16ac4e2abc48f9b5500d047a4b77a2506212"
+    },
+    "verifying-in-browser": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/verifying-in-browser/SKILL.md",
+      "computedHash": "efc3c7e43c402fe05929a6413448b0ce95dab7b673b0f805245f03c1dc3412a4"
+    },
+    "visual-qa-testing": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/visual-qa-testing/SKILL.md",
+      "computedHash": "41c3266cfd34e720b26821e4a9620919e346b694b2ba6dddd3a4cada5bb5e903"
+    },
+    "writing-commit-messages": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/writing-commit-messages/SKILL.md",
+      "computedHash": "a995c4fc9127a677b3ddc6cbeba0fdc981d6da4d7fa84d63de412ba3efeeeb29"
+    }
+  }
+}

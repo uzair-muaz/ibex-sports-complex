@@ -21,18 +21,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/ui/date-picker";
 
 import { getCourts } from "../actions/courts";
 import {
-  createBooking,
   getQuickSlotCourtAvailability,
   type AvailableStartTimeQuote,
 } from "../actions/bookings";
+import { maxRedeemablePoints } from "@/lib/loyalty-rules";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
 import { useBookingAvailability } from "@/components/booking/hooks/useBookingAvailability";
+import Link from "next/link";
+import {
+  createPublicBookingRequest,
+  fetchMyLoyalty,
+  fetchMyMembership,
+} from "@/lib/tanstack/requests/account.requests";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
 type CheckoutFormErrors = {
@@ -137,6 +142,17 @@ function isHourInPeriod(
 export default function BookingClient() {
   const { data: session } = useSession();
   const userRole = session?.user?.role;
+  const isCustomerLoggedIn =
+    !!session?.user && userRole !== "admin" && userRole !== "super_admin";
+
+  const [useLoyalty, setUseLoyalty] = useState(false);
+  const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
+  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
+  const [useMembershipHours, setUseMembershipHours] = useState(false);
+  const [useGuestPass, setUseGuestPass] = useState(false);
+  const [membershipHoursRemaining, setMembershipHoursRemaining] = useState(0);
+  const [guestPassesRemaining, setGuestPassesRemaining] = useState(0);
+  const [hasMembership, setHasMembership] = useState(false);
   const canQuickCheck = userRole === "admin" || userRole === "super_admin";
 
   // Default to opening date if today is before it
@@ -211,6 +227,60 @@ export default function BookingClient() {
     () => formatLocalDate(quickCheckDate),
     [quickCheckDate],
   );
+
+  // Prefill checkout + load loyalty/membership for customers
+  useEffect(() => {
+    if (!isCustomerLoggedIn || !session?.user) return;
+    setFormData((prev) => ({
+      name: prev.name || session.user.name || "",
+      email: prev.email || session.user.email || "",
+      phone: prev.phone || session.user.phone || "",
+    }));
+    void (async () => {
+      const [loyalty, membership] = await Promise.all([
+        fetchMyLoyalty().catch(() => null),
+        fetchMyMembership().catch(() => null),
+      ]);
+      if (loyalty) {
+        setLoyaltyBalance(loyalty.balance);
+      }
+      const mem = membership?.membership as
+        | { hoursRemaining?: number; guestPassesRemaining?: number }
+        | null
+        | undefined;
+      if (mem) {
+        setHasMembership(true);
+        setMembershipHoursRemaining(mem.hoursRemaining || 0);
+        setGuestPassesRemaining(mem.guestPassesRemaining || 0);
+      } else {
+        setHasMembership(false);
+        setMembershipHoursRemaining(0);
+        setGuestPassesRemaining(0);
+      }
+    })();
+  }, [isCustomerLoggedIn, session?.user]);
+
+  const maxLoyaltyRedeem = useMemo(() => {
+    if (!selectedQuote) return 0;
+    return maxRedeemablePoints(loyaltyBalance, selectedQuote.totalPrice);
+  }, [loyaltyBalance, selectedQuote]);
+
+  useEffect(() => {
+    if (!useLoyalty) {
+      setLoyaltyPointsToRedeem(0);
+      return;
+    }
+    setLoyaltyPointsToRedeem((prev) =>
+      prev > 0 ? Math.min(prev, maxLoyaltyRedeem) : maxLoyaltyRedeem,
+    );
+  }, [useLoyalty, maxLoyaltyRedeem]);
+
+  useEffect(() => {
+    if (useMembershipHours) {
+      setUseLoyalty(false);
+      setLoyaltyPointsToRedeem(0);
+    }
+  }, [useMembershipHours]);
 
   // Load court types on mount
   useEffect(() => {
@@ -500,7 +570,7 @@ export default function BookingClient() {
     setFormStatus("loading");
     setCheckoutError("");
     try {
-      const result = await createBooking({
+      const result = await createPublicBookingRequest({
         courtType: selectedCourtType,
         date: dateString,
         startTime: selectedQuote.startTime,
@@ -508,10 +578,20 @@ export default function BookingClient() {
         userName: formData.name.trim(),
         userEmail: email,
         userPhone: normalizedPhone,
+        loyaltyPointsToRedeem:
+          isCustomerLoggedIn && useLoyalty && !useMembershipHours
+            ? loyaltyPointsToRedeem
+            : undefined,
+        useMembershipHours:
+          isCustomerLoggedIn && useMembershipHours ? true : undefined,
+        useGuestPass:
+          isCustomerLoggedIn && useMembershipHours && useGuestPass
+            ? true
+            : undefined,
       });
 
       if (result.success) {
-        setCreatedBooking(result.booking);
+        setCreatedBooking(result.booking as CreatedBooking);
         setFormStatus("success");
         setShowCheckoutModal(false);
       } else {
@@ -558,6 +638,15 @@ export default function BookingClient() {
             A 50% advance payment is required to confirm bookings. Reservations
             without advance may be cancelled. All advance payments are
             non-refundable.
+            {!isCustomerLoggedIn ? (
+              <>
+                {" "}
+                <Link href="/login" className="text-[#2DD4BF] underline">
+                  Sign in
+                </Link>{" "}
+                to track bookings and earn rewards.
+              </>
+            ) : null}
           </div>
 
           {/* Date trigger */}
@@ -814,15 +903,18 @@ export default function BookingClient() {
               <div className="flex items-center gap-3 flex-wrap mb-4">
                 <div className="w-[210px]">
                   <div className="text-xs text-zinc-400 mb-2">Date</div>
-                  <DatePicker
-                    date={quickCheckDate}
-                    onDateChange={(d) => {
-                      if (!d) return;
-                      setQuickCheckDate(d);
-                      loadQuickCheck(formatLocalDate(d));
+                  <input
+                    type="date"
+                    value={quickCheckDateKey}
+                    min={formatLocalDate(quickCheckMinDate)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (!value) return;
+                      const next = dateKeyToLocalDate(value);
+                      setQuickCheckDate(next);
+                      void loadQuickCheck(value);
                     }}
-                    variant="admin"
-                    minDate={quickCheckMinDate}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-white"
                   />
                 </div>
               </div>
@@ -934,6 +1026,20 @@ export default function BookingClient() {
         formStatus={formStatus}
         formData={formData}
         formErrors={formErrors}
+        isLoggedIn={isCustomerLoggedIn}
+        loyaltyBalance={loyaltyBalance}
+        maxLoyaltyRedeem={maxLoyaltyRedeem}
+        useLoyalty={useLoyalty}
+        loyaltyPointsToRedeem={loyaltyPointsToRedeem}
+        hasMembership={hasMembership}
+        membershipHoursRemaining={membershipHoursRemaining}
+        guestPassesRemaining={guestPassesRemaining}
+        useMembershipHours={useMembershipHours}
+        useGuestPass={useGuestPass}
+        onUseLoyaltyChange={setUseLoyalty}
+        onLoyaltyPointsChange={setLoyaltyPointsToRedeem}
+        onUseMembershipChange={setUseMembershipHours}
+        onUseGuestPassChange={setUseGuestPass}
         onClose={() => setShowCheckoutModal(false)}
         onFieldChange={handleFieldChange}
         onSubmit={handleSubmit}

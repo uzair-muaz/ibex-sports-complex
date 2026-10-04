@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { CheckOutlined } from "@ant-design/icons";
 import type { Court, CourtPricingPeriod } from "@/types";
 import { getPricePerHourForTime } from "@/lib/pricing-utils";
 import { cn } from "@/lib/utils";
@@ -46,31 +46,31 @@ function AdminSlotCard({
       className={cn(
         "relative h-28 rounded-3xl border transition-all duration-300 flex flex-col items-start justify-between p-5 overflow-hidden",
         isBooked &&
-          "bg-zinc-900/12 border-white/10 text-zinc-700 cursor-not-allowed opacity-55 bg-[repeating-linear-gradient(-45deg,rgba(255,255,255,0.02)_0px,rgba(255,255,255,0.02)_6px,transparent_6px,transparent_14px)] ring-1 ring-red-500/25",
+          "bg-[var(--ant-color-fill-tertiary)] border-[var(--ant-color-border)] text-[var(--ant-color-text-secondary)] cursor-not-allowed opacity-55 bg-[repeating-linear-gradient(-45deg,rgba(0,0,0,0.03)_0px,rgba(0,0,0,0.03)_6px,transparent_6px,transparent_14px)] ring-1 ring-red-500/25",
         !isBooked &&
           isSelected &&
-          "bg-[#2DD4BF] border-[#2DD4BF] text-black scale-[0.98] shadow-[0_10px_30px_rgba(45,212,191,0.2)]",
+          "bg-[var(--ant-color-primary)] border-[var(--ant-color-primary)] text-[rgba(15,23,42,1)] scale-[0.98] shadow-[0_10px_30px_rgba(45,212,191,0.2)]",
         !isBooked &&
           !isSelected &&
           blocked &&
-          "bg-zinc-800/50 border border-zinc-700 cursor-not-allowed opacity-50",
+          "bg-[var(--ant-color-fill-secondary)] border border-[var(--ant-color-border)] cursor-not-allowed opacity-50",
         !isBooked &&
           !isSelected &&
           !blocked &&
-          "bg-zinc-900/40 border-white/10 hover:border-white/20 active:scale-95",
+          "bg-[var(--ant-color-bg-elevated)] border-[var(--ant-color-border)] hover:border-[var(--ant-color-primary)] active:scale-95",
       )}
     >
       <div className="flex justify-between w-full items-start">
         <span
           className={cn(
             "text-[10px] font-black uppercase tracking-tighter",
-            isSelected ? "text-black/60" : "text-zinc-700",
-            isBooked && "text-zinc-600",
+            isSelected ? "text-[rgba(15,23,42,0.6)]" : "text-[var(--ant-color-text-secondary)]",
+            isBooked && "text-[var(--ant-color-text-secondary)]",
           )}
         >
           {isBooked ? "Booked" : "START"}
         </span>
-        {isSelected ? <Check size={16} className="text-black" /> : null}
+        {isSelected ? <CheckOutlined style={{ fontSize: 16, color: "rgba(15,23,42,1)" }} /> : null}
         {isPeak && !isSelected && !isBooked ? (
           <div className="w-1.5 h-1.5 rounded-full bg-amber-400 ring-1 ring-amber-400/40 shrink-0" />
         ) : null}
@@ -79,9 +79,9 @@ function AdminSlotCard({
         <span
           className={cn(
             "text-xl font-black leading-none mb-1 tracking-tighter",
-            isSelected ? "text-black" : "text-white",
-            isBooked && "text-zinc-500",
-            blocked && !isBooked && "text-zinc-400",
+            isSelected ? "text-[rgba(15,23,42,1)]" : "text-[var(--ant-color-text)]",
+            isBooked && "text-[var(--ant-color-text-secondary)]",
+            blocked && !isBooked && "text-[var(--ant-color-text-secondary)]",
           )}
         >
           {startLabel}
@@ -89,8 +89,8 @@ function AdminSlotCard({
         <span
           className={cn(
             "text-[9px] font-black uppercase tracking-[0.2em]",
-            isSelected ? "text-black/40" : "text-zinc-700",
-            isBooked && "text-zinc-600",
+            isSelected ? "text-[rgba(15,23,42,0.4)]" : "text-[var(--ant-color-text-secondary)]",
+            isBooked && "text-[var(--ant-color-text-secondary)]",
           )}
         >
           UNTIL {endLabel}
@@ -116,10 +116,10 @@ export function AdminCourtSlotCards({
       {courts.map((court) => (
         <div
           key={court._id}
-          className="rounded-3xl border border-white/10 bg-zinc-900/40 p-5 md:p-6 space-y-5 shadow-[0_20px_50px_rgba(0,0,0,0.35)]"
+          className="rounded-3xl border border-[var(--ant-color-border)] bg-[var(--ant-color-bg-elevated)] p-5 md:p-6 space-y-5 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
         >
-          <div className="space-y-1 pb-4 border-b border-white/10">
-            <h3 className="text-lg font-bold text-white tracking-tight">
+          <div className="space-y-1 pb-4 border-b border-[var(--ant-color-border)]">
+            <h3 className="text-lg font-bold text-[var(--ant-color-text)] tracking-tight">
               {court.name}
             </h3>
             {court.timeBasedPricingEnabled &&
@@ -127,19 +127,19 @@ export function AdminCourtSlotCards({
             court.pricingPeriods.length > 0 ? (
               <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-6 pt-1">
                 {court.pricingPeriods.map((period: CourtPricingPeriod, idx) => (
-                  <p key={idx} className="text-xs text-zinc-400">
-                    <span className="font-semibold text-zinc-300">
+                  <p key={idx} className="text-xs text-[var(--ant-color-text-secondary)]">
+                    <span className="font-semibold text-[var(--ant-color-text-secondary)]">
                       {period.label === "peak" ? "Peak" : "Off-peak"}
                     </span>
                     : PKR {period.pricePerHour.toLocaleString()}/hr{" "}
-                    <span className="text-zinc-500">
+                    <span className="text-[var(--ant-color-text-secondary)]">
                       ({formatPeriodTime(period)})
                     </span>
                   </p>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-[#2DD4BF] font-semibold">
+              <p className="text-sm text-[var(--ant-color-primary)] font-semibold">
                 PKR {court.pricePerHour.toLocaleString()}/hr
               </p>
             )}

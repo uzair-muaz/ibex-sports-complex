@@ -12,57 +12,40 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  CUSTOMER_CANCEL_MIN_HOURS_BEFORE_START,
+  MEMBERSHIP_LAPSE_GRACE_DAYS,
+  MEMBERSHIP_PLAN_SEEDS,
+  MEMBERSHIP_VALIDITY_DAYS,
+  MEMBERSHIP_WEEKDAY_ADVANCE_HOURS,
+  MEMBERSHIP_WEEKEND_ADVANCE_HOURS,
+} from "@/lib/membership-rules";
 
 const CONTACT_PHONE = "+923255429429";
 const WHATSAPP_URL = `https://wa.me/${CONTACT_PHONE.replace(/\D/g, "")}`;
 
-const PLANS = [
-  {
-    name: "Bronze",
-    price: 52500,
-    hours: 15,
-    highlight: false,
-    features: ["15 court hours", "Weekday access", "Basic booking"],
-  },
-  {
-    name: "Silver",
-    price: 76800,
-    hours: 24,
-    highlight: false,
-    features: ["24 court hours", "Full week access", "Priority booking"],
-  },
-  {
-    name: "Gold",
-    price: 96000,
-    hours: 32,
-    highlight: true,
-    features: [
-      "32 court hours",
-      "Full week access",
-      "Priority booking",
-      "Guest passes",
-    ],
-  },
-  {
-    name: "Platinum",
-    price: 112000,
-    hours: 40,
-    highlight: false,
-    features: [
-      "40 court hours",
-      "Full week access",
-      "Priority booking",
-      "Guest passes",
-      "Hive Cafe perks",
-    ],
-  },
-];
+const PLANS = MEMBERSHIP_PLAN_SEEDS.map((plan) => ({
+  name: plan.name,
+  price: plan.price,
+  hours: plan.hours,
+  highlight: plan.slug === "gold",
+  features: [
+    `${plan.hours} court hours`,
+    plan.weekdayOnly ? "Weekday access" : "Full week access",
+    ...(plan.priorityBadge ? ["Priority member badge"] : []),
+    ...(plan.guestPassesPerPeriod > 0
+      ? [`${plan.guestPassesPerPeriod} guest passes / period`]
+      : []),
+  ],
+}));
 
 const TERMS = [
-  "Valid for one month from date of purchase.",
-  "Slot booking must be confirmed at least 2 hours in advance on weekdays.",
-  "Slot booking must be confirmed at least 1 day in advance on weekends.",
-  "Unused hours carry forward upon membership renewal or extension.",
+  `Valid for ${MEMBERSHIP_VALIDITY_DAYS} days from date of purchase.`,
+  `Slot booking must be confirmed at least ${MEMBERSHIP_WEEKDAY_ADVANCE_HOURS} hours in advance on weekdays.`,
+  `Slot booking must be confirmed at least ${MEMBERSHIP_WEEKEND_ADVANCE_HOURS} hours in advance on weekends.`,
+  `Unused hours carry forward on renewal (grace ${MEMBERSHIP_LAPSE_GRACE_DAYS} days after expiry).`,
+  `Online cancel allowed until ${CUSTOMER_CANCEL_MIN_HOURS_BEFORE_START} hours before start.`,
+  "Membership purchase is currently activated by staff after WhatsApp confirmation (online payments coming soon).",
 ];
 
 export const MembershipSection = () => {
@@ -77,11 +60,17 @@ export const MembershipSection = () => {
               Get Started
             </DialogTitle>
             <DialogDescription className="text-zinc-400 text-base leading-relaxed">
-              Drop us a message on WhatsApp or give us a call. Our team will get
-              in touch with you shortly.
+              Sign in to your Ibex account, then message us on WhatsApp. Our team
+              activates your membership hours after payment.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <a
+              href="/account/membership"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2DD4BF] hover:bg-[#14B8A6] text-[#0F172A] font-semibold py-3 px-4 transition-colors"
+            >
+              Open membership
+            </a>
             <a
               href={WHATSAPP_URL}
               target="_blank"

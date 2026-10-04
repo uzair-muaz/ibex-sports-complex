@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getAllBookings } from "@/app/actions/bookings";
+import { getBookingForVerification } from "@/app/actions/bookings";
 import type { Booking, Court, AppliedDiscount } from "@/types";
 
 export default function VerifyBookingPage() {
@@ -29,16 +29,11 @@ export default function VerifyBookingPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await getAllBookings();
-      if (result.success) {
-        const foundBooking = result.bookings.find((b: Booking) => b._id === bookingId);
-        if (foundBooking) {
-          setBooking(foundBooking);
-        } else {
-          setError("Booking not found");
-        }
+      const result = await getBookingForVerification(bookingId);
+      if (result.success && result.booking) {
+        setBooking(result.booking as Booking);
       } else {
-        setError("Failed to load booking");
+        setError(result.error || "Booking not found");
       }
     } catch {
       setError("An error occurred while loading the booking");

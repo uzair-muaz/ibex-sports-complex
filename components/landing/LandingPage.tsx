@@ -1,42 +1,77 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { HeroSection } from "@/components/sections/HeroSection";
-import { FacilitiesSection } from "@/components/sections/FacilitiesSection";
-import { AmenitiesSection } from "@/components/sections/AmenitiesSection";
-import { MembershipSection } from "@/components/sections/MembershipSection";
-import { GetInTouchSection } from "@/components/sections/GetInTouchSection";
-import { InfiniteGallery } from "@/components/ui/InfiniteScroll";
-import { ParallaxSection } from "@/components/ui/ParallaxSection";
+import { MarqueeSection } from "@/components/sections/MarqueeSection";
 import { SectionThemeProvider } from "@/contexts/SectionThemeContext";
 import { SectionWrapper } from "@/components/landing/SectionWrapper";
-import { LifestyleParallaxBg } from "@/components/landing/LifestyleParallaxBg";
-import { MarqueeSection } from "@/components/sections/MarqueeSection";
 import { GALLERY_IMAGES } from "@/types";
+
+const FacilitiesSection = dynamic(
+  () =>
+    import("@/components/sections/FacilitiesSection").then(
+      (m) => m.FacilitiesSection,
+    ),
+  { ssr: true },
+);
+const AmenitiesSection = dynamic(
+  () =>
+    import("@/components/sections/AmenitiesSection").then(
+      (m) => m.AmenitiesSection,
+    ),
+  { ssr: true },
+);
+const MembershipSection = dynamic(
+  () =>
+    import("@/components/sections/MembershipSection").then(
+      (m) => m.MembershipSection,
+    ),
+  { ssr: true },
+);
+const GetInTouchSection = dynamic(
+  () =>
+    import("@/components/sections/GetInTouchSection").then(
+      (m) => m.GetInTouchSection,
+    ),
+  { ssr: true },
+);
+const InfiniteGallery = dynamic(
+  () =>
+    import("@/components/ui/InfiniteScroll").then((m) => m.InfiniteGallery),
+  { ssr: true },
+);
+const ParallaxSection = dynamic(
+  () =>
+    import("@/components/ui/ParallaxSection").then((m) => m.ParallaxSection),
+  { ssr: true },
+);
+const LifestyleParallaxBg = dynamic(
+  () =>
+    import("@/components/landing/LifestyleParallaxBg").then(
+      (m) => m.LifestyleParallaxBg,
+    ),
+  { ssr: true },
+);
 
 export function LandingPage() {
   return (
     <SectionThemeProvider>
       <>
         <main id="main-content" className="relative" tabIndex={-1}>
-          {/* 1 — Hero */}
           <SectionWrapper id="hero">
             <HeroSection />
           </SectionWrapper>
 
-          {/* Ticker */}
           <MarqueeSection text="Paddle · Pickleball · Futsal" />
 
-          {/* 2 — Facilities (Choose Your Arena) */}
           <SectionWrapper id="facilities">
             <FacilitiesSection />
           </SectionWrapper>
 
-          {/* 3 — Hive Cafe (The Social Hub) */}
           <SectionWrapper id="amenities">
             <AmenitiesSection />
           </SectionWrapper>
 
-          {/* 4 — Lifestyle gallery */}
           <SectionWrapper id="lifestyle" useChapterBg className="relative">
             <LifestyleParallaxBg />
             <ParallaxSection speed={0.1}>
@@ -54,12 +89,10 @@ export function LandingPage() {
             </ParallaxSection>
           </SectionWrapper>
 
-          {/* 5 — Membership (Join the Ibex Community) */}
           <SectionWrapper id="membership">
             <MembershipSection />
           </SectionWrapper>
 
-          {/* 6 — Get in Touch (unchanged) */}
           <SectionWrapper id="contact">
             <GetInTouchSection />
           </SectionWrapper>

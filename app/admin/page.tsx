@@ -57,20 +57,20 @@ function AdminLoginForm() {
 
   if (status === "loading" || session) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--ant-color-bg-base)]">
         <Spin size="large" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-black px-4">
-      <Card className="w-full max-w-sm border-zinc-800" styles={{ body: { paddingTop: 8 } }}>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--ant-color-bg-base)] px-4">
+      <Card className="w-full max-w-sm border-[var(--ant-color-border)]" styles={{ body: { paddingTop: 8 } }}>
         <div className="mb-6 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#2DD4BF]">
-            <LockOutlined className="text-xl text-[#0F172A]" />
+            <LockOutlined className="text-xl text-[rgba(15,23,42,1)]" />
           </div>
-          <Title level={3} className="!mb-1 !text-white">
+          <Title level={3} className="!mb-1 !text-[var(--ant-color-text)]">
             Admin Access
           </Title>
           <Text type="secondary">Sign in to manage court bookings</Text>

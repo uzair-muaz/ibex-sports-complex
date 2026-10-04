@@ -1,42 +1,54 @@
-import {
-  createDiscount,
-  deleteDiscount,
-  getDiscountById,
-  getDiscounts,
-  toggleDiscountActive,
-  updateDiscount,
-  type CreateDiscountInput,
-  type UpdateDiscountInput,
+import { bffFetch } from "@/lib/bff/client";
+import type {
+  CreateDiscountInput,
+  UpdateDiscountInput,
 } from "@/app/actions/discounts";
+import type { ActionResult } from "@/lib/tanstack/requests/bookings.requests";
 
 export async function fetchDiscounts() {
-  const result = await getDiscounts();
-  if (!result.success) {
-    throw new Error(result.error ?? "Failed to fetch discounts");
-  }
-  return result.discounts;
+  const data = await bffFetch<{ discounts: unknown[] }>(
+    "/api/v1/admin/discounts",
+  );
+  return data.discounts;
 }
 
 export async function fetchDiscountById(discountId: string) {
-  const result = await getDiscountById(discountId);
-  if (!result.success) {
-    throw new Error(result.error ?? "Failed to fetch discount");
-  }
-  return result.discount;
+  const data = await bffFetch<{ discount: unknown }>(
+    `/api/v1/admin/discounts?discountId=${encodeURIComponent(discountId)}`,
+  );
+  return data.discount;
 }
 
 export async function requestCreateDiscount(input: CreateDiscountInput) {
-  return createDiscount(input);
+  return bffFetch<ActionResult<{ discount?: unknown }>>(
+    "/api/v1/admin/discounts",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export async function requestUpdateDiscount(input: UpdateDiscountInput) {
-  return updateDiscount(input);
+  return bffFetch<ActionResult<{ discount?: unknown }>>(
+    "/api/v1/admin/discounts",
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export async function requestDeleteDiscount(discountId: string) {
-  return deleteDiscount(discountId);
+  return bffFetch<ActionResult>(
+    `/api/v1/admin/discounts?discountId=${encodeURIComponent(discountId)}`,
+    { method: "DELETE" },
+  );
 }
 
 export async function requestToggleDiscountActive(discountId: string) {
-  return toggleDiscountActive(discountId);
+  return bffFetch<ActionResult>("/api/v1/admin/discounts", {
+    method: "POST",
+    body: JSON.stringify({ action: "toggle", discountId }),
+  });
 }

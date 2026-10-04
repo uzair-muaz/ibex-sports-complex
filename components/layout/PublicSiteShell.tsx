@@ -1,5 +1,3 @@
-"use client";
-
 import { Navbar } from "@/components/Navbar";
 import { DiscountBanner } from "@/components/DiscountBanner";
 import { Footer } from "@/components/Footer";
@@ -8,6 +6,7 @@ type PublicSiteShellProps = {
   children: React.ReactNode;
 };
 
+/** Server shell — client islands live in Navbar / DiscountBanner. */
 export function PublicSiteShell({ children }: PublicSiteShellProps) {
   return (
     <div className="min-h-screen bg-[#050505] text-white overflow-x-hidden">

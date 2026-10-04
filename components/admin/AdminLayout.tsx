@@ -2,13 +2,14 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Layout,
   Menu,
   Button,
   Typography,
   theme,
+  Tooltip,
 } from "antd";
 import {
   BarChartOutlined,
@@ -22,7 +23,13 @@ import {
   ReloadOutlined,
   LogoutOutlined,
   DashboardOutlined,
+  CustomerServiceOutlined,
+  GiftOutlined,
+  BulbOutlined,
+  BulbFilled,
 } from "@ant-design/icons";
+import { useAdminTheme } from "@/components/admin/AdminAntdProvider";
+import { isSuperAdminRole } from "@/lib/authz";
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -48,11 +55,12 @@ export function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { token } = theme.useToken();
+  const { mode, toggleMode } = useAdminTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const userRole = (session?.user as { role?: string })?.role;
-  const isSuperAdmin = userRole === "super_admin";
+  const userRole = session?.user?.role;
+  const isSuperAdmin = isSuperAdminRole(userRole);
 
   const menuItems = useMemo(() => {
     const items = [];
@@ -78,6 +86,16 @@ export function AdminLayout({
         key: "/admin/feedback",
         icon: <MessageOutlined />,
         label: "Feedback",
+      },
+      {
+        key: "/admin/support",
+        icon: <CustomerServiceOutlined />,
+        label: "Support",
+      },
+      {
+        key: "/admin/memberships",
+        icon: <GiftOutlined />,
+        label: "Memberships",
       },
     );
     if (isSuperAdmin) {
@@ -116,13 +134,21 @@ export function AdminLayout({
       >
         <div
           className="flex h-10 w-10 items-center justify-center rounded-lg"
-          style={{ background: token.colorPrimary, color: "#0F172A" }}
+          style={{
+            background: token.colorPrimary,
+            color: mode === "dark" ? "rgba(15,23,42,1)" : "#ffffff",
+          }}
         >
           <DashboardOutlined style={{ fontSize: 20 }} />
         </div>
         {!collapsed && (
           <div>
-            <div className="font-semibold text-white">Admin Panel</div>
+            <div
+              className="font-semibold"
+              style={{ color: token.colorText }}
+            >
+              Admin Panel
+            </div>
             <Text type="secondary" className="text-xs">
               {isSuperAdmin ? "Super Admin" : "Admin"}
             </Text>
@@ -131,12 +157,13 @@ export function AdminLayout({
       </div>
 
       <Menu
-        theme="dark"
+        theme={mode === "dark" ? "dark" : "light"}
         mode="inline"
         selectedKeys={[selectedKey]}
         items={menuItems}
         onClick={({ key }) => handleNavigate(key)}
-        className="flex-1 border-none bg-transparent px-2 py-3"
+        className="flex-1 border-none px-2 py-3"
+        style={{ background: "transparent" }}
       />
 
       <div className="border-t p-4" style={{ borderColor: token.colorBorder }}>
@@ -148,18 +175,21 @@ export function AdminLayout({
             <Text type="secondary" className="text-xs">
               Logged in as
             </Text>
-            <div className="truncate text-sm font-medium text-white">
-              {(session?.user as { name?: string; email?: string })?.name ||
-                (session?.user as { email?: string })?.email}
+            <div
+              className="truncate text-sm font-medium"
+              style={{ color: token.colorText }}
+            >
+              {session?.user?.name || session?.user?.email}
             </div>
           </div>
         )}
         <Button
           type="text"
           icon={<LogoutOutlined />}
-          onClick={() => signOut()}
+          onClick={() => signOut({ callbackUrl: "/admin" })}
           block
-          className="justify-start text-zinc-400"
+          className="justify-start"
+          style={{ color: token.colorTextSecondary }}
         >
           {!collapsed && "Logout"}
         </Button>
@@ -168,7 +198,10 @@ export function AdminLayout({
   );
 
   return (
-    <Layout className="min-h-screen bg-black">
+    <Layout
+      className="min-h-screen"
+      style={{ background: token.colorBgBase }}
+    >
       <Sider
         width={256}
         collapsed={collapsed}
@@ -189,7 +222,8 @@ export function AdminLayout({
       {mobileOpen && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+            className="fixed inset-0 z-40 lg:hidden"
+            style={{ background: "rgba(0,0,0,0.45)" }}
             onClick={() => setMobileOpen(false)}
           />
           <Sider
@@ -205,7 +239,7 @@ export function AdminLayout({
         </>
       )}
 
-      <Layout className="min-h-screen bg-black">
+      <Layout className="min-h-screen" style={{ background: token.colorBgBase }}>
         <div
           className={`flex min-h-screen flex-col transition-all duration-300 ml-0 ${collapsed ? "lg:ml-[72px]" : "lg:ml-64"}`}
         >
@@ -238,7 +272,11 @@ export function AdminLayout({
                 onClick={() => setCollapsed((v) => !v)}
               />
               <div className="min-w-0">
-                <Title level={4} className="!mb-0 truncate !text-white">
+                <Title
+                  level={4}
+                  className="!mb-0 truncate"
+                  style={{ color: token.colorText }}
+                >
                   {title}
                 </Title>
                 {description && (
@@ -249,6 +287,16 @@ export function AdminLayout({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <Tooltip
+                title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                <Button
+                  type="text"
+                  aria-label="Toggle color theme"
+                  icon={mode === "dark" ? <BulbOutlined /> : <BulbFilled />}
+                  onClick={toggleMode}
+                />
+              </Tooltip>
               {onRefresh && (
                 <Button
                   icon={<ReloadOutlined spin={isLoading} />}
@@ -262,7 +310,12 @@ export function AdminLayout({
             </div>
           </Header>
 
-          <Content className="flex-1 bg-black p-4 sm:p-6">{children}</Content>
+          <Content
+            className="flex-1 p-4 sm:p-6"
+            style={{ background: token.colorBgBase }}
+          >
+            {children}
+          </Content>
         </div>
       </Layout>
     </Layout>

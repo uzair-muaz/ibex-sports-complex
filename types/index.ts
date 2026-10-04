@@ -52,6 +52,7 @@ export interface Booking {
   duration: number; // Hours
    /** Incremental booking serial (1, 2, 3, ...) */
   serialNumber?: number;
+  userId?: string;
   userName: string;
   userEmail: string;
   userPhone?: string;
@@ -59,6 +60,12 @@ export interface Booking {
   originalPrice: number;
   discounts: AppliedDiscount[];
   discountAmount: number;
+  loyaltyPointsRedeemed?: number;
+  loyaltyDiscountPkr?: number;
+  usedMembershipHours?: boolean;
+  membershipId?: string;
+  membershipHoursUsed?: number;
+  usedGuestPass?: boolean;
   totalPrice: number;
   amountPaid: number;
   amountReceivedOnline?: number;

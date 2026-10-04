@@ -78,7 +78,7 @@ export default function FeedbackPage() {
         sorter: (a, b) => (a.userName || "").localeCompare(b.userName || ""),
         render: (_, record) => (
           <div>
-            <div className="font-medium text-white">{record.userName}</div>
+            <div className="font-medium text-[var(--ant-color-text)]">{record.userName}</div>
             <Text type="secondary" className="text-xs">
               {record.userEmail}
             </Text>
@@ -115,7 +115,7 @@ export default function FeedbackPage() {
         key: "comment",
         width: 240,
         render: (_, record) => (
-          <p className="m-0 line-clamp-2 text-sm text-zinc-300">
+          <p className="m-0 line-clamp-2 text-sm text-[var(--ant-color-text-secondary)]">
             {record.comment || "No comment"}
           </p>
         ),
@@ -173,7 +173,7 @@ export default function FeedbackPage() {
             className="w-full sm:max-w-xl"
           />
 
-          <Card className="border-zinc-800" styles={{ body: { padding: 0 } }}>
+          <Card className="border-[var(--ant-color-border)]" styles={{ body: { padding: 0 } }}>
             <Table<FeedbackRecord>
               columns={columns}
               dataSource={filteredFeedbacks}

@@ -4,6 +4,7 @@ import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import bcrypt from 'bcryptjs';
 import { revalidatePath } from 'next/cache';
+import { requireStaffActor, type StaffActorOpts } from '@/lib/action-auth';
 
 export interface CreateUserInput {
   email: string;
@@ -12,8 +13,10 @@ export interface CreateUserInput {
   role: 'super_admin' | 'admin' | 'user';
 }
 
-export async function createUser(input: CreateUserInput) {
+export async function createUser(input: CreateUserInput, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts, { superAdmin: true });
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     // Check if user already exists
@@ -58,8 +61,10 @@ export interface UpdateUserInput {
   role?: 'super_admin' | 'admin' | 'user';
 }
 
-export async function updateUser(input: UpdateUserInput) {
+export async function updateUser(input: UpdateUserInput, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts, { superAdmin: true });
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     const { userId, password, ...updateData } = input;
@@ -107,8 +112,10 @@ export async function updateUser(input: UpdateUserInput) {
   }
 }
 
-export async function deleteUser(userId: string) {
+export async function deleteUser(userId: string, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts, { superAdmin: true });
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     const user = await User.findByIdAndDelete(userId);
@@ -131,8 +138,10 @@ export async function deleteUser(userId: string) {
   }
 }
 
-export async function getAllUsers() {
+export async function getAllUsers(opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts, { superAdmin: true });
+    if (!gate.ok) return { success: false, error: gate.error, users: [] };
     await connectDB();
 
     const users = await User.find()

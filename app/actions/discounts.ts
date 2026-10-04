@@ -10,6 +10,7 @@ import type {
 import { CourtType } from '@/models/Court';
 import { safeRevalidatePath } from '@/lib/safe-revalidate';
 import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from '@/lib/date-time';
+import { requireStaffActor, type StaffActorOpts } from '@/lib/action-auth';
 
 const PRICING_TIERS: DiscountPricingTier[] = ['any', 'peak', 'off_peak'];
 
@@ -196,8 +197,10 @@ function dateBoundaryUTC(input: string, boundary: "start" | "end"): Date {
   return new Date(Date.UTC(y, m, d, 23, 59, 59, 999));
 }
 
-export async function getDiscounts() {
+export async function getDiscounts(opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error, discounts: [] };
     await connectDB();
 
     const discounts = await Discount.find().sort({ createdAt: -1 }).lean();
@@ -216,8 +219,10 @@ export async function getDiscounts() {
   }
 }
 
-export async function getDiscountById(discountId: string) {
+export async function getDiscountById(discountId: string, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     const discount = await Discount.findById(discountId).lean();
@@ -326,8 +331,10 @@ export interface CreateDiscountInput {
   dayRules?: DayRuleInput[] | null;
 }
 
-export async function createDiscount(input: CreateDiscountInput) {
+export async function createDiscount(input: CreateDiscountInput, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     const hourErr = validateBookingHourFields(input.minBookingHours, input.maxBookingHours);
@@ -465,8 +472,10 @@ export interface UpdateDiscountInput {
   dayRules?: DayRuleInput[] | null;
 }
 
-export async function updateDiscount(input: UpdateDiscountInput) {
+export async function updateDiscount(input: UpdateDiscountInput, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     const { discountId, ...updateData } = input;
@@ -648,8 +657,10 @@ export async function updateDiscount(input: UpdateDiscountInput) {
   }
 }
 
-export async function deleteDiscount(discountId: string) {
+export async function deleteDiscount(discountId: string, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     const discount = await Discount.findByIdAndDelete(discountId);
@@ -674,8 +685,10 @@ export async function deleteDiscount(discountId: string) {
   }
 }
 
-export async function toggleDiscountActive(discountId: string) {
+export async function toggleDiscountActive(discountId: string, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     const discount = await Discount.findById(discountId);

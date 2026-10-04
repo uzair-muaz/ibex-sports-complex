@@ -271,7 +271,7 @@ export default function AdminNewBookingPage() {
                       className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                         durationHours === preset.hours
                           ? "border-teal-400 bg-teal-500/20 text-teal-200"
-                          : "border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:border-zinc-500"
+                          : "border-[var(--ant-color-border)] bg-[var(--ant-color-bg-elevated)] text-[var(--ant-color-text)] hover:border-[var(--ant-color-primary)]"
                       }`}
                     >
                       {preset.label}
@@ -284,7 +284,7 @@ export default function AdminNewBookingPage() {
 
           {courtType && dateStr && (
             <div className="space-y-3">
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm text-[var(--ant-color-text-secondary)]">
                 Available start times (includes past dates and times)
               </p>
               {isInitialSlotLoading ? (
@@ -308,8 +308,8 @@ export default function AdminNewBookingPage() {
           )}
 
           {selectedQuote && (
-            <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-300">
-              <p className="font-medium text-white">Price preview</p>
+            <div className="space-y-2 rounded-lg border border-[var(--ant-color-border)] bg-[var(--ant-color-bg-elevated)] p-4 text-sm text-[var(--ant-color-text-secondary)]">
+              <p className="font-medium text-[var(--ant-color-text)]">Price preview</p>
               <div className="flex flex-wrap gap-x-6 gap-y-1">
                 <span>
                   Original: Rs. {selectedQuote.originalPrice.toLocaleString()}
@@ -358,7 +358,7 @@ export default function AdminNewBookingPage() {
             </Form.Item>
           </div>
 
-          <div className="flex items-center justify-end gap-4 border-t border-zinc-800 pt-4">
+          <div className="flex items-center justify-end gap-4 border-t border-[var(--ant-color-border)] pt-4">
             <Button type="text" onClick={() => router.push("/admin/bookings")}>
               Cancel
             </Button>

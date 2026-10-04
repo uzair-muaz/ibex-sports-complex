@@ -345,7 +345,7 @@ export default function UsersPage() {
         ]}
         width={672}
       >
-        <p className="mb-4 text-zinc-400">
+        <p className="mb-4 text-[var(--ant-color-text-secondary)]">
           Manage user accounts and permissions
         </p>
         <Form<UserFormValues>
@@ -394,7 +394,7 @@ export default function UsersPage() {
               <>
                 Password{" "}
                 {editingUser && (
-                  <span className="text-zinc-400">
+                  <span className="text-[var(--ant-color-text-secondary)]">
                     (leave empty to keep current)
                   </span>
                 )}

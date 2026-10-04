@@ -5,6 +5,7 @@ import Feedback from '@/models/Feedback';
 import Booking from '@/models/Booking';
 import Court from '@/models/Court';
 import { revalidatePath } from 'next/cache';
+import { requireStaffActor, type StaffActorOpts } from '@/lib/action-auth';
 
 export interface CreateFeedbackInput {
   bookingId: string;
@@ -78,44 +79,32 @@ export async function createFeedback(input: CreateFeedbackInput) {
   }
 }
 
-export async function getAllFeedback() {
+export async function getAllFeedback(opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error, feedbacks: [] };
     await connectDB();
 
     const feedbacks = await Feedback.find()
-      .populate('bookingId')
-      .sort({ createdAt: -1 });
-
-    // Backfill courtType for feedbacks that don't have it
-    const feedbacksWithCourtType = await Promise.all(
-      feedbacks.map(async (feedback: any) => {
-        // If courtType is missing, try to get it from the booking
-        if (!feedback.courtType && feedback.bookingId) {
-          try {
-            const bookingIdValue = typeof feedback.bookingId === 'object' && feedback.bookingId?._id
-              ? feedback.bookingId._id.toString()
-              : feedback.bookingId.toString();
-
-            const booking = await Booking.findById(bookingIdValue);
-            if (booking) {
-              const courtIdValue = typeof booking.courtId === 'object' && booking.courtId?._id
-                ? booking.courtId._id.toString()
-                : booking.courtId.toString();
-              
-              const court = await Court.findById(courtIdValue);
-              if (court?.type) {
-                // Update the feedback with courtType
-                await Feedback.findByIdAndUpdate(feedback._id, { courtType: court.type });
-                feedback.courtType = court.type;
-              }
-            }
-          } catch (error) {
-            console.error('Error backfilling courtType for feedback:', feedback._id, error);
-          }
-        }
-        return feedback;
+      .populate({
+        path: "bookingId",
+        populate: { path: "courtId", select: "type name" },
       })
-    );
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const feedbacksWithCourtType = feedbacks.map((feedback) => {
+      let courtType = feedback.courtType as string | undefined;
+      if (!courtType && feedback.bookingId && typeof feedback.bookingId === "object") {
+        const booking = feedback.bookingId as {
+          courtId?: { type?: string } | string;
+        };
+        if (booking.courtId && typeof booking.courtId === "object") {
+          courtType = booking.courtId.type;
+        }
+      }
+      return { ...feedback, courtType };
+    });
 
     return {
       success: true,

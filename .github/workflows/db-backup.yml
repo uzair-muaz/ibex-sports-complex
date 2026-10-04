@@ -1,0 +1,65 @@
+# Scheduled MongoDB backups for production.
+#
+# Vercel cannot store dumps (ephemeral FS). Options:
+#   1) Preferred — MongoDB Atlas continuous / cloud backup (enable in Atlas UI)
+#   2) This workflow — mongodump → S3 or Cloudflare R2 (set GitHub secrets)
+#
+# Secrets for option 2:
+#   MONGODB_URI, BACKUP_S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+#   AWS_DEFAULT_REGION (optional AWS_ENDPOINT_URL for R2)
+
+name: Database backup
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  dump-to-object-storage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check configuration
+        id: cfg
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+        run: |
+          if [[ -z "${MONGODB_URI}" || -z "${BACKUP_S3_BUCKET}" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "S3 backup secrets not configured."
+            echo "Enable MongoDB Atlas backups, or set MONGODB_URI + BACKUP_S3_BUCKET (+ AWS_*) secrets."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install tools
+        if: steps.cfg.outputs.skip == 'false'
+        run: |
+          wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
+          echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+          sudo apt-get update
+          sudo apt-get install -y mongodb-database-tools awscli
+
+      - name: Dump and upload
+        if: steps.cfg.outputs.skip == 'false'
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
+        run: |
+          set -euo pipefail
+          STAMP=$(date -u +%Y-%m-%d_%H%M)
+          OUT="/tmp/ibex-backup-$STAMP"
+          mongodump --uri="$MONGODB_URI" --out="$OUT"
+          tar -C /tmp -czf "/tmp/ibex-backup-$STAMP.tgz" "ibex-backup-$STAMP"
+          DEST="s3://${BACKUP_S3_BUCKET}/ibex-mongo/${STAMP}.tgz"
+          if [[ -n "${AWS_ENDPOINT_URL:-}" ]]; then
+            aws --endpoint-url="$AWS_ENDPOINT_URL" s3 cp "/tmp/ibex-backup-$STAMP.tgz" "$DEST"
+          else
+            aws s3 cp "/tmp/ibex-backup-$STAMP.tgz" "$DEST"
+          fi
+          echo "Uploaded $DEST"

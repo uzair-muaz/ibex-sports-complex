@@ -5,13 +5,22 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, ArrowRight } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
+import { Menu, X, ArrowRight, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
 
 export const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { data: session, status } = useSession();
+  const isCustomer =
+    status === "authenticated" &&
+    session?.user?.role !== "admin" &&
+    session?.user?.role !== "super_admin";
+  const isStaff =
+    status === "authenticated" &&
+    (session?.user?.role === "admin" || session?.user?.role === "super_admin");
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -34,7 +43,6 @@ export const Navbar = () => {
       className="fixed top-0 left-0 right-0 z-100 isolate transition-all duration-500 bg-zinc-950/80 border-b border-white/8 backdrop-blur-xl"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 h-16 sm:h-17 md:h-17 flex items-center justify-between">
-        {/* Logo — Ibex Sports Complex */}
         <Link href="/" className="relative group z-10 shrink-0">
           <motion.div
             whileHover={{ scale: 1.02 }}
@@ -52,21 +60,16 @@ export const Navbar = () => {
               />
             </div>
             <div className="flex flex-col leading-tight">
-              <span
-                className="text-base sm:text-lg md:text-xl font-bold tracking-tight text-white"
-              >
+              <span className="text-base sm:text-lg md:text-xl font-bold tracking-tight text-white">
                 Ibex
               </span>
-              <span
-                className="hidden sm:block text-[10px] sm:text-xs font-medium tracking-wide text-zinc-400"
-              >
+              <span className="hidden sm:block text-[10px] sm:text-xs font-medium tracking-wide text-zinc-400">
                 Sports Complex
               </span>
             </div>
           </motion.div>
         </Link>
 
-        {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-1">
           {navLinks.map((link, index) => {
             const isActive = pathname === link.path;
@@ -91,7 +94,11 @@ export const Navbar = () => {
                       layoutId="navbarIndicator"
                       className="absolute inset-0 rounded-xl bg-white/10 -z-10"
                       initial={false}
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 30,
+                      }}
                     />
                   )}
                 </Link>
@@ -100,6 +107,38 @@ export const Navbar = () => {
           })}
 
           <div className="flex items-center gap-2 ml-2 pl-2 border-l border-white/10">
+            {isCustomer ? (
+              <Link href="/account">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl border-white/15 bg-transparent text-white hover:bg-white/10 h-10"
+                >
+                  <User className="w-4 h-4 mr-1.5" />
+                  Account
+                </Button>
+              </Link>
+            ) : isStaff ? (
+              <Link href="/admin/bookings">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl border-white/15 bg-transparent text-white hover:bg-white/10 h-10"
+                >
+                  Admin
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/login">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl border-white/15 bg-transparent text-white hover:bg-white/10 h-10"
+                >
+                  Sign in
+                </Button>
+              </Link>
+            )}
             <Link href="/booking">
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                 <Button
@@ -116,7 +155,6 @@ export const Navbar = () => {
           </div>
         </div>
 
-        {/* Mobile: Book + Hamburger */}
         <div className="md:hidden flex items-center gap-2">
           <Link href="/booking">
             <motion.button
@@ -160,7 +198,6 @@ export const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile Menu — portaled to body so fixed overlay/panel cover full viewport */}
       {typeof document !== "undefined" &&
         createPortal(
           <AnimatePresence>
@@ -182,7 +219,6 @@ export const Navbar = () => {
                   transition={{ type: "spring", damping: 30, stiffness: 300 }}
                   className="fixed top-0 right-0 bottom-0 z-120 w-full max-w-sm shadow-2xl md:hidden flex flex-col bg-zinc-900 border-l border-white/10"
                 >
-                  {/* Sidebar header: title + close */}
                   <div className="flex items-center justify-between h-16 shrink-0 px-5 border-b border-white/10">
                     <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">
                       Menu
@@ -197,7 +233,6 @@ export const Navbar = () => {
                     </button>
                   </div>
 
-                  {/* All options in one clear sequence */}
                   <nav className="flex-1 overflow-y-auto py-4 px-4 flex flex-col gap-1">
                     {navLinks.map((link, index) => {
                       const isActive = pathname === link.path;
@@ -223,6 +258,33 @@ export const Navbar = () => {
                       );
                     })}
 
+                    <Link
+                      href={
+                        isCustomer
+                          ? "/account"
+                          : isStaff
+                            ? "/admin/bookings"
+                            : "/login"
+                      }
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center py-3.5 px-4 rounded-xl text-base font-medium text-white active:bg-white/10"
+                    >
+                      {isCustomer ? "Account" : isStaff ? "Admin" : "Sign in"}
+                    </Link>
+
+                    {isCustomer ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          void signOut({ callbackUrl: "/" });
+                        }}
+                        className="flex items-center py-3.5 px-4 rounded-xl text-base font-medium text-zinc-400"
+                      >
+                        Sign out
+                      </button>
+                    ) : null}
+
                     <motion.div
                       initial={{ opacity: 0, x: 12 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -237,13 +299,12 @@ export const Navbar = () => {
                         <ArrowRight className="w-4 h-4 shrink-0" />
                       </Link>
                     </motion.div>
-
                   </nav>
                 </motion.div>
               </>
             )}
           </AnimatePresence>,
-          document.body
+          document.body,
         )}
     </motion.nav>
   );

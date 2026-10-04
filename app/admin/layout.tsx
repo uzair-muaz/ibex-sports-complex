@@ -3,21 +3,29 @@
 import { useSession } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { Spin } from "antd";
+import { Spin, theme } from "antd";
 import { AdminAntdProvider } from "@/components/admin/AdminAntdProvider";
-import { QueryProvider } from "@/components/providers/QueryProvider";
+import { isStaffRole } from "@/lib/authz";
 
 function AdminAuthGate({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+  const { token } = theme.useToken();
   const isLoginPage = pathname === "/admin";
 
   useEffect(() => {
     if (!isLoginPage && status === "unauthenticated") {
-      router.push("/admin");
+      router.replace("/admin");
     }
-  }, [status, router, isLoginPage]);
+    if (
+      !isLoginPage &&
+      status === "authenticated" &&
+      !isStaffRole(session?.user?.role)
+    ) {
+      router.replace("/account");
+    }
+  }, [status, router, isLoginPage, session]);
 
   if (isLoginPage) {
     return <>{children}</>;
@@ -25,13 +33,16 @@ function AdminAuthGate({ children }: { children: React.ReactNode }) {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black">
+      <div
+        className="flex min-h-screen items-center justify-center"
+        style={{ background: token.colorBgBase }}
+      >
         <Spin size="large" />
       </div>
     );
   }
 
-  if (!session) {
+  if (!session || !isStaffRole(session.user?.role)) {
     return null;
   }
 
@@ -45,9 +56,7 @@ export default function AdminRootLayout({
 }) {
   return (
     <AdminAntdProvider>
-      <QueryProvider>
-        <AdminAuthGate>{children}</AdminAuthGate>
-      </QueryProvider>
+      <AdminAuthGate>{children}</AdminAuthGate>
     </AdminAntdProvider>
   );
 }

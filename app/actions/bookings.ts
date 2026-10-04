@@ -6,6 +6,12 @@ import Booking from '@/models/Booking';
 import Court from '@/models/Court';
 import Discount from '@/models/Discount';
 import { auth } from '@/lib/auth';
+import {
+  isTrustedApiActor,
+  requireStaffActor,
+  type StaffActorOpts,
+  type TrustedApiActor,
+} from '@/lib/action-auth';
 import { safeRevalidatePath } from '@/lib/safe-revalidate';
 import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
@@ -17,14 +23,61 @@ import {
 import { calculateOriginalPrice } from '@/lib/pricing-utils';
 import type { AppliedDiscount } from '@/types';
 import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from '@/lib/date-time';
+import {
+  awardLoyaltyForCompletedBooking,
+  redeemLoyaltyPoints,
+  refundLoyaltyForBooking,
+} from '@/lib/loyalty';
+import {
+  assertMembershipUsable,
+  deductMembershipForBooking,
+  refundMembershipHours,
+} from '@/lib/membership';
 
 async function getActiveDiscountsForBusinessDate(bookingDateKey: string) {
-  const discountsRaw = await Discount.find({ isActive: true });
+  const discountsRaw = await Discount.find({ isActive: true }).lean();
   return discountsRaw.filter((d: any) => {
     const fromKey = toDateKeyInTimezone(new Date(d.validFrom), BUSINESS_TIMEZONE);
     const untilKey = toDateKeyInTimezone(new Date(d.validUntil), BUSINESS_TIMEZONE);
     return fromKey <= bookingDateKey && bookingDateKey <= untilKey;
   });
+}
+
+/** Fire-and-forget refresh of AnalyticsDaily for affected business dates. */
+function scheduleAnalyticsDailyRebuild(dates: Array<string | undefined | null>) {
+  const unique = [
+    ...new Set(
+      dates.filter(
+        (d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d),
+      ),
+    ),
+  ];
+  if (unique.length === 0) return;
+  void import("@/lib/analytics/daily-rollup")
+    .then(({ rebuildAnalyticsDaily }) => rebuildAnalyticsDaily(unique))
+    .catch((err) => console.error("Analytics daily rebuild failed:", err));
+}
+
+const ACTIVE_BOOKING_STATUSES = [
+  "pending_payment",
+  "confirmed",
+  "completed",
+] as const;
+
+/** Scoped conflict scan: only relevant courts + lean projection. */
+async function findConflictBookings(params: {
+  courtIds: Array<string | mongoose.Types.ObjectId>;
+  date: string;
+}) {
+  const dateMinus = shiftDateUTC(params.date, -1);
+  const datePlus = shiftDateUTC(params.date, 1);
+  return Booking.find({
+    courtId: { $in: params.courtIds },
+    date: { $in: [dateMinus, params.date, datePlus] },
+    status: { $in: [...ACTIVE_BOOKING_STATUSES] },
+  })
+    .select("courtId date startTime duration")
+    .lean();
 }
 
 function toDiscountInput(d: any): DiscountInput {
@@ -112,11 +165,33 @@ export interface CreateBookingInput {
   userName: string;
   userEmail: string;
   userPhone: string;
+  /** Optional: redeem this many loyalty points (logged-in only) */
+  loyaltyPointsToRedeem?: number;
+  /** Optional: pay with membership hours (logged-in only) */
+  useMembershipHours?: boolean;
+  /** Optional: consume a guest pass with membership hours */
+  useGuestPass?: boolean;
 }
 
-export async function createBooking(input: CreateBookingInput) {
+export async function createBooking(
+  input: CreateBookingInput,
+  options?: TrustedApiActor,
+) {
   try {
     await connectDB();
+
+    const session = await auth();
+    const trusted = isTrustedApiActor(options);
+    const sessionUserId = trusted
+      ? options.actorUserId
+      : session?.user?.id;
+    const sessionRole = trusted
+      ? options.actorRole || "user"
+      : session?.user?.role;
+    const shouldLinkUser =
+      !!sessionUserId &&
+      sessionRole !== 'admin' &&
+      sessionRole !== 'super_admin';
 
     // Validate phone number
     if (!input.userPhone || input.userPhone.trim().length === 0) {
@@ -149,11 +224,9 @@ export async function createBooking(input: CreateBookingInput) {
     // Get existing bookings around the date we are trying to book.
     // Because bookings can span midnight, conflicts may involve bookings
     // from the day before or the day after.
-    const dateMinus = shiftDateUTC(input.date, -1);
-    const datePlus = shiftDateUTC(input.date, 1);
-    const existingBookings = await Booking.find({
-      date: { $in: [dateMinus, input.date, datePlus] },
-      status: { $ne: 'cancelled' },
+    const existingBookings = await findConflictBookings({
+      courtIds: availableCourts.map((c) => c._id),
+      date: input.date,
     });
 
     // Find available court
@@ -230,12 +303,42 @@ export async function createBooking(input: CreateBookingInput) {
     const lastBooking = await Booking.findOne().sort({ serialNumber: -1, createdAt: -1 });
     const nextSerialNumber = (lastBooking?.serialNumber ?? 0) + 1;
 
+    let totalPrice = finalPrice;
+    let loyaltyPointsRedeemed = 0;
+    let loyaltyDiscountPkr = 0;
+    let usedMembershipHours = false;
+    let membershipId: mongoose.Types.ObjectId | undefined;
+    let membershipHoursUsed = 0;
+    let usedGuestPass = false;
+
+    if (input.useMembershipHours) {
+      if (!shouldLinkUser || !sessionUserId) {
+        throw new Error('Sign in required to use membership hours');
+      }
+      const check = await assertMembershipUsable({
+        userId: sessionUserId,
+        date: input.date,
+        startTime: input.startTime,
+        duration: input.duration,
+        useGuestPass: input.useGuestPass,
+      });
+      if (!check.ok) {
+        throw new Error(check.error);
+      }
+      usedMembershipHours = true;
+      membershipId = check.membership._id as mongoose.Types.ObjectId;
+      membershipHoursUsed = input.duration;
+      usedGuestPass = !!input.useGuestPass;
+      totalPrice = 0;
+    }
+
     // Create booking with discount information
     const booking = await Booking.create({
       courtId: assignedCourt._id,
       date: input.date,
       startTime: input.startTime,
       duration: input.duration,
+      userId: shouldLinkUser ? sessionUserId : undefined,
       userName: input.userName,
       userEmail: input.userEmail.toLowerCase(),
       userPhone: input.userPhone,
@@ -243,10 +346,46 @@ export async function createBooking(input: CreateBookingInput) {
       originalPrice,
       discounts: discountsForDB,
       discountAmount,
-      totalPrice: finalPrice,
-      status: 'pending_payment',
-      amountPaid: 0,
+      totalPrice,
+      loyaltyPointsRedeemed: 0,
+      loyaltyDiscountPkr: 0,
+      usedMembershipHours,
+      membershipId,
+      membershipHoursUsed,
+      usedGuestPass,
+      status: usedMembershipHours ? 'confirmed' : 'pending_payment',
+      amountPaid: usedMembershipHours ? 0 : 0,
     });
+
+    if (usedMembershipHours && membershipId) {
+      await deductMembershipForBooking({
+        membershipId: membershipId.toString(),
+        duration: input.duration,
+        useGuestPass: usedGuestPass,
+      });
+    }
+
+    if (
+      !usedMembershipHours &&
+      shouldLinkUser &&
+      sessionUserId &&
+      input.loyaltyPointsToRedeem &&
+      input.loyaltyPointsToRedeem > 0
+    ) {
+      const redeemed = await redeemLoyaltyPoints({
+        userId: sessionUserId,
+        points: input.loyaltyPointsToRedeem,
+        bookingId: booking._id,
+        totalPriceAfterPromo: finalPrice,
+      });
+      loyaltyPointsRedeemed = redeemed.points;
+      loyaltyDiscountPkr = redeemed.discountPkr;
+      totalPrice = Math.max(0, finalPrice - loyaltyDiscountPkr);
+      booking.loyaltyPointsRedeemed = loyaltyPointsRedeemed;
+      booking.loyaltyDiscountPkr = loyaltyDiscountPkr;
+      booking.totalPrice = totalPrice;
+      await booking.save();
+    }
 
     await booking.populate('courtId');
 
@@ -262,7 +401,7 @@ export async function createBooking(input: CreateBookingInput) {
       originalPrice,
       discounts: appliedDiscounts, // Already has string discountId
       discountAmount,
-      totalPrice: finalPrice,
+      totalPrice: booking.totalPrice,
       bookingId: booking._id.toString(),
       baseUrl: getBaseUrl(),
     }).catch((error) => {
@@ -273,6 +412,8 @@ export async function createBooking(input: CreateBookingInput) {
 
     safeRevalidatePath('/booking');
     safeRevalidatePath('/admin');
+    safeRevalidatePath('/account/bookings');
+    scheduleAnalyticsDailyRebuild([input.date]);
 
     return {
       success: true,
@@ -344,11 +485,9 @@ export async function getAvailableStartTimes(
       return { success: false, error: `No ${input.courtType} courts available`, startTimes: [] };
     }
 
-    const dateMinus = shiftDateUTC(input.date, -1);
-    const datePlus = shiftDateUTC(input.date, 1);
-    const existingBookings = await Booking.find({
-      date: { $in: [dateMinus, input.date, datePlus] },
-      status: { $ne: 'cancelled' },
+    const existingBookings = await findConflictBookings({
+      courtIds: courts.map((c) => c._id),
+      date: input.date,
     });
 
     // Fetch active discounts once (pricing varies per startTime due to time restrictions).
@@ -473,11 +612,9 @@ export async function getQuickSlotCourtAvailability(
 
     const totalCourtCount = courts.length;
 
-    const dateMinus = shiftDateUTC(input.date, -1);
-    const datePlus = shiftDateUTC(input.date, 1);
-    const existingBookings = await Booking.find({
-      date: { $in: [dateMinus, input.date, datePlus] },
-      status: { $ne: 'cancelled' },
+    const existingBookings = await findConflictBookings({
+      courtIds: courts.map((c) => c._id),
+      date: input.date,
     });
 
     // Group bookings by courtId to reduce inner-loop scanning.
@@ -527,10 +664,11 @@ export async function getBookingsByDate(date: string) {
 
     const bookings = await Booking.find({
       date,
-      status: { $ne: 'cancelled' },
+      status: { $in: [...ACTIVE_BOOKING_STATUSES] },
     })
       .populate('courtId')
-      .sort({ startTime: 1 });
+      .sort({ startTime: 1 })
+      .lean();
 
     return {
       success: true,
@@ -546,14 +684,23 @@ export async function getBookingsByDate(date: string) {
   }
 }
 
-export async function getAllBookings() {
+export async function getAllBookings(opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) {
+      return { success: false, error: gate.error, bookings: [] };
+    }
     await connectDB();
 
+    // Prefer date-bounded callers. Cap to recent window to avoid full-table loads.
     const bookings = await Booking.find()
-      .populate('courtId')
-      // Default ordering: newest bookings first
-      .sort({ createdAt: -1 });
+      .select(
+        "courtId date startTime duration status userName userEmail userPhone totalPrice originalPrice discountAmount amountPaid amountReceivedCash amountReceivedOnline serialNumber createdAt",
+      )
+      .populate("courtId", "name type isActive")
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
 
     return {
       success: true,
@@ -569,6 +716,103 @@ export async function getAllBookings() {
   }
 }
 
+export async function getBookingByIdForAdmin(
+  bookingId: string,
+  opts?: StaffActorOpts,
+) {
+  try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) {
+      return { success: false as const, error: gate.error };
+    }
+    await connectDB();
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      return { success: false as const, error: "Invalid booking id" };
+    }
+    const booking = await Booking.findById(bookingId)
+      .populate("courtId")
+      .lean();
+    if (!booking) {
+      return { success: false as const, error: "Booking not found" };
+    }
+    return {
+      success: true as const,
+      booking: JSON.parse(JSON.stringify(booking)),
+    };
+  } catch (error: unknown) {
+    return {
+      success: false as const,
+      error:
+        error instanceof Error ? error.message : "Failed to fetch booking",
+    };
+  }
+}
+
+export async function getAnalyticsSummary(
+  input: { dateFrom?: string | null; dateTo?: string | null },
+  opts?: StaffActorOpts,
+) {
+  try {
+    const gate = await requireStaffActor(opts, { superAdmin: true });
+    if (!gate.ok) {
+      return { success: false as const, error: gate.error };
+    }
+    await connectDB();
+
+    const {
+      summarizeAnalyticsFromDaily,
+      ensureRecentAnalyticsFresh,
+    } = await import("@/lib/analytics/daily-rollup");
+
+    // Hourly freshness on read (Hobby Cron is daily-only).
+    const freshness = await ensureRecentAnalyticsFresh({ lookbackDays: 1 });
+
+    const stats = await summarizeAnalyticsFromDaily({
+      dateFrom: input.dateFrom,
+      dateTo: input.dateTo,
+    });
+
+    return {
+      success: true as const,
+      stats,
+      lastRebuiltAt: freshness.lastRebuiltAt,
+      nextRefreshAt: freshness.nextRefreshAt,
+      refreshed: freshness.refreshed,
+      maxAgeMs: freshness.maxAgeMs,
+    };
+  } catch (error: unknown) {
+    return {
+      success: false as const,
+      error:
+        error instanceof Error ? error.message : "Failed to load analytics",
+    };
+  }
+}
+
+/** Super-admin: rebuild AnalyticsDaily for all or specific dates. */
+export async function rebuildAnalyticsRollup(
+  input: { dates?: string[] } | undefined,
+  opts?: StaffActorOpts,
+) {
+  try {
+    const gate = await requireStaffActor(opts, { superAdmin: true });
+    if (!gate.ok) {
+      return { success: false as const, error: gate.error };
+    }
+    const { rebuildAnalyticsDaily } = await import(
+      "@/lib/analytics/daily-rollup"
+    );
+    const result = await rebuildAnalyticsDaily(input?.dates);
+    return { success: true as const, ...result };
+  } catch (error: unknown) {
+    return {
+      success: false as const,
+      error:
+        error instanceof Error ? error.message : "Failed to rebuild analytics",
+    };
+  }
+}
+
 export interface GetBookingsPaginatedInput {
   page: number; // 1-based
   limit: number;
@@ -576,8 +820,12 @@ export interface GetBookingsPaginatedInput {
   search?: string; // matches userName/userEmail and (if valid ObjectId) booking _id
 }
 
-export async function getBookingsPaginated(input: GetBookingsPaginatedInput) {
+export async function getBookingsPaginated(input: GetBookingsPaginatedInput, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) {
+      return { success: false, error: gate.error, bookings: [], totalCount: 0 };
+    }
     await connectDB();
 
     const page = Math.max(1, Number(input.page) || 1);
@@ -637,22 +885,40 @@ export async function getBookingsPaginated(input: GetBookingsPaginatedInput) {
   }
 }
 
-export async function cancelBooking(bookingId: string) {
+export async function cancelBooking(bookingId: string, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
-    const booking = await Booking.findByIdAndUpdate(
-      bookingId,
-      { status: 'cancelled' },
-      { new: true }
-    );
-
+    const booking = await Booking.findById(bookingId);
     if (!booking) {
       throw new Error('Booking not found');
+    }
+    if (booking.status === 'cancelled') {
+      return {
+        success: true,
+        booking: JSON.parse(JSON.stringify(booking)),
+      };
+    }
+
+    booking.status = 'cancelled';
+    await booking.save();
+
+    await refundLoyaltyForBooking(bookingId);
+
+    if (booking.usedMembershipHours && booking.membershipId) {
+      await refundMembershipHours({
+        membershipId: booking.membershipId.toString(),
+        hours: booking.membershipHoursUsed || booking.duration,
+        refundGuestPass: !!booking.usedGuestPass,
+      });
     }
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');
+    safeRevalidatePath('/account/bookings');
+    scheduleAnalyticsDailyRebuild([booking.date]);
 
     return {
       success: true,
@@ -684,11 +950,15 @@ export interface UpdateBookingInput {
   amountReceivedCash?: number;
 }
 
-export async function updateBooking(input: UpdateBookingInput) {
+export async function updateBooking(input: UpdateBookingInput, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     const { bookingId, ...updateData } = input;
+    const existingForRollup = await Booking.findById(bookingId).select("date").lean();
+    const previousDate = existingForRollup?.date as string | undefined;
 
     // If email is provided, lowercase it
     if (updateData.userEmail) {
@@ -739,10 +1009,13 @@ export async function updateBooking(input: UpdateBookingInput) {
         const dateMinus = shiftDateUTC(finalDate, -1);
         const datePlus = shiftDateUTC(finalDate, 1);
         const existingBookings = await Booking.find({
+          courtId: courtForSlot._id,
           date: { $in: [dateMinus, finalDate, datePlus] },
-          status: { $ne: 'cancelled' },
+          status: { $in: [...ACTIVE_BOOKING_STATUSES] },
           _id: { $ne: bookingId },
-        });
+        })
+          .select("courtId date startTime duration")
+          .lean();
 
         const hasConflict = existingBookings.some((b) => {
           if (b.courtId.toString() !== courtForSlot._id.toString()) {
@@ -809,8 +1082,20 @@ export async function updateBooking(input: UpdateBookingInput) {
       throw new Error('Booking not found');
     }
 
+    if (updatedBooking.status === 'completed') {
+      await awardLoyaltyForCompletedBooking(updatedBooking._id.toString()).catch(
+        (err) => console.error('Loyalty award error:', err),
+      );
+    }
+
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');
+    safeRevalidatePath('/account/bookings');
+    safeRevalidatePath('/account/rewards');
+    scheduleAnalyticsDailyRebuild([
+      updatedBooking.date,
+      previousDate,
+    ]);
 
     return {
       success: true,
@@ -830,8 +1115,12 @@ export interface ExtendBookingInput {
   extraDuration: 0.5 | 1;
 }
 
-export async function checkBookingExtensionAvailability(bookingId: string) {
+export async function checkBookingExtensionAvailability(bookingId: string, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) {
+      return { success: false, error: gate.error, canExtend30: false, canExtend60: false, hasAnyOption: false };
+    }
     await connectDB();
 
     const booking = await Booking.findById(bookingId);
@@ -846,10 +1135,12 @@ export async function checkBookingExtensionAvailability(bookingId: string) {
     const datePlus = shiftDateUTC(booking.date, 1);
     const existingBookings = await Booking.find({
       date: { $in: [dateMinus, booking.date, datePlus] },
-      status: { $ne: "cancelled" },
+      status: { $in: [...ACTIVE_BOOKING_STATUSES] },
       _id: { $ne: bookingId },
       courtId: booking.courtId,
-    });
+    })
+      .select("courtId date startTime duration")
+      .lean();
 
     const canExtendBy = (extraDuration: 0.5 | 1): boolean => {
       const candidateDuration = booking.duration + extraDuration;
@@ -874,8 +1165,10 @@ export async function checkBookingExtensionAvailability(bookingId: string) {
   }
 }
 
-export async function extendBooking(input: ExtendBookingInput) {
+export async function extendBooking(input: ExtendBookingInput, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     if (input.extraDuration % 0.5 !== 0) {
@@ -900,18 +1193,17 @@ export async function extendBooking(input: ExtendBookingInput) {
     return await updateBooking({
       bookingId: input.bookingId,
       duration: nextDuration,
-    });
+    }, opts);
   } catch (error: any) {
     console.error("Extend booking error:", error);
     return { success: false, error: error.message || "Failed to extend booking" };
   }
 }
 
-export async function deleteBooking(bookingId: string) {
+export async function deleteBooking(bookingId: string, opts?: StaffActorOpts) {
   try {
-    const session = await auth();
-    const role = (session?.user as { role?: string })?.role;
-    if (role !== 'super_admin') {
+    const gate = await requireStaffActor(opts, { superAdmin: true });
+    if (!gate.ok) {
       return {
         success: false,
         error: 'Only super admin can delete bookings.',
@@ -928,6 +1220,7 @@ export async function deleteBooking(bookingId: string) {
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');
+    scheduleAnalyticsDailyRebuild([booking.date]);
 
     return {
       success: true,
@@ -941,3 +1234,28 @@ export async function deleteBooking(bookingId: string) {
   }
 }
 
+
+
+/** Public entry verification — single booking by id (no list dump). */
+export async function getBookingForVerification(bookingId: string) {
+  try {
+    await connectDB();
+    if (!bookingId || bookingId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(bookingId)) {
+      return { success: false as const, error: "Invalid booking ID", booking: null };
+    }
+    const booking = await Booking.findById(bookingId).populate("courtId");
+    if (!booking) {
+      return { success: false as const, error: "Booking not found", booking: null };
+    }
+    return {
+      success: true as const,
+      booking: JSON.parse(JSON.stringify(booking)),
+    };
+  } catch (error: unknown) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Failed to load booking",
+      booking: null,
+    };
+  }
+}

@@ -16,6 +16,7 @@ export interface IBooking extends Document {
   startTime: number; // Hour (0-23)
   duration: number; // Hours (minimum 1, can add 0.5 for 30 min)
   serialNumber?: number; // Incremental booking serial (1, 2, 3, ...)
+  userId?: mongoose.Types.ObjectId;
   userName: string;
   userEmail: string;
   userPhone: string;
@@ -23,6 +24,12 @@ export interface IBooking extends Document {
   originalPrice: number; // Price before discounts
   discounts: IAppliedDiscount[]; // Applied discounts
   discountAmount: number; // Total discount in PKR
+  loyaltyPointsRedeemed?: number;
+  loyaltyDiscountPkr?: number;
+  usedMembershipHours?: boolean;
+  membershipId?: mongoose.Types.ObjectId;
+  membershipHoursUsed?: number;
+  usedGuestPass?: boolean;
   totalPrice: number; // Final price after discounts
   amountPaid: number; // Total received (online + cash), kept for backward compatibility
   amountReceivedOnline?: number; // Payment received online (e.g. bank transfer)
@@ -62,6 +69,12 @@ const BookingSchema: Schema = new Schema(
       index: true,
       unique: true,
       sparse: true, // allow existing documents without serialNumber
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: false,
+      index: true,
     },
     userName: {
       type: String,
@@ -122,6 +135,34 @@ const BookingSchema: Schema = new Schema(
       default: 0,
       min: 0,
     },
+    loyaltyPointsRedeemed: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    loyaltyDiscountPkr: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    usedMembershipHours: {
+      type: Boolean,
+      default: false,
+    },
+    membershipId: {
+      type: Schema.Types.ObjectId,
+      ref: 'UserMembership',
+      required: false,
+    },
+    membershipHoursUsed: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    usedGuestPass: {
+      type: Boolean,
+      default: false,
+    },
     totalPrice: {
       type: Number,
       required: true,
@@ -153,6 +194,8 @@ BookingSchema.index({ courtId: 1, date: 1, startTime: 1 });
 BookingSchema.index({ date: 1, status: 1 });
 BookingSchema.index({ date: 1, status: 1, startTime: 1 });
 BookingSchema.index({ createdAt: -1 });
+BookingSchema.index({ userId: 1, date: 1, startTime: 1 });
+BookingSchema.index({ userEmail: 1 });
 // Helps the "latest serial" lookup pattern used when creating bookings.
 BookingSchema.index({ serialNumber: -1, createdAt: -1 });
 

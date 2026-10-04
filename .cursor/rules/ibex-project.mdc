@@ -1,0 +1,32 @@
+---
+description: Core IBEX Sports Complex conventions (admin Ant Design, dual auth)
+alwaysApply: true
+---
+
+# IBEX Sports Complex
+
+Next.js 16 venue platform: public site + customer account, Ant Design **admin dashboards** (light+dark), shared `/api/v1` for web + Flutter.
+
+## Non-negotiables
+
+- **Ant Design is for admin dashboards only** (`/admin/**`, `components/admin/**`). Public marketing, booking, and customer account may keep the existing public UI stack (Tailwind / existing components). Do not force-migrate public pages to antd.
+- Admin dashboard supports **light and dark** via `AdminAntdProvider` / `useAdminTheme`. Prefer Ant tokens / CSS vars over hardcoded dark colors in admin.
+- **Authorization:** staff (`admin` | `super_admin`) ↔ `/admin`; customers (`user`) ↔ `/account` + customer APIs. Use `lib/authz.ts`. Middleware + layout + API guards must agree.
+- Never trust client-supplied `userId`; resolve identity from cookie or Bearer (`createTrustedApiActor` only from `/api/v1` handlers).
+- Keep components small; HTTP in `lib/tanstack/requests`; domain in `app/actions`.
+- Update `lib/api/openapi.ts` when `/api/v1` contracts change.
+- **HTTP API umbrella:** all product endpoints live under `/api/v1/**` (web + Flutter). Do not add new routes under `/api/*` outside `v1`. Sole exception: NextAuth at `/api/auth/[...nextauth]`. `/api/bff/*` is a rewrite alias → `/api/v1/*` only (no separate handlers). UI at `/docs` serves the v1 OpenAPI spec.
+
+## Skills
+
+Load when relevant:
+
+- Reasoning: `structured-reasoning`, `systematic-debugging`, `best-of-n-solving`
+- Quality: `web-best-practices`, `nextjs-best-practices`, `component-architecture`, `vercel-react-best-practices`, `vercel-composition-patterns`
+- Admin UI: `ui-design-antd`, `admin-antd-patterns`, `dark-mode-testing`
+- Domain: `booking-flow`, `domain-mongodb`, `tanstack-data-layer`
+- Auth/API: `auth-roles`, `api-v1-flutter`, `api-smoke-testing`, `adding-api-docs`, `auditing-security`
+- Verify UI: `verifying-in-browser`, `visual-qa-testing`, `responsive-testing`, `form-testing`, `accessibility-auditing`
+- Dev loop: `grinding-until-pass`, `auto-type-checking`, `finding-dev-server-url`, `detecting-port-conflicts`, `monitoring-terminal-errors`
+- Workflow: `babysitting-pr`, `creating-pr`, `writing-commit-messages`, `reviewing-code`
+- Meta: `suggesting-cursor-rules`, `building-skills-from-patterns`, `parallel-exploring`, `codebase-onboarding`

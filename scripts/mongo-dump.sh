@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Local / laptop dumps only. On Vercel the filesystem is ephemeral — do NOT rely
+# on this for production. Use MongoDB Atlas backups or .github/workflows/db-backup.yml
+# uploading to S3/R2.
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="$ROOT/.env.local"
 

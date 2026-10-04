@@ -1,13 +1,15 @@
-import 'next-auth';
-import 'next-auth/jwt';
+import "next-auth";
+import "next-auth/jwt";
 
-declare module 'next-auth' {
+declare module "next-auth" {
   interface Session {
     user: {
       id: string;
       email: string;
       name: string;
-      role: 'super_admin' | 'admin' | 'user';
+      role: "super_admin" | "admin" | "user";
+      image?: string | null;
+      phone?: string;
     };
   }
 
@@ -15,14 +17,15 @@ declare module 'next-auth' {
     id: string;
     email: string;
     name: string;
-    role: 'super_admin' | 'admin' | 'user';
+    role: "super_admin" | "admin" | "user";
+    image?: string | null;
   }
 }
 
-declare module 'next-auth/jwt' {
+declare module "next-auth/jwt" {
   interface JWT {
     id: string;
-    role: 'super_admin' | 'admin' | 'user';
+    role: "super_admin" | "admin" | "user";
+    phone?: string;
   }
 }
-

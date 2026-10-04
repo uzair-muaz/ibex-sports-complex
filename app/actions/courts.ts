@@ -4,6 +4,7 @@ import connectDB from '@/lib/mongodb';
 import Court from '@/models/Court';
 import { safeRevalidatePath } from '@/lib/safe-revalidate';
 import type { CourtPricingPeriod } from '@/types';
+import { requireStaffActor, type StaffActorOpts } from '@/lib/action-auth';
 
 const FULL_DAY_HOURS = 24;
 
@@ -92,8 +93,10 @@ export async function getCourts(type?: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUT
   }
 }
 
-export async function getAllCourts() {
+export async function getAllCourts(opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts, { superAdmin: true });
+    if (!gate.ok) return { success: false, error: gate.error, courts: [] };
     await connectDB();
 
     const courts = await Court.find().sort({ createdAt: 1 });
@@ -122,8 +125,10 @@ export interface CreateCourtInput {
   pricingPeriods?: CourtPricingPeriod[];
 }
 
-export async function createCourt(input: CreateCourtInput) {
+export async function createCourt(input: CreateCourtInput, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts, { superAdmin: true });
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     if (input.timeBasedPricingEnabled) {
@@ -175,8 +180,10 @@ export interface UpdateCourtInput {
   pricingPeriods?: CourtPricingPeriod[];
 }
 
-export async function updateCourt(input: UpdateCourtInput) {
+export async function updateCourt(input: UpdateCourtInput, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts, { superAdmin: true });
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     const { courtId, ...updateData } = input;
@@ -217,8 +224,10 @@ export async function updateCourt(input: UpdateCourtInput) {
   }
 }
 
-export async function deleteCourt(courtId: string) {
+export async function deleteCourt(courtId: string, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts, { superAdmin: true });
+    if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
     const court = await Court.findByIdAndDelete(courtId);

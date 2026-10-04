@@ -53,20 +53,20 @@ function QuoteSlotCard({
       className={cn(
         "relative flex h-28 w-full flex-col items-start justify-between overflow-hidden rounded-3xl border p-5 text-left transition-all duration-300",
         isSelected
-          ? "scale-[0.98] border-[#2DD4BF] bg-[#2DD4BF] text-black shadow-[0_10px_30px_rgba(45,212,191,0.2)]"
-          : "border-white/10 bg-zinc-900/40 hover:border-white/20 active:scale-95",
+          ? "scale-[0.98] border-[var(--ant-color-primary)] bg-[var(--ant-color-primary)] text-[rgba(15,23,42,1)] shadow-[0_10px_30px_rgba(45,212,191,0.2)]"
+          : "border-[var(--ant-color-border)] bg-[var(--ant-color-bg-elevated)] hover:border-[var(--ant-color-primary)] active:scale-95",
       )}
     >
       <div className="flex w-full items-start justify-between">
         <span
           className={cn(
             "text-[10px] font-black uppercase tracking-tighter",
-            isSelected ? "text-black/60" : "text-zinc-700",
+            isSelected ? "text-[rgba(15,23,42,0.6)]" : "text-[var(--ant-color-text-secondary)]",
           )}
         >
           START
         </span>
-        {isSelected ? <CheckOutlined className="text-black" /> : null}
+        {isSelected ? <CheckOutlined className="text-[rgba(15,23,42,1)]" /> : null}
         {peak && !isSelected ? (
           <div
             className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400 ring-1 ring-amber-400/40"
@@ -78,7 +78,7 @@ function QuoteSlotCard({
         <span
           className={cn(
             "mb-1 text-xl font-black leading-none tracking-tighter",
-            isSelected ? "text-black" : "text-white",
+            isSelected ? "text-[rgba(15,23,42,1)]" : "text-[var(--ant-color-text)]",
           )}
         >
           {startLabel}
@@ -86,7 +86,7 @@ function QuoteSlotCard({
         <span
           className={cn(
             "text-[9px] font-black uppercase tracking-[0.2em]",
-            isSelected ? "text-black/40" : "text-zinc-700",
+            isSelected ? "text-[rgba(15,23,42,0.4)]" : "text-[var(--ant-color-text-secondary)]",
           )}
         >
           UNTIL {endLabel}
@@ -115,7 +115,7 @@ export function AdminAvailableSlotGrid({
         {Array.from({ length: skeletonCount }).map((_, index) => (
           <div
             key={`av-skel-${index}`}
-            className="h-28 rounded-3xl border border-white/10 bg-zinc-900/40 p-5"
+            className="h-28 rounded-3xl border border-[var(--ant-color-border)] bg-[var(--ant-color-bg-elevated)] p-5"
           >
             <Skeleton active paragraph={{ rows: 2 }} title={false} />
           </div>
@@ -126,7 +126,7 @@ export function AdminAvailableSlotGrid({
 
   if (quotes.length === 0) {
     return (
-      <div className="rounded-3xl border border-white/10 bg-zinc-900/30 px-6 py-10 text-center text-sm text-zinc-400">
+      <div className="rounded-3xl border border-[var(--ant-color-border)] bg-[var(--ant-color-bg-container)] px-6 py-10 text-center text-sm text-[var(--ant-color-text-secondary)]">
         {emptyMessage}
       </div>
     );

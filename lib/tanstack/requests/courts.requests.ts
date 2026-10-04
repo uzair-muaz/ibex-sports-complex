@@ -1,38 +1,38 @@
-import {
-  createCourt,
-  deleteCourt,
-  getAllCourts,
-  getCourts,
-  updateCourt,
-  type CreateCourtInput,
-  type UpdateCourtInput,
-} from "@/app/actions/courts";
+import { bffFetch } from "@/lib/bff/client";
+import type { CreateCourtInput, UpdateCourtInput } from "@/app/actions/courts";
 import type { Court, CourtType } from "@/types";
+import type { ActionResult } from "@/lib/tanstack/requests/bookings.requests";
 
 export async function fetchAllCourts() {
-  const result = await getAllCourts();
-  if (!result.success) {
-    throw new Error(result.error ?? "Failed to fetch courts");
-  }
-  return result.courts as Court[];
+  const data = await bffFetch<{ courts: Court[] }>("/api/v1/admin/courts");
+  return data.courts;
 }
 
 export async function fetchCourtsByType(type?: CourtType) {
-  const result = await getCourts(type);
-  if (!result.success) {
-    throw new Error(result.error ?? "Failed to fetch courts");
-  }
-  return result.courts as Court[];
+  const qs = type ? `?type=${encodeURIComponent(type)}` : "";
+  const data = await bffFetch<{ courts: Court[] }>(
+    `/api/v1/admin/courts${qs}`,
+  );
+  return data.courts;
 }
 
 export async function requestCreateCourt(input: CreateCourtInput) {
-  return createCourt(input);
+  return bffFetch<ActionResult<{ court?: Court }>>("/api/v1/admin/courts", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function requestUpdateCourt(input: UpdateCourtInput) {
-  return updateCourt(input);
+  return bffFetch<ActionResult<{ court?: Court }>>("/api/v1/admin/courts", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function requestDeleteCourt(courtId: string) {
-  return deleteCourt(courtId);
+  return bffFetch<ActionResult>(
+    `/api/v1/admin/courts?courtId=${encodeURIComponent(courtId)}`,
+    { method: "DELETE" },
+  );
 }

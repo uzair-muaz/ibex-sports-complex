@@ -13,15 +13,35 @@ A premium Next.js booking platform for sports courts (Padel, Cricket, Pickleball
 - **Server-Side Rendering**: Optimized performance with Next.js App Router
 - **Type-Safe**: Full TypeScript support
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Database**: MongoDB with Mongoose
-- **Authentication**: NextAuth.js v5
-- **UI Components**: shadcn/ui + TailwindCSS
-- **Animations**: GSAP + Framer Motion
-- **Email**: Resend
+- **Authentication**: NextAuth.js v5 (Google customers + staff credentials) + mobile Bearer JWT
+- **Admin UI**: Ant Design (light/dark)
+- **Public UI**: Tailwind + existing components (shadcn/Radix where present)
+- **API**: `/api/v1` shared by web + Flutter (`/docs` OpenAPI)
+- **Data fetching**: TanStack Query via `bffFetch`
+- **Email / SMS**: Resend, AWS SES/SNS (optional)
 - **Language**: TypeScript
+
+Payment gateway integration is deferred (manual / staff settlement for now).
+
+## Testing
+
+```bash
+npm test              # Vitest unit tests (loyalty, membership, authz, trusted actor)
+npm run test:e2e      # Playwright smoke (needs app running or builds via webServer)
+# Against an already-running dev server:
+PLAYWRIGHT_SKIP_WEBSERVER=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 npm run test:e2e
+```
+
+## Monitoring & backups (Vercel)
+
+- **Health:** `GET /api/v1/health` — point UptimeRobot / Better Stack here.
+- **Analytics:** Vercel Analytics + Speed Insights (already in app).
+- **Errors:** optional `SENTRY_DSN` + `@sentry/nextjs` (see `lib/monitoring.ts`).
+- **DB backups:** do **not** store dumps on Vercel (ephemeral disk). Prefer **MongoDB Atlas** continuous backup. Optional: GitHub Action `.github/workflows/db-backup.yml` → S3/R2.
 
 ## 📋 Prerequisites
 
@@ -70,6 +90,7 @@ A premium Next.js booking platform for sports courts (Padel, Cricket, Pickleball
 
 4. **Seed the database**
    ```bash
+   npm run typecheck
    npm run seed
    ```
    

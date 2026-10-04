@@ -2,9 +2,13 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IUser extends Document {
   email: string;
-  password: string;
+  password?: string;
   name: string;
   role: "super_admin" | "admin" | "user";
+  image?: string;
+  phone?: string;
+  googleId?: string;
+  emailVerified?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -20,7 +24,7 @@ const UserSchema: Schema = new Schema(
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
+      required: false,
       minlength: 6,
     },
     name: {
@@ -33,14 +37,34 @@ const UserSchema: Schema = new Schema(
       enum: ["super_admin", "admin", "user"],
       default: "user",
     },
+    image: {
+      type: String,
+      required: false,
+    },
+    phone: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    googleId: {
+      type: String,
+      required: false,
+      sparse: true,
+      unique: true,
+    },
+    emailVerified: {
+      type: Date,
+      required: false,
+      default: null,
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-// Admin screens list newest users first
 UserSchema.index({ createdAt: -1 });
+UserSchema.index({ role: 1, name: 1 });
 
 const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>("User", UserSchema);
