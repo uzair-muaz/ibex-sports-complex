@@ -11,9 +11,15 @@ import { isStaffRole } from "@/lib/authz";
  */
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // Behind a TLS-terminating proxy the request is plain http, but Auth.js set the
+  // `__Secure-` session cookie; read the proxy's scheme to pick the right name.
+  const secureCookie =
+    req.headers.get("x-forwarded-proto") === "https" ||
+    req.nextUrl.protocol === "https:";
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
+    secureCookie,
   });
 
   const role = (token?.role as string | undefined) || undefined;
