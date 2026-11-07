@@ -20,8 +20,17 @@ try {
 // Email provider configuration
 const EMAIL_PROVIDER = process.env.EMAIL_PROVIDER || 'resend'; // 'resend' or 'ses'
 
-// Resend configuration
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Resend configuration. Created on first send, so a missing key (e.g. local
+// testing) doesn't crash every page that imports this file. With no key, a
+// send fails with "Email is not configured" and nothing is sent.
+let resendClient: Resend | null = null;
+function getResend(): Resend {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('Email is not configured (RESEND_API_KEY is missing)');
+  }
+  resendClient ??= new Resend(process.env.RESEND_API_KEY);
+  return resendClient;
+}
 const resendFromEmail = process.env.RESEND_FROM_EMAIL || 'IBEX Sports <onboarding@resend.dev>';
 
 // SES configuration (kept for future use)
@@ -153,7 +162,7 @@ async function sendViaResend(
     const subject = `Booking Confirmed - IBEX Sports Complex - ${formattedDate} at ${startTimeFormatted}`;
 
     // Send via Resend
-    const response = await resend.emails.send({
+    const response = await getResend().emails.send({
       from: resendFromEmail,
       to: validEmail,
       subject,
@@ -383,7 +392,7 @@ export async function sendHtmlEmail(input: {
       return { success: true, emailId: response.MessageId };
     }
 
-    const response = await resend.emails.send({
+    const response = await getResend().emails.send({
       from: resendFromEmail,
       to,
       subject: input.subject,
