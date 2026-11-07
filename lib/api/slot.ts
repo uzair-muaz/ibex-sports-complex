@@ -7,7 +7,7 @@ import { getActiveDiscountInputs } from "@/lib/active-discounts";
 import { checkAvailabilityRequest, parseSlotStart, priceForSlot, type RateType } from "@/lib/api/availability";
 import { overlapsBooking, pakistanNow } from "@/lib/booking-overlap";
 import { shiftDateKey } from "@/lib/date-time";
-import type { CourtType } from "@/types";
+import type { AppliedDiscount, CourtType } from "@/types";
 
 const ACTIVE_STATUSES = ["pending_payment", "confirmed", "completed"];
 
@@ -24,6 +24,7 @@ export type ResolvedSlot = {
   rateType: RateType;
   price: number;
   originalPrice: number;
+  discounts: AppliedDiscount[];
 };
 
 /**

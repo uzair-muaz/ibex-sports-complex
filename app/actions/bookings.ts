@@ -15,6 +15,8 @@ import {
 import { safeRevalidatePath } from '@/lib/safe-revalidate';
 import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
+import { acquireSlotLocks, releaseSlotLocks } from '@/lib/booking-locks';
+import { nextBookingSerial } from '@/lib/booking-serial';
 import {
   getApplicableDiscounts,
   calculateDiscountedPrice,
@@ -177,6 +179,8 @@ export async function createBooking(
   input: CreateBookingInput,
   options?: TrustedApiActor,
 ) {
+  let newBookingId: mongoose.Types.ObjectId | null = null;
+  let holdsLocks = false;
   try {
     await connectDB();
 
@@ -231,6 +235,7 @@ export async function createBooking(
 
     // Find available court
     let assignedCourt = null;
+    newBookingId = new mongoose.Types.ObjectId();
 
     for (const court of availableCourts) {
         // Check if this court has any conflicts
@@ -249,14 +254,25 @@ export async function createBooking(
       });
 
       if (!hasConflict) {
-        assignedCourt = court;
-        break;
+        // Claim the half hours so two people can't book the same court at once.
+        const locked = await acquireSlotLocks({
+          courtId: court._id,
+          bookingId: newBookingId,
+          dateKey: input.date,
+          startHour: input.startTime,
+          durationHours: input.duration,
+        });
+        if (locked) {
+          assignedCourt = court;
+          break;
+        }
       }
     }
 
     if (!assignedCourt) {
       throw new Error('No available courts for the selected time slot');
     }
+    holdsLocks = true;
 
     // Calculate original price (before discounts) with peak/off-peak support
     const { originalPrice } = calculateOriginalPrice(
@@ -299,9 +315,8 @@ export async function createBooking(
       amountSaved: d.amountSaved,
     }));
 
-    // Determine next booking serial number (incremental)
-    const lastBooking = await Booking.findOne().sort({ serialNumber: -1, createdAt: -1 });
-    const nextSerialNumber = (lastBooking?.serialNumber ?? 0) + 1;
+    // Next booking serial number (one atomic step, no duplicates)
+    const nextSerialNumber = await nextBookingSerial();
 
     let totalPrice = finalPrice;
     let loyaltyPointsRedeemed = 0;
@@ -334,6 +349,7 @@ export async function createBooking(
 
     // Create booking with discount information
     const booking = await Booking.create({
+      _id: newBookingId,
       courtId: assignedCourt._id,
       date: input.date,
       startTime: input.startTime,
@@ -356,6 +372,7 @@ export async function createBooking(
       status: usedMembershipHours ? 'confirmed' : 'pending_payment',
       amountPaid: usedMembershipHours ? 0 : 0,
     });
+    holdsLocks = false; // the booking now exists, so its locks are valid
 
     if (usedMembershipHours && membershipId) {
       await deductMembershipForBooking({
@@ -423,6 +440,9 @@ export async function createBooking(
     };
   } catch (error: any) {
     console.error('Booking creation error:', error);
+    if (holdsLocks && newBookingId) {
+      await releaseSlotLocks(newBookingId).catch(() => {});
+    }
     return {
       success: false,
       error: error.message || 'Failed to create booking',

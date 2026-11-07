@@ -197,20 +197,73 @@ export function getOpenApiDocument(baseUrl?: string) {
       "/api/v1/bookings": {
         post: {
           tags: ["Bookings"],
-          summary: "Create a booking (guest or authenticated customer)",
-          description:
-            "Guests may book without auth. Authenticated customers (cookie or Bearer) are linked via userId. Membership hours / loyalty redeem require a customer account.",
+          summary: "Create a booking (guest or signed-in customer) — app or website",
+          description: [
+            "**App (body has courtId + start):** `{courtId, start, durationMinutes, usePoints?, useWallet?}`; guests add `guest: {name, email, phone}`. Send an `Idempotency-Key` header (any unique string per tap of Book): sending it again returns the first booking (200) instead of a new one. Price is worked out exactly like POST /bookings/quote.",
+            "Response 201: `{booking, guestAccessToken}`. guestAccessToken (`gt_…`) is only for guests: keep it on the phone to open the booking later. It is shown once and never stored in plain form.",
+            "Status is `reserved` until the advance is verified (nothing is auto-cancelled). If points cover the whole advance (toTransfer 0), the booking is `confirmed` straight away. No email is sent from the app path yet.",
+            "Errors: 400 VALIDATION_ERROR, INVALID_PHONE, PHONE_REQUIRED (signed-in customer with no phone in profile), DATE_IN_PAST, DATE_OUT_OF_WINDOW, INVALID_DURATION; 403 STAFF_ACCOUNT; 404 COURT_NOT_FOUND; 409 SLOT_UNAVAILABLE, POINTS_CHANGED, REQUEST_IN_PROGRESS; 422 IDEMPOTENCY_KEY_REUSED (same key, different booking); 429 GUEST_LIMIT_REACHED (a guest email/phone already holds 3 upcoming bookings).",
+            "",
+            "**Website (unchanged):** body `CreateBookingInput` (courtType, date, startTime, duration …). Guests may book without auth. Membership hours / loyalty redeem require a customer account.",
+          ].join("\n"),
           security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
+          parameters: [
+            { name: "Idempotency-Key", in: "header", required: false, schema: { type: "string", maxLength: 200 } },
+          ],
           requestBody: {
             required: true,
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/CreateBookingInput" },
+                examples: {
+                  app: {
+                    summary: "App (guest)",
+                    value: {
+                      courtId: "6650c0ffee0000000000c001",
+                      start: "2026-11-20T18:00:00+05:00",
+                      durationMinutes: 90,
+                      guest: { name: "Ali Raza", email: "ali@example.com", phone: "03001234567" },
+                    },
+                  },
+                },
               },
             },
           },
           responses: {
-            "200": { description: "Booking created" },
+            "201": {
+              description: "App: booking made",
+              content: {
+                "application/json": {
+                  example: {
+                    booking: {
+                      id: "6650c0ffee0000000000b001",
+                      reference: "IBX-8821",
+                      courtId: "6650c0ffee0000000000c001",
+                      courtName: "Padel Court 1",
+                      sport: "PADEL",
+                      start: "2026-11-20T18:00:00+05:00",
+                      durationMinutes: 90,
+                      status: "reserved",
+                      price: { courtFee: 9000, pointsUsed: 0, pointsDiscount: 0, total: 9000 },
+                      payment: {
+                        status: "awaiting_proof",
+                        advanceRequired: 4500,
+                        amountVerified: 0,
+                        walletCreditUsed: 0,
+                        balanceDue: 9000,
+                        proofs: [],
+                      },
+                      cancellation: { canCancel: false, cancelUntil: "2026-11-20T14:00:00+05:00" },
+                      refund: null,
+                      hoursUsed: 0,
+                      createdAt: "2026-11-07T15:00:00+05:00",
+                    },
+                    guestAccessToken: "gt_9c1f0b2e7a4d4c55b1f3a8e6d2c7b901",
+                  },
+                },
+              },
+            },
+            "200": { description: "Website: booking created. App: same Idempotency-Key again → the first booking." },
             "400": {
               description: "Validation error",
               content: {

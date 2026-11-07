@@ -8,7 +8,7 @@ import { overlapsBooking, type BookingSpan } from "@/lib/booking-overlap";
 import { shiftDateKey } from "@/lib/date-time";
 import { roundPkr } from "@/lib/api/catalog";
 import type { SportRules } from "@/lib/app-settings";
-import type { CourtType } from "@/types";
+import type { AppliedDiscount, CourtType } from "@/types";
 
 export type RateType = "off_peak" | "standard" | "peak";
 
@@ -84,7 +84,7 @@ export function priceForSlot(
   startHour: number,
   durationMinutes: number,
   discounts: DiscountInput[],
-): { rateType: RateType; price: number; originalPrice: number } {
+): { rateType: RateType; price: number; originalPrice: number; discounts: AppliedDiscount[] } {
   const duration = durationMinutes / 60;
   const { originalPrice } = calculateOriginalPrice(court, startHour, duration);
   const applicable = getApplicableDiscounts(discounts, {
@@ -94,7 +94,7 @@ export function priceForSlot(
     startTime: startHour,
     date: dateKey,
   });
-  const { finalPrice } = calculateDiscountedPrice(originalPrice, applicable, {
+  const { finalPrice, appliedDiscounts } = calculateDiscountedPrice(originalPrice, applicable, {
     court,
     startTime: startHour,
     duration,
@@ -104,6 +104,7 @@ export function priceForSlot(
     rateType: getBookingStartPricingLabel(court, startHour) ?? "standard",
     price: roundPkr(finalPrice),
     originalPrice: roundPkr(originalPrice),
+    discounts: appliedDiscounts,
   };
 }
 
@@ -141,11 +142,14 @@ export function buildCourtSlots(input: {
     if (start < (input.fromHour ?? 0)) continue;
 
     const available = !input.bookings.some((b) => overlapsBooking(input.dateKey, start, duration, b));
-    slots.push({
-      start: slotStartIso(input.dateKey, start),
-      available,
-      ...priceForSlot(input.court, input.dateKey, start, input.durationMinutes, input.discounts),
-    });
+    const { rateType, price, originalPrice } = priceForSlot(
+      input.court,
+      input.dateKey,
+      start,
+      input.durationMinutes,
+      input.discounts,
+    );
+    slots.push({ start: slotStartIso(input.dateKey, start), available, rateType, price, originalPrice });
   }
   return slots;
 }

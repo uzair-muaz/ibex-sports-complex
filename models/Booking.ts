@@ -34,6 +34,15 @@ export interface IBooking extends Document {
   amountPaid: number; // Total received (online + cash), kept for backward compatibility
   amountReceivedOnline?: number; // Payment received online (e.g. bank transfer)
   amountReceivedCash?: number; // Payment received in cash at venue
+  /** Mobile app: where the booking came from ("web" when missing). */
+  source?: 'web' | 'app';
+  /** Mobile app: advance the customer must pay (whole PKR) and the % used. */
+  advanceRequired?: number;
+  advancePercent?: number;
+  /** Mobile app: wallet credit used (Phase 11). */
+  walletCreditUsed?: number;
+  /** Mobile app guests: SHA-256 of their guestAccessToken (never the token). */
+  guestAccessTokenHash?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -182,6 +191,21 @@ const BookingSchema: Schema = new Schema(
       type: Number,
       default: 0,
       min: 0,
+    },
+    source: {
+      type: String,
+      enum: ['web', 'app'],
+      required: false,
+    },
+    advanceRequired: { type: Number, min: 0, required: false },
+    advancePercent: { type: Number, min: 0, max: 100, required: false },
+    walletCreditUsed: { type: Number, min: 0, default: 0 },
+    guestAccessTokenHash: {
+      type: String,
+      required: false,
+      default: null,
+      select: false,
+      index: { sparse: true },
     },
   },
   {
