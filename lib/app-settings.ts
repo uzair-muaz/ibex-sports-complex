@@ -1,5 +1,7 @@
 import connectDB from "@/lib/mongodb";
 import AppSettings, {
+  type ILoyaltySetting,
+  type IPaymentSetting,
   type ISportSetting,
   type IVenueSetting,
   type SportKey,
@@ -32,10 +34,29 @@ export type VenueInfo = {
   weatherSummary: string | null;
 };
 
+export type LoyaltyRules = {
+  earnBasis: "per_pkr" | "per_hour";
+  /** Points earned per block (per_pkr) or per hour (per_hour). */
+  earnPoints: number;
+  /** Size of a spending block in PKR (used when earnBasis is per_pkr). */
+  earnPerPkr: number;
+  minRedeemPoints: number;
+  maxRedeemPercent: number;
+  pkrPerPoint: number;
+  signUpBonusPoints: number;
+  earnOnMembershipHours: boolean;
+};
+
+export type PaymentRules = {
+  minAdvancePercent: number;
+};
+
 export type ResolvedAppSettings = {
   venue: VenueInfo;
   sports: SportRules[];
   cancellationNoticeMinutes: number;
+  loyalty: LoyaltyRules;
+  payments: PaymentRules;
 };
 
 export const SPORT_KEYS: SportKey[] = ["PADEL", "PICKLEBALL", "FUTSAL", "CRICKET"];
@@ -108,12 +129,27 @@ export const DEFAULT_APP_SETTINGS: ResolvedAppSettings = {
     },
   ],
   cancellationNoticeMinutes: 240,
+  // Today's staging rules (lib/loyalty-rules.ts): 10 points per hour played,
+  // use from 100 points, up to 50% of the court fee, 1 point = PKR 1.
+  loyalty: {
+    earnBasis: "per_hour",
+    earnPoints: 10,
+    earnPerPkr: 100,
+    minRedeemPoints: 100,
+    maxRedeemPercent: 50,
+    pkrPerPoint: 1,
+    signUpBonusPoints: 0,
+    earnOnMembershipHours: false,
+  },
+  payments: { minAdvancePercent: 50 },
 };
 
 type StoredSettings = {
   venue?: IVenueSetting | null;
   sports?: ISportSetting[] | null;
   cancellationNoticeMinutes?: number | null;
+  loyalty?: ILoyaltySetting | null;
+  payments?: IPaymentSetting | null;
 };
 
 function pick<T>(value: T | null | undefined, fallback: T): T {
@@ -166,10 +202,26 @@ export function resolveAppSettings(stored: StoredSettings | null | undefined): R
     })
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
+  const l = stored?.loyalty || {};
+  const loyalty: LoyaltyRules = {
+    earnBasis: pick(l.earnBasis, d.loyalty.earnBasis),
+    earnPoints: pick(l.earnPoints, d.loyalty.earnPoints),
+    earnPerPkr: pick(l.earnPerPkr, d.loyalty.earnPerPkr),
+    minRedeemPoints: pick(l.minRedeemPoints, d.loyalty.minRedeemPoints),
+    maxRedeemPercent: pick(l.maxRedeemPercent, d.loyalty.maxRedeemPercent),
+    pkrPerPoint: pick(l.pkrPerPoint, d.loyalty.pkrPerPoint),
+    signUpBonusPoints: pick(l.signUpBonusPoints, d.loyalty.signUpBonusPoints),
+    earnOnMembershipHours: pick(l.earnOnMembershipHours, d.loyalty.earnOnMembershipHours),
+  };
+
   return {
     venue,
     sports,
     cancellationNoticeMinutes: pick(stored?.cancellationNoticeMinutes, d.cancellationNoticeMinutes),
+    loyalty,
+    payments: {
+      minAdvancePercent: pick(stored?.payments?.minAdvancePercent, d.payments.minAdvancePercent),
+    },
   };
 }
 
@@ -177,6 +229,8 @@ export type SettingsPatch = {
   venue?: Partial<VenueInfo>;
   sports?: Array<Partial<SportRules> & { sport: SportKey }>;
   cancellationNoticeMinutes?: number;
+  loyalty?: Partial<LoyaltyRules>;
+  payments?: Partial<PaymentRules>;
 };
 
 type CheckResult = { ok: true; value: SettingsPatch } | { ok: false; error: string };
@@ -236,6 +290,61 @@ export function validateSettingsPatch(input: unknown): CheckResult {
       venue[key] = n;
     }
     out.venue = venue;
+  }
+
+  if (body.loyalty !== undefined) {
+    if (!body.loyalty || typeof body.loyalty !== "object") {
+      return { ok: false, error: "Points rules must be an object." };
+    }
+    const l = body.loyalty as Record<string, unknown>;
+    const loyalty: Partial<LoyaltyRules> = {};
+    if (l.earnBasis !== undefined) {
+      if (l.earnBasis !== "per_pkr" && l.earnBasis !== "per_hour") {
+        return { ok: false, error: "Points are earned either per amount spent or per hour played." };
+      }
+      loyalty.earnBasis = l.earnBasis;
+    }
+    const intRules: Array<[keyof LoyaltyRules, number, number, string]> = [
+      ["earnPoints", 0, 10000, "Points earned"],
+      ["earnPerPkr", 1, 100000, "Spending block (PKR)"],
+      ["minRedeemPoints", 0, 1000000, "Minimum points to use"],
+      ["maxRedeemPercent", 0, 100, "Most of the court fee points can pay (%)"],
+      ["signUpBonusPoints", 0, 100000, "Sign-up bonus"],
+    ];
+    for (const [key, min, max, label] of intRules) {
+      if (l[key] === undefined) continue;
+      if (!isInt(l[key]) || (l[key] as number) < min || (l[key] as number) > max) {
+        return { ok: false, error: `${label} must be a whole number from ${min} to ${max}.` };
+      }
+      (loyalty as Record<string, unknown>)[key] = l[key];
+    }
+    if (l.pkrPerPoint !== undefined) {
+      const v = l.pkrPerPoint;
+      if (typeof v !== "number" || !Number.isFinite(v) || v < 0.01 || v > 1000) {
+        return { ok: false, error: "PKR value of 1 point must be from 0.01 to 1000." };
+      }
+      loyalty.pkrPerPoint = v;
+    }
+    if (l.earnOnMembershipHours !== undefined) {
+      if (typeof l.earnOnMembershipHours !== "boolean") {
+        return { ok: false, error: "earnOnMembershipHours must be true or false." };
+      }
+      loyalty.earnOnMembershipHours = l.earnOnMembershipHours;
+    }
+    out.loyalty = loyalty;
+  }
+
+  if (body.payments !== undefined) {
+    if (!body.payments || typeof body.payments !== "object") {
+      return { ok: false, error: "Payment settings must be an object." };
+    }
+    const p = body.payments as Record<string, unknown>;
+    if (p.minAdvancePercent !== undefined) {
+      if (!isInt(p.minAdvancePercent) || p.minAdvancePercent < 0 || p.minAdvancePercent > 100) {
+        return { ok: false, error: "Advance must be a whole % from 0 to 100." };
+      }
+      out.payments = { minAdvancePercent: p.minAdvancePercent };
+    }
   }
 
   if (body.sports !== undefined) {
@@ -345,6 +454,8 @@ export async function updateAppSettings(
     venue: { ...current.venue, ...(patch.venue || {}) },
     sports,
     cancellationNoticeMinutes: patch.cancellationNoticeMinutes ?? current.cancellationNoticeMinutes,
+    loyalty: { ...current.loyalty, ...(patch.loyalty || {}) },
+    payments: { ...current.payments, ...(patch.payments || {}) },
     updatedBy,
   };
 

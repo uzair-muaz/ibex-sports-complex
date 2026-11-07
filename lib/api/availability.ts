@@ -77,6 +77,50 @@ export function checkAvailabilityRequest(input: {
   return { ok: true };
 }
 
+/** Price of one start time for a duration, after automatic discounts. Whole PKR. */
+export function priceForSlot(
+  court: CourtLike & { type: CourtType },
+  dateKey: string,
+  startHour: number,
+  durationMinutes: number,
+  discounts: DiscountInput[],
+): { rateType: RateType; price: number; originalPrice: number } {
+  const duration = durationMinutes / 60;
+  const { originalPrice } = calculateOriginalPrice(court, startHour, duration);
+  const applicable = getApplicableDiscounts(discounts, {
+    courtType: court.type,
+    court,
+    duration,
+    startTime: startHour,
+    date: dateKey,
+  });
+  const { finalPrice } = calculateDiscountedPrice(originalPrice, applicable, {
+    court,
+    startTime: startHour,
+    duration,
+    date: dateKey,
+  });
+  return {
+    rateType: getBookingStartPricingLabel(court, startHour) ?? "standard",
+    price: roundPkr(finalPrice),
+    originalPrice: roundPkr(originalPrice),
+  };
+}
+
+/** "2026-11-05T18:00:00+05:00" (any offset) → venue date and start hour. Must be on a half hour. */
+export function parseSlotStart(start: unknown): { dateKey: string; hour: number } | null {
+  if (typeof start !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(start)) {
+    return null;
+  }
+  const ms = Date.parse(start);
+  if (Number.isNaN(ms)) return null;
+  const pk = new Date(ms + 5 * 60 * 60_000);
+  if (pk.getUTCSeconds() !== 0 || pk.getUTCMilliseconds() !== 0) return null;
+  const minutes = pk.getUTCHours() * 60 + pk.getUTCMinutes();
+  if (minutes % 30 !== 0) return null;
+  return { dateKey: pk.toISOString().slice(0, 10), hour: minutes / 60 };
+}
+
 /**
  * Every half-hour start (courts are open 24 hours) for one court and day,
  * free or taken, with its price. Starts before `fromHour` (already past) are left out.
@@ -97,27 +141,10 @@ export function buildCourtSlots(input: {
     if (start < (input.fromHour ?? 0)) continue;
 
     const available = !input.bookings.some((b) => overlapsBooking(input.dateKey, start, duration, b));
-    const { originalPrice } = calculateOriginalPrice(input.court, start, duration);
-    const applicable = getApplicableDiscounts(input.discounts, {
-      courtType: input.court.type,
-      court: input.court,
-      duration,
-      startTime: start,
-      date: input.dateKey,
-    });
-    const { finalPrice } = calculateDiscountedPrice(originalPrice, applicable, {
-      court: input.court,
-      startTime: start,
-      duration,
-      date: input.dateKey,
-    });
-
     slots.push({
       start: slotStartIso(input.dateKey, start),
       available,
-      rateType: getBookingStartPricingLabel(input.court, start) ?? "standard",
-      price: roundPkr(finalPrice),
-      originalPrice: roundPkr(originalPrice),
+      ...priceForSlot(input.court, input.dateKey, start, input.durationMinutes, input.discounts),
     });
   }
   return slots;

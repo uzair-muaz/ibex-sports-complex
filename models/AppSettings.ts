@@ -33,11 +33,31 @@ export interface IVenueSetting {
   weatherSummary?: string | null;
 }
 
+export interface ILoyaltySetting {
+  /** "per_pkr": earnPoints for every earnPerPkr spent. "per_hour": earnPoints per hour played. */
+  earnBasis?: "per_pkr" | "per_hour";
+  earnPoints?: number;
+  earnPerPkr?: number;
+  minRedeemPoints?: number;
+  /** Most of the court fee points can pay, in % (100 = all of it). */
+  maxRedeemPercent?: number;
+  pkrPerPoint?: number;
+  signUpBonusPoints?: number;
+  /** Earn points on the part paid with membership hours too. */
+  earnOnMembershipHours?: boolean;
+}
+
+export interface IPaymentSetting {
+  minAdvancePercent?: number;
+}
+
 export interface IAppSettings extends Document {
   key: string;
   venue?: IVenueSetting;
   sports?: ISportSetting[];
   cancellationNoticeMinutes?: number;
+  loyalty?: ILoyaltySetting;
+  payments?: IPaymentSetting;
   updatedBy?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -75,12 +95,33 @@ const VenueSettingSchema = new Schema<IVenueSetting>(
   { _id: false },
 );
 
+const LoyaltySettingSchema = new Schema<ILoyaltySetting>(
+  {
+    earnBasis: { type: String, enum: ["per_pkr", "per_hour"] },
+    earnPoints: { type: Number, min: 0, max: 10000 },
+    earnPerPkr: { type: Number, min: 1, max: 100000 },
+    minRedeemPoints: { type: Number, min: 0, max: 1000000 },
+    maxRedeemPercent: { type: Number, min: 0, max: 100 },
+    pkrPerPoint: { type: Number, min: 0.01, max: 1000 },
+    signUpBonusPoints: { type: Number, min: 0, max: 100000 },
+    earnOnMembershipHours: { type: Boolean },
+  },
+  { _id: false },
+);
+
+const PaymentSettingSchema = new Schema<IPaymentSetting>(
+  { minAdvancePercent: { type: Number, min: 0, max: 100 } },
+  { _id: false },
+);
+
 const AppSettingsSchema = new Schema<IAppSettings>(
   {
     key: { type: String, required: true, unique: true, default: "main" },
     venue: { type: VenueSettingSchema, default: undefined },
     sports: { type: [SportSettingSchema], default: undefined },
     cancellationNoticeMinutes: { type: Number, min: 0, max: 10080 },
+    loyalty: { type: LoyaltySettingSchema, default: undefined },
+    payments: { type: PaymentSettingSchema, default: undefined },
     updatedBy: { type: String, default: null },
   },
   { timestamps: true },

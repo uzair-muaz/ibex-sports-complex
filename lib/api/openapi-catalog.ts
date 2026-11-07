@@ -170,6 +170,71 @@ export const catalogPaths = {
       },
     },
   },
+  "/api/v1/bookings/quote": {
+    post: {
+      tags: ["Bookings"],
+      summary: "Price check before booking (guest or signed in)",
+      description: [
+        "Nothing is saved or reserved. Order: court fee (after automatic promotions) → points → total → advance → wallet → toTransfer → pointsToEarn. All money is whole PKR.",
+        "- total = courtFee − points discount (wallet is money, not a discount).",
+        "- advanceRequired = advancePercent of total, rounded UP. advancePercent comes from Admin → App Settings (50 today).",
+        "- toTransfer = advanceRequired − wallet used (never below 0). 0 means the booking can be confirmed straight away.",
+        "- Guests: points and wallet are null. Points rules come from App Settings (today: 10 per hour played, use from 100, up to 50% of the fee, 1 point = PKR 1).",
+        "- Wallet is always 0 until the wallet phase. Membership hours come in a later phase.",
+        "Errors: 400 VALIDATION_ERROR (bad start), DATE_IN_PAST, DATE_OUT_OF_WINDOW, INVALID_DURATION; 404 COURT_NOT_FOUND; 409 SLOT_UNAVAILABLE.",
+      ].join("\n"),
+      security: [{ bearerAuth: [] }, {}],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["courtId", "start", "durationMinutes"],
+              properties: {
+                courtId: { type: "string" },
+                start: { type: "string", format: "date-time", example: "2026-11-05T18:00:00+05:00" },
+                durationMinutes: { type: "integer", example: 90 },
+                usePoints: { type: "boolean" },
+                useWallet: { type: "boolean" },
+              },
+            },
+            example: {
+              courtId: "6650c0ffee0000000000c001",
+              start: "2026-11-05T18:00:00+05:00",
+              durationMinutes: 90,
+              usePoints: true,
+              useWallet: true,
+            },
+          },
+        },
+      },
+      responses: {
+        "200": ok("Price", {
+          courtId: "6650c0ffee0000000000c001",
+          courtName: "Padel Court 1",
+          sport: "PADEL",
+          start: "2026-11-05T18:00:00+05:00",
+          durationMinutes: 90,
+          rateType: "peak",
+          originalCourtFee: 9000,
+          promotionDiscount: 0,
+          courtFee: 9000,
+          points: { available: 1850, canUse: true, minToUse: 500, maxUsable: 1850, used: 1850, discount: 1850 },
+          wallet: { available: 2000, used: 2000 },
+          total: 7150,
+          advancePercent: 50,
+          advanceRequired: 3575,
+          toTransfer: 1575,
+          remainingAfterAdvance: 3575,
+          pointsToEarn: 710,
+        }),
+        "400": err("Wrong input", "INVALID_DURATION", "Choose one of: 60, 90, 120 minutes."),
+        "404": err("Court not found", "COURT_NOT_FOUND", "Court not found"),
+        "409": err("Already booked", "SLOT_UNAVAILABLE", "This time is already booked. Please pick another."),
+      },
+    },
+  },
   "/api/v1/admin/settings": {
     get: {
       tags: ["Admin"],

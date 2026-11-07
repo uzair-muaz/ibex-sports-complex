@@ -64,6 +64,9 @@ export default function AdminAppSettingsPage() {
   const setVenue = (key: keyof ResolvedAppSettings["venue"], value: unknown) =>
     setDraft((d) => (d ? { ...d, venue: { ...d.venue, [key]: value } } : d));
 
+  const setLoyalty = (patch: Partial<ResolvedAppSettings["loyalty"]>) =>
+    setDraft((d) => (d ? { ...d, loyalty: { ...d.loyalty, ...patch } } : d));
+
   const setSport = (sport: SportRules["sport"], patch: Partial<SportRules>) =>
     setDraft((d) =>
       d
@@ -88,6 +91,8 @@ export default function AdminAppSettingsPage() {
       const { settings } = await saveAdminAppSettings({
         venue: draft.venue,
         cancellationNoticeMinutes: draft.cancellationNoticeMinutes,
+        loyalty: draft.loyalty,
+        payments: draft.payments,
         sports: draft.sports.map((s) => ({
           sport: s.sport,
           label: s.label,
@@ -207,6 +212,104 @@ export default function AdminAppSettingsPage() {
                 }
               />
             </Form.Item>
+          </Card>
+
+          <Card title="Payments">
+            <Form.Item
+              label="Advance to pay before the booking is confirmed (%)"
+              extra={
+                <Text type="secondary">
+                  Worked out on the total after points, rounded up to a whole rupee.
+                </Text>
+              }
+            >
+              <InputNumber
+                min={0}
+                max={100}
+                value={draft.payments.minAdvancePercent}
+                onChange={(v) =>
+                  typeof v === "number" &&
+                  setDraft({ ...draft, payments: { minAdvancePercent: Math.round(v) } })
+                }
+              />
+            </Form.Item>
+          </Card>
+
+          <Card title="Reward points">
+            <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+              <Form.Item label="Customers earn points">
+                <Select
+                  value={draft.loyalty.earnBasis}
+                  onChange={(v: "per_pkr" | "per_hour") => setLoyalty({ earnBasis: v })}
+                  options={[
+                    { value: "per_pkr", label: "For the amount they spend" },
+                    { value: "per_hour", label: "For the hours they play" },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item
+                label={
+                  draft.loyalty.earnBasis === "per_pkr"
+                    ? "Points earned for every block spent"
+                    : "Points earned per hour played"
+                }
+              >
+                <InputNumber
+                  min={0}
+                  value={draft.loyalty.earnPoints}
+                  onChange={(v) => typeof v === "number" && setLoyalty({ earnPoints: Math.round(v) })}
+                />
+              </Form.Item>
+              {draft.loyalty.earnBasis === "per_pkr" && (
+                <Form.Item label="Block size (PKR)" extra={<Text type="secondary">e.g. 10 points for every PKR 100</Text>}>
+                  <InputNumber
+                    min={1}
+                    value={draft.loyalty.earnPerPkr}
+                    onChange={(v) => typeof v === "number" && setLoyalty({ earnPerPkr: Math.round(v) })}
+                  />
+                </Form.Item>
+              )}
+              <Form.Item label="PKR value of 1 point">
+                <InputNumber
+                  min={0.01}
+                  step={0.5}
+                  value={draft.loyalty.pkrPerPoint}
+                  onChange={(v) => typeof v === "number" && setLoyalty({ pkrPerPoint: v })}
+                />
+              </Form.Item>
+              <Form.Item label="Minimum points before they can be used">
+                <InputNumber
+                  min={0}
+                  value={draft.loyalty.minRedeemPoints}
+                  onChange={(v) => typeof v === "number" && setLoyalty({ minRedeemPoints: Math.round(v) })}
+                />
+              </Form.Item>
+              <Form.Item label="Most of the court fee points can pay (%)">
+                <InputNumber
+                  min={0}
+                  max={100}
+                  value={draft.loyalty.maxRedeemPercent}
+                  onChange={(v) => typeof v === "number" && setLoyalty({ maxRedeemPercent: Math.round(v) })}
+                />
+              </Form.Item>
+              <Form.Item label="Sign-up bonus points">
+                <InputNumber
+                  min={0}
+                  value={draft.loyalty.signUpBonusPoints}
+                  onChange={(v) => typeof v === "number" && setLoyalty({ signUpBonusPoints: Math.round(v) })}
+                />
+              </Form.Item>
+              <Form.Item label="Earn points on hours paid with membership">
+                <Switch
+                  checked={draft.loyalty.earnOnMembershipHours}
+                  onChange={(v) => setLoyalty({ earnOnMembershipHours: v })}
+                />
+              </Form.Item>
+            </div>
+            <Text type="secondary">
+              The app uses these rules now. The website will switch to them when the points work
+              (Phase 10) is done.
+            </Text>
           </Card>
 
           {draft.sports.map((s) => (
