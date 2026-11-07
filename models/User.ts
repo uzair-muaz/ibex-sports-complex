@@ -9,6 +9,10 @@ export interface IUser extends Document {
   phone?: string;
   googleId?: string;
   appleId?: string;
+  /** YYYY-MM-DD, optional (mobile profile). */
+  dateOfBirth?: string | null;
+  gender?: "male" | "female" | "unspecified" | null;
+  city?: string | null;
   emailVerified?: Date | null;
   passwordResetTokenHash?: string | null;
   passwordResetExpires?: Date | null;
@@ -62,6 +66,9 @@ const UserSchema: Schema = new Schema(
       sparse: true,
       unique: true,
     },
+    dateOfBirth: { type: String, default: null, match: /^\d{4}-\d{2}-\d{2}$/ },
+    gender: { type: String, enum: ["male", "female", "unspecified", null], default: null },
+    city: { type: String, trim: true, maxlength: 60, default: null },
     emailVerified: {
       type: Date,
       required: false,

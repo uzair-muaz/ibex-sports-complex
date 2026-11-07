@@ -1,0 +1,93 @@
+import mongoose, { Schema, Document, Model } from "mongoose";
+
+/**
+ * One row (key "main") of settings the super admin edits: venue contacts,
+ * per-sport booking rules for the app, and the cancellation notice.
+ * Anything missing falls back to the defaults in lib/app-settings.ts.
+ */
+export type SportKey = "PADEL" | "PICKLEBALL" | "FUTSAL" | "CRICKET";
+
+export interface ISportSetting {
+  sport: SportKey;
+  label?: string;
+  showInApp?: boolean;
+  imageUrl?: string;
+  badge?: string | null;
+  durationsMinutes?: number[];
+  defaultDurationMinutes?: number;
+  bookingWindowDays?: number;
+  sortOrder?: number;
+}
+
+export interface IVenueSetting {
+  name?: string;
+  branchName?: string;
+  hoursLabel?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  phone?: string;
+  whatsApp?: string;
+  email?: string;
+  facilityNote?: string | null;
+  weatherSummary?: string | null;
+}
+
+export interface IAppSettings extends Document {
+  key: string;
+  venue?: IVenueSetting;
+  sports?: ISportSetting[];
+  cancellationNoticeMinutes?: number;
+  updatedBy?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const SportSettingSchema = new Schema<ISportSetting>(
+  {
+    sport: { type: String, enum: ["PADEL", "PICKLEBALL", "FUTSAL", "CRICKET"], required: true },
+    label: { type: String, trim: true, maxlength: 40 },
+    showInApp: { type: Boolean },
+    imageUrl: { type: String, trim: true, maxlength: 1000 },
+    badge: { type: String, trim: true, maxlength: 30, default: null },
+    durationsMinutes: [{ type: Number, min: 30, max: 720 }],
+    defaultDurationMinutes: { type: Number, min: 30, max: 720 },
+    bookingWindowDays: { type: Number, min: 1, max: 365 },
+    sortOrder: { type: Number },
+  },
+  { _id: false },
+);
+
+const VenueSettingSchema = new Schema<IVenueSetting>(
+  {
+    name: { type: String, trim: true, maxlength: 80 },
+    branchName: { type: String, trim: true, maxlength: 80 },
+    hoursLabel: { type: String, trim: true, maxlength: 80 },
+    address: { type: String, trim: true, maxlength: 300 },
+    latitude: { type: Number, min: -90, max: 90 },
+    longitude: { type: Number, min: -180, max: 180 },
+    phone: { type: String, trim: true, maxlength: 30 },
+    whatsApp: { type: String, trim: true, maxlength: 30 },
+    email: { type: String, trim: true, maxlength: 120 },
+    facilityNote: { type: String, trim: true, maxlength: 120, default: null },
+    weatherSummary: { type: String, trim: true, maxlength: 60, default: null },
+  },
+  { _id: false },
+);
+
+const AppSettingsSchema = new Schema<IAppSettings>(
+  {
+    key: { type: String, required: true, unique: true, default: "main" },
+    venue: { type: VenueSettingSchema, default: undefined },
+    sports: { type: [SportSettingSchema], default: undefined },
+    cancellationNoticeMinutes: { type: Number, min: 0, max: 10080 },
+    updatedBy: { type: String, default: null },
+  },
+  { timestamps: true },
+);
+
+const AppSettings: Model<IAppSettings> =
+  mongoose.models.AppSettings ||
+  mongoose.model<IAppSettings>("AppSettings", AppSettingsSchema);
+
+export default AppSettings;

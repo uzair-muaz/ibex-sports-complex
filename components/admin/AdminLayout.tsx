@@ -19,6 +19,7 @@ import {
   TagOutlined,
   MessageOutlined,
   AppstoreOutlined,
+  SettingOutlined,
   TeamOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -110,6 +111,11 @@ export function AdminLayout({
           key: "/admin/users",
           icon: <TeamOutlined />,
           label: "Users",
+        },
+        {
+          key: "/admin/settings",
+          icon: <SettingOutlined />,
+          label: "App Settings",
         },
       );
     }

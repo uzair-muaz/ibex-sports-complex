@@ -1,6 +1,9 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import { COURT_FEATURE_KEYS, type CourtFeature } from "@/lib/court-features";
 
 export type CourtType = "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
+
+export { COURT_FEATURE_KEYS, type CourtFeature, type CourtFeatureKey } from "@/lib/court-features";
 
 export interface ICourt extends Document {
   name: string;
@@ -19,9 +22,23 @@ export interface ICourt extends Document {
     pricePerHour: number;
     allDay?: boolean;
   }[];
+  /** Mobile app card details (all optional; the website ignores them). */
+  surfaceLabel?: string;
+  isIndoor?: boolean;
+  hasRacketRental?: boolean;
+  features?: CourtFeature[];
+  highlight?: CourtFeature | null;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const CourtFeatureSchema = new Schema(
+  {
+    key: { type: String, enum: COURT_FEATURE_KEYS, required: true },
+    label: { type: String, required: true, trim: true, maxlength: 40 },
+  },
+  { _id: false },
+);
 
 const CourtSchema: Schema = new Schema(
   {
@@ -58,6 +75,11 @@ const CourtSchema: Schema = new Schema(
       type: Boolean,
       default: false,
     },
+    surfaceLabel: { type: String, trim: true, maxlength: 40, default: "" },
+    isIndoor: { type: Boolean, default: false },
+    hasRacketRental: { type: Boolean, default: false },
+    features: { type: [CourtFeatureSchema], default: [] },
+    highlight: { type: CourtFeatureSchema, default: null },
     pricingPeriods: [
       {
         label: {

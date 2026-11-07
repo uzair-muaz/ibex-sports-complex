@@ -23,8 +23,13 @@ import {
   patchPricingPeriod,
   type CourtFormState,
 } from "./courtHelpers";
+import { COURT_FEATURE_LABELS } from "@/lib/court-features";
 
 const { Text } = Typography;
+
+const FEATURE_OPTIONS = Object.entries(COURT_FEATURE_LABELS).map(
+  ([value, label]) => ({ value, label }),
+);
 const { TextArea } = Input;
 
 type CourtFormModalProps = {
@@ -291,6 +296,94 @@ export function CourtFormModal({
             )}
           </div>
         )}
+
+        <div className="mt-6 rounded-lg border border-white/10 p-4">
+          <Text strong className="block">
+            Mobile app details
+          </Text>
+          <Text type="secondary" className="mb-3 block text-[11px]">
+            Shown on the court card in the app. The website ignores these.
+          </Text>
+          <Form.Item
+            label="Photo link"
+            extra={
+              <Text type="secondary" className="text-[11px]">
+                An https:// link (or /images/… on this site). Leave empty to use
+                the sport&apos;s photo.
+              </Text>
+            }
+          >
+            <Input
+              value={courtForm.image}
+              onChange={(e) =>
+                setCourtForm({ ...courtForm, image: e.target.value })
+              }
+              placeholder="https://…/court1.jpg"
+            />
+          </Form.Item>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Form.Item label="Surface">
+              <Input
+                value={courtForm.surfaceLabel}
+                maxLength={40}
+                onChange={(e) =>
+                  setCourtForm({ ...courtForm, surfaceLabel: e.target.value })
+                }
+                placeholder="Pro turf"
+              />
+            </Form.Item>
+            <Form.Item label="Filters">
+              <Space direction="vertical">
+                <Checkbox
+                  checked={courtForm.isIndoor}
+                  onChange={(e) =>
+                    setCourtForm({ ...courtForm, isIndoor: e.target.checked })
+                  }
+                >
+                  Indoor
+                </Checkbox>
+                <Checkbox
+                  checked={courtForm.hasRacketRental}
+                  onChange={(e) =>
+                    setCourtForm({
+                      ...courtForm,
+                      hasRacketRental: e.target.checked,
+                    })
+                  }
+                >
+                  Racket rental
+                </Checkbox>
+              </Space>
+            </Form.Item>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Form.Item label="Features">
+              <Select
+                mode="multiple"
+                value={courtForm.featureKeys}
+                onChange={(v) =>
+                  setCourtForm({ ...courtForm, featureKeys: v as string[] })
+                }
+                options={FEATURE_OPTIONS}
+                placeholder="LED lighting, Benches…"
+              />
+            </Form.Item>
+            <Form.Item label="Main feature (highlight)">
+              <Select
+                allowClear
+                value={courtForm.highlightKey ?? undefined}
+                onChange={(v) =>
+                  setCourtForm({
+                    ...courtForm,
+                    highlightKey: (v as string | undefined) ?? null,
+                  })
+                }
+                options={FEATURE_OPTIONS}
+                placeholder="Match replay"
+              />
+            </Form.Item>
+          </div>
+        </div>
 
         <Form.Item className="mb-0 mt-6">
           <Space className="flex justify-end">

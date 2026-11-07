@@ -2,6 +2,8 @@
 
 import connectDB from '@/lib/mongodb';
 import Court from '@/models/Court';
+import type { CourtFeature } from '@/models/Court';
+import { sanitizeCourtAppFields } from '@/lib/court-app-fields';
 import { safeRevalidatePath } from '@/lib/safe-revalidate';
 import type { CourtPricingPeriod } from '@/types';
 import { requireStaffActor, type StaffActorOpts } from '@/lib/action-auth';
@@ -123,6 +125,12 @@ export interface CreateCourtInput {
   pricePerHour: number;
   timeBasedPricingEnabled?: boolean;
   pricingPeriods?: CourtPricingPeriod[];
+  surfaceLabel?: string;
+  isIndoor?: boolean;
+  hasRacketRental?: boolean;
+  /** Feature objects, or just keys (labels are filled in). */
+  features?: Array<CourtFeature | string>;
+  highlight?: CourtFeature | string | null;
 }
 
 export async function createCourt(input: CreateCourtInput, opts?: StaffActorOpts) {
@@ -141,11 +149,15 @@ export async function createCourt(input: CreateCourtInput, opts?: StaffActorOpts
       }
     }
 
+    const app = sanitizeCourtAppFields(input as unknown as Record<string, unknown>);
+    if (!app.ok) return { success: false, error: app.error };
+
     const court = await Court.create({
       name: input.name,
       type: input.type,
-      image: input.image || '', // Images are hardcoded, not stored
+      image: input.image || '', // Empty → the app falls back to the sport photo
       description: input.description,
+      ...app.value,
       pricePerHour: input.pricePerHour,
       isActive: true,
       timeBasedPricingEnabled: input.timeBasedPricingEnabled ?? false,
@@ -178,6 +190,12 @@ export interface UpdateCourtInput {
   isActive?: boolean;
   timeBasedPricingEnabled?: boolean;
   pricingPeriods?: CourtPricingPeriod[];
+  surfaceLabel?: string;
+  isIndoor?: boolean;
+  hasRacketRental?: boolean;
+  /** Feature objects, or just keys (labels are filled in). */
+  features?: Array<CourtFeature | string>;
+  highlight?: CourtFeature | string | null;
 }
 
 export async function updateCourt(input: UpdateCourtInput, opts?: StaffActorOpts) {
@@ -187,6 +205,10 @@ export async function updateCourt(input: UpdateCourtInput, opts?: StaffActorOpts
     await connectDB();
 
     const { courtId, ...updateData } = input;
+
+    const app = sanitizeCourtAppFields(updateData as unknown as Record<string, unknown>);
+    if (!app.ok) return { success: false, error: app.error };
+    Object.assign(updateData, app.value);
 
     if (updateData.timeBasedPricingEnabled) {
       const error = validateTimeBasedPricing(updateData.pricingPeriods || []);

@@ -1,0 +1,289 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import {
+  App,
+  Button,
+  Card,
+  Form,
+  Input,
+  InputNumber,
+  Select,
+  Switch,
+  Typography,
+} from "antd";
+import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminTableSkeleton } from "@/components/admin/loaders";
+import {
+  fetchAdminAppSettings,
+  saveAdminAppSettings,
+} from "@/lib/tanstack/requests/admin-settings.requests";
+import type { ResolvedAppSettings, SportRules } from "@/lib/app-settings";
+
+const { Text } = Typography;
+
+/** Same rule as the server: Futsal from 90 minutes, others from 60. */
+function durationOptions(sport: SportRules["sport"]) {
+  const min = sport === "FUTSAL" ? 90 : 60;
+  const out: { value: number; label: string }[] = [];
+  for (let m = min; m <= 360; m += 30) {
+    const h = m / 60;
+    out.push({ value: m, label: `${m} min (${h} h)` });
+  }
+  return out;
+}
+
+export default function AdminAppSettingsPage() {
+  const { message } = App.useApp();
+  const { data: session } = useSession();
+  const router = useRouter();
+  const isSuperAdmin = session?.user?.role === "super_admin";
+  const [draft, setDraft] = useState<ResolvedAppSettings | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const query = useQuery({
+    queryKey: ["admin", "app-settings"],
+    queryFn: fetchAdminAppSettings,
+    enabled: !!session && isSuperAdmin,
+  });
+
+  useEffect(() => {
+    if (!session || isSuperAdmin) return;
+    router.push("/admin/bookings");
+  }, [session, isSuperAdmin, router]);
+
+  useEffect(() => {
+    if (query.data?.settings) setDraft(query.data.settings);
+  }, [query.data]);
+
+  if (!isSuperAdmin) return null;
+
+  const setVenue = (key: keyof ResolvedAppSettings["venue"], value: unknown) =>
+    setDraft((d) => (d ? { ...d, venue: { ...d.venue, [key]: value } } : d));
+
+  const setSport = (sport: SportRules["sport"], patch: Partial<SportRules>) =>
+    setDraft((d) =>
+      d
+        ? {
+            ...d,
+            sports: d.sports.map((s) => {
+              if (s.sport !== sport) return s;
+              const next = { ...s, ...patch };
+              if (!next.durationsMinutes.includes(next.defaultDurationMinutes)) {
+                next.defaultDurationMinutes = next.durationsMinutes[0] ?? next.defaultDurationMinutes;
+              }
+              return next;
+            }),
+          }
+        : d,
+    );
+
+  const save = async () => {
+    if (!draft) return;
+    setSaving(true);
+    try {
+      const { settings } = await saveAdminAppSettings({
+        venue: draft.venue,
+        cancellationNoticeMinutes: draft.cancellationNoticeMinutes,
+        sports: draft.sports.map((s) => ({
+          sport: s.sport,
+          label: s.label,
+          showInApp: s.showInApp,
+          imageUrl: s.imageUrl,
+          badge: s.badge,
+          durationsMinutes: s.durationsMinutes,
+          defaultDurationMinutes: s.defaultDurationMinutes,
+          bookingWindowDays: s.bookingWindowDays,
+          sortOrder: s.sortOrder,
+        })),
+      });
+      setDraft(settings);
+      message.success("Settings saved");
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : "Could not save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AdminLayout
+      title="App Settings"
+      description="Venue details and booking rules for the mobile app"
+      onRefresh={() => query.refetch()}
+      isLoading={query.isFetching}
+      actionButton={
+        <Button type="primary" onClick={save} loading={saving} disabled={!draft}>
+          Save changes
+        </Button>
+      }
+    >
+      {!draft ? (
+        <AdminTableSkeleton />
+      ) : (
+        <Form layout="vertical" className="flex flex-col gap-4">
+          <Card title="Venue and contacts">
+            <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+              <Form.Item label="Venue name">
+                <Input value={draft.venue.name} onChange={(e) => setVenue("name", e.target.value)} />
+              </Form.Item>
+              <Form.Item label="Branch name">
+                <Input
+                  value={draft.venue.branchName}
+                  onChange={(e) => setVenue("branchName", e.target.value)}
+                />
+              </Form.Item>
+              <Form.Item label="Opening hours text">
+                <Input
+                  value={draft.venue.hoursLabel}
+                  onChange={(e) => setVenue("hoursLabel", e.target.value)}
+                  placeholder="Open 24 hours"
+                />
+              </Form.Item>
+              <Form.Item label="Email">
+                <Input value={draft.venue.email} onChange={(e) => setVenue("email", e.target.value)} />
+              </Form.Item>
+              <Form.Item label="Phone">
+                <Input value={draft.venue.phone} onChange={(e) => setVenue("phone", e.target.value)} />
+              </Form.Item>
+              <Form.Item label="WhatsApp">
+                <Input
+                  value={draft.venue.whatsApp}
+                  onChange={(e) => setVenue("whatsApp", e.target.value)}
+                />
+              </Form.Item>
+              <Form.Item label="Latitude">
+                <InputNumber
+                  className="w-full"
+                  value={draft.venue.latitude}
+                  step={0.0001}
+                  onChange={(v) => typeof v === "number" && setVenue("latitude", v)}
+                />
+              </Form.Item>
+              <Form.Item label="Longitude">
+                <InputNumber
+                  className="w-full"
+                  value={draft.venue.longitude}
+                  step={0.0001}
+                  onChange={(v) => typeof v === "number" && setVenue("longitude", v)}
+                />
+              </Form.Item>
+            </div>
+            <Form.Item label="Address">
+              <Input.TextArea
+                rows={2}
+                value={draft.venue.address}
+                onChange={(e) => setVenue("address", e.target.value)}
+              />
+            </Form.Item>
+            <Form.Item
+              label="Home screen note (optional)"
+              extra={<Text type="secondary">A short line on the app&apos;s Home, e.g. “Night slots now open”.</Text>}
+            >
+              <Input
+                maxLength={120}
+                value={draft.venue.facilityNote ?? ""}
+                onChange={(e) => setVenue("facilityNote", e.target.value || null)}
+              />
+            </Form.Item>
+          </Card>
+
+          <Card title="Booking rules">
+            <Form.Item
+              label="Customers can cancel until (minutes before start)"
+              extra={<Text type="secondary">240 minutes = 4 hours.</Text>}
+            >
+              <InputNumber
+                min={0}
+                max={10080}
+                step={30}
+                value={draft.cancellationNoticeMinutes}
+                onChange={(v) =>
+                  typeof v === "number" &&
+                  setDraft({ ...draft, cancellationNoticeMinutes: v })
+                }
+              />
+            </Form.Item>
+          </Card>
+
+          {draft.sports.map((s) => (
+            <Card
+              key={s.sport}
+              title={s.label}
+              extra={
+                <span className="flex items-center gap-2">
+                  <Text type="secondary">Show in app</Text>
+                  <Switch
+                    checked={s.showInApp}
+                    onChange={(v) => setSport(s.sport, { showInApp: v })}
+                  />
+                </span>
+              }
+            >
+              <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+                <Form.Item label="Name in the app">
+                  <Input
+                    value={s.label}
+                    maxLength={40}
+                    onChange={(e) => setSport(s.sport, { label: e.target.value })}
+                  />
+                </Form.Item>
+                <Form.Item label="Badge (optional)">
+                  <Input
+                    value={s.badge ?? ""}
+                    maxLength={30}
+                    placeholder="Most Popular"
+                    onChange={(e) => setSport(s.sport, { badge: e.target.value || null })}
+                  />
+                </Form.Item>
+                <Form.Item label="Durations customers can pick">
+                  <Select
+                    mode="multiple"
+                    value={s.durationsMinutes}
+                    options={durationOptions(s.sport)}
+                    onChange={(v: number[]) =>
+                      v.length > 0 &&
+                      setSport(s.sport, { durationsMinutes: [...v].sort((a, b) => a - b) })
+                    }
+                  />
+                </Form.Item>
+                <Form.Item label="Selected by default">
+                  <Select
+                    value={s.defaultDurationMinutes}
+                    options={s.durationsMinutes.map((m) => ({ value: m, label: `${m} min` }))}
+                    onChange={(v: number) => setSport(s.sport, { defaultDurationMinutes: v })}
+                  />
+                </Form.Item>
+                <Form.Item label="How many days ahead customers can book">
+                  <InputNumber
+                    min={1}
+                    max={365}
+                    value={s.bookingWindowDays}
+                    onChange={(v) =>
+                      typeof v === "number" && setSport(s.sport, { bookingWindowDays: v })
+                    }
+                  />
+                </Form.Item>
+                <Form.Item label="Order on Home">
+                  <InputNumber
+                    value={s.sortOrder}
+                    onChange={(v) => typeof v === "number" && setSport(s.sport, { sortOrder: v })}
+                  />
+                </Form.Item>
+              </div>
+              <Form.Item label="Photo link" extra={<Text type="secondary">https://… or /images/…</Text>}>
+                <Input
+                  value={s.imageUrl}
+                  onChange={(e) => setSport(s.sport, { imageUrl: e.target.value })}
+                />
+              </Form.Item>
+            </Card>
+          ))}
+        </Form>
+      )}
+    </AdminLayout>
+  );
+}

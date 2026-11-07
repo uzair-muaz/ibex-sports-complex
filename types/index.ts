@@ -34,6 +34,12 @@ export interface Court {
   timeBasedPricingEnabled?: boolean;
   /** Optional list of peak/off-peak pricing periods */
   pricingPeriods?: CourtPricingPeriod[];
+  /** Mobile app card details */
+  surfaceLabel?: string;
+  isIndoor?: boolean;
+  hasRacketRental?: boolean;
+  features?: { key: string; label: string }[];
+  highlight?: { key: string; label: string } | null;
 }
 
 export interface AppliedDiscount {

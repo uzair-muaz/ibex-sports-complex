@@ -3,6 +3,7 @@
 import bcrypt from "bcryptjs";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
+import { normalizePakPhone } from "@/lib/phone";
 
 export type RegisterCustomerInput = {
   name: string;
@@ -26,17 +27,6 @@ export type RegisterCustomerResult =
       user: { id: string; email: string; name: string; role: "user" };
     }
   | { success: false; error: string; code: RegisterErrorCode };
-
-function normalizePakPhone(raw: string): string | null {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 11 && digits.startsWith("03")) {
-    return `+92${digits.slice(1)}`;
-  }
-  if (digits.length === 12 && digits.startsWith("92")) {
-    return `+${digits}`;
-  }
-  return null;
-}
 
 export async function registerCustomer(
   input: RegisterCustomerInput,

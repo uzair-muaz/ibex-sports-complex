@@ -8,6 +8,13 @@ export type CourtFormState = {
   isActive: boolean;
   timeBasedPricingEnabled: boolean;
   pricingPeriods: CourtPricingPeriod[];
+  /** Mobile app details */
+  image: string;
+  surfaceLabel: string;
+  isIndoor: boolean;
+  hasRacketRental: boolean;
+  featureKeys: string[];
+  highlightKey: string | null;
 };
 
 export const COURT_TYPE_OPTIONS = [
@@ -31,6 +38,12 @@ export function createEmptyCourtForm(): CourtFormState {
     isActive: true,
     timeBasedPricingEnabled: false,
     pricingPeriods: [],
+    image: "",
+    surfaceLabel: "",
+    isIndoor: false,
+    hasRacketRental: false,
+    featureKeys: [],
+    highlightKey: null,
   };
 }
 
@@ -43,7 +56,19 @@ export function courtToFormState(court: Court): CourtFormState {
     isActive: court.isActive,
     timeBasedPricingEnabled: court.timeBasedPricingEnabled ?? false,
     pricingPeriods: court.pricingPeriods ?? [],
+    image: court.image ?? "",
+    surfaceLabel: court.surfaceLabel ?? "",
+    isIndoor: court.isIndoor ?? false,
+    hasRacketRental: court.hasRacketRental ?? false,
+    featureKeys: (court.features ?? []).map((f) => f.key),
+    highlightKey: court.highlight?.key ?? null,
   };
+}
+
+/** Form state → what the courts API saves (features sent as keys; labels filled on the server). */
+export function courtFormToPayload(form: CourtFormState) {
+  const { featureKeys, highlightKey, ...rest } = form;
+  return { ...rest, features: featureKeys, highlight: highlightKey };
 }
 
 export function formatHourLabel(hour: number): string {

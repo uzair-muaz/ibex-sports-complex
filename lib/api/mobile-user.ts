@@ -12,6 +12,9 @@ export type MobileUserSource = {
   googleId?: string | null;
   appleId?: string | null;
   createdAt?: Date | string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  city?: string | null;
 };
 
 export type SignInMethod = "email" | "google" | "apple";
@@ -73,10 +76,9 @@ export function toMobileUser(user: MobileUserSource): MobileUser {
     image,
     role: user.role,
     memberSince: toPkIso(user.createdAt ?? null),
-    // Filled in by Phase 2 (profile fields).
-    dateOfBirth: null,
-    gender: null,
-    city: null,
+    dateOfBirth: user.dateOfBirth || null,
+    gender: user.gender || null,
+    city: user.city || null,
     signInMethod: signInMethodFor(user),
   };
 }

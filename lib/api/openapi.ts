@@ -1,4 +1,5 @@
 import { authPaths, authSchemas } from "@/lib/api/openapi-auth";
+import { catalogPaths } from "@/lib/api/openapi-catalog";
 
 /**
  * OpenAPI 3.0 document for the public HTTP API (`/api/v1`).
@@ -37,6 +38,7 @@ export function getOpenApiDocument(baseUrl?: string) {
     servers: [{ url: serverUrl, description: "API host" }],
     tags: [
       { name: "Auth", description: "Mobile Google sign-in and session probe" },
+      { name: "Venue", description: "Venue, sports, booking policy and courts (public)" },
       { name: "Bookings", description: "Public booking create" },
       { name: "Account", description: "Customer profile, bookings, loyalty, membership, support" },
       { name: "Admin", description: "Staff-only operations" },
@@ -264,23 +266,6 @@ export function getOpenApiDocument(baseUrl?: string) {
           },
         },
       },
-      "/api/v1/courts": {
-        get: {
-          tags: ["Bookings"],
-          summary: "Public active courts catalog",
-          parameters: [
-            {
-              name: "type",
-              in: "query",
-              schema: {
-                type: "string",
-                enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
-              },
-            },
-          ],
-          responses: { "200": { description: "OK" } },
-        },
-      },
       "/api/v1/health": {
         get: {
           tags: ["Auth"],
@@ -288,39 +273,6 @@ export function getOpenApiDocument(baseUrl?: string) {
           responses: {
             "200": { description: "Healthy" },
             "503": { description: "Database unavailable" },
-          },
-        },
-      },
-      "/api/v1/account/profile": {
-        get: {
-          tags: ["Account"],
-          summary: "Get my profile",
-          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-          responses: {
-            "200": { description: "OK" },
-            "401": { description: "Unauthorized" },
-          },
-        },
-        patch: {
-          tags: ["Account"],
-          summary: "Update my profile (name, phone)",
-          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-          requestBody: {
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string" },
-                    phone: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-          responses: {
-            "200": { description: "OK" },
-            "401": { description: "Unauthorized" },
           },
         },
       },
@@ -709,6 +661,7 @@ export function getOpenApiDocument(baseUrl?: string) {
         },
       },
       ...authPaths,
+      ...catalogPaths,
     },
   } as const;
 }
