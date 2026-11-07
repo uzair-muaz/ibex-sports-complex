@@ -7,6 +7,7 @@ import {
 } from "@/lib/membership-rules";
 import { refundLoyaltyForBooking } from "@/lib/loyalty";
 import { returnHoursForBooking } from "@/lib/membership-hours";
+import { notifyBookingCancelled } from "@/lib/notifications/events";
 import { revalidatePath } from "next/cache";
 import { resolveCustomerActor } from "@/lib/action-auth";
 import { creditWallet } from "@/lib/wallet";
@@ -151,6 +152,7 @@ export async function cancelMyBooking(
 
   // Gives the hours back to the right sport, once.
   await returnHoursForBooking(bookingId);
+  await notifyBookingCancelled({ bookingId, by: "customer", refundAmount });
 
   revalidatePath("/account/bookings");
   revalidatePath(`/account/bookings/${bookingId}`);

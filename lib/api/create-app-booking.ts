@@ -10,6 +10,7 @@ import { resolveSlot } from "@/lib/api/slot";
 import { debitWallet, undoWalletDebit, walletBalance } from "@/lib/wallet";
 import { getAppSettings } from "@/lib/app-settings";
 import { computeQuote } from "@/lib/pricing/quote";
+import { notifyBookingReceived } from "@/lib/notifications/events";
 import {
   checkHoursForSlot,
   loadMembershipForHours,
@@ -412,6 +413,7 @@ export async function createAppBooking(params: {
       );
     }
 
+    await notifyBookingReceived(bookingId);
     const view = await viewFor(bookingId, settings);
     return { ok: true, status: 201, booking: view!, guestAccessToken };
   } catch (err) {

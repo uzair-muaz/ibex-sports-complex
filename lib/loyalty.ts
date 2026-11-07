@@ -67,6 +67,9 @@ export async function awardLoyaltyForCompletedBooking(bookingId: string) {
     note: `Earned for completed booking (${booking.duration}h)`,
   });
 
+  const { notifyPointsEarned } = await import("@/lib/notifications/events");
+  await notifyPointsEarned({ userId: booking.userId, points, bookingId: booking._id });
+
   return { success: true as const, skipped: false, points };
 }
 

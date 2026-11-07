@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { notifyPaymentVerified, notifyProofRejected, notifyProofSubmitted } from "@/lib/notifications/events";
 import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import Booking from "@/models/Booking";
@@ -230,6 +231,7 @@ export async function submitAppProof(params: {
     fileType: file.type,
     fileSize: file.data.length,
   });
+  await notifyProofSubmitted({ bookingId: params.bookingId, proofId: proof._id.toString(), amount });
   return { ok: true, proof: toMobileProof(proof.toObject() as unknown as ProofLike) };
 }
 
@@ -305,6 +307,7 @@ export async function verifyProof(params: {
     return { ok: false, status: 409, code: "PROOF_ALREADY_REVIEWED", error: "This proof was already checked." };
   }
   await applyVerifiedAmount(proof.bookingId, amount, params.minAdvancePercent, `proof:${proof._id}`);
+  await notifyPaymentVerified({ bookingId: proof.bookingId.toString(), proofId: proof._id.toString(), amount });
   return { ok: true };
 }
 
@@ -330,6 +333,7 @@ export async function rejectProof(params: {
   if (!proof) {
     return { ok: false, status: 409, code: "PROOF_ALREADY_REVIEWED", error: "This proof was already checked." };
   }
+  await notifyProofRejected({ bookingId: proof.bookingId.toString(), proofId: proof._id.toString(), reason });
   return { ok: true };
 }
 
@@ -394,5 +398,6 @@ export async function addWhatsAppProof(params: {
     params.minAdvancePercent,
     `proof:${created._id}`,
   );
+  await notifyPaymentVerified({ bookingId, proofId: created._id.toString(), amount });
   return { ok: true, bookingId };
 }

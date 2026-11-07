@@ -39,6 +39,7 @@ import {
   returnHoursForBooking,
   takeSportHours,
 } from '@/lib/membership-hours';
+import { notifyBookingCancelled } from '@/lib/notifications/events';
 
 async function getActiveDiscountsForBusinessDate(bookingDateKey: string) {
   const discountsRaw = await Discount.find({ isActive: true }).lean();
@@ -947,6 +948,7 @@ export async function cancelBooking(bookingId: string, opts?: StaffActorOpts) {
 
     // Gives the hours back to the right sport, once.
     await returnHoursForBooking(bookingId);
+    await notifyBookingCancelled({ bookingId, by: "venue" });
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');
@@ -990,8 +992,9 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
     await connectDB();
 
     const { bookingId, ...updateData } = input;
-    const existingForRollup = await Booking.findById(bookingId).select("date").lean();
+    const existingForRollup = await Booking.findById(bookingId).select("date status").lean();
     const previousDate = existingForRollup?.date as string | undefined;
+    const previousStatus = existingForRollup?.status as string | undefined;
 
     // If email is provided, lowercase it
     if (updateData.userEmail) {
@@ -1126,6 +1129,10 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
       await returnHoursForBooking(updatedBooking._id).catch((err) =>
         console.error('Membership hours return error:', err),
       );
+      // Only when staff just changed it to cancelled; sent once per booking.
+      if (previousStatus && previousStatus !== 'cancelled') {
+        await notifyBookingCancelled({ bookingId: updatedBooking._id, by: 'venue' });
+      }
     }
 
     safeRevalidatePath('/admin');

@@ -46,6 +46,14 @@ export async function creditWallet(params: {
       { upsert: true, new: true },
     );
     await WalletTransaction.updateOne({ _id: txnId }, { $set: { balanceAfter: account.balance } });
+    const { notifyWalletCredited } = await import("@/lib/notifications/events");
+    await notifyWalletCredited({
+      userId: params.userId,
+      amount,
+      balance: account.balance,
+      refKey: params.refKey,
+      bookingId: params.bookingId ?? null,
+    });
     return { credited: true, balance: account.balance };
   } catch (err) {
     await WalletTransaction.deleteOne({ _id: txnId }).catch(() => {});
