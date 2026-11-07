@@ -158,7 +158,7 @@ export function getOpenApiDocument(baseUrl?: string) {
           tags: ["Auth"],
           summary: "Request a password reset email",
           description:
-            "Always returns a generic success message. Sends a 1-hour reset link when a customer account exists for the email (including Google-only accounts).",
+            "Always returns a generic success message. Sends a reset link (valid linkValidMinutes, 60 today) when a customer account exists for the email (including Google-only accounts).",
           requestBody: {
             required: true,
             content: {
@@ -174,7 +174,19 @@ export function getOpenApiDocument(baseUrl?: string) {
             },
           },
           responses: {
-            "200": { description: "Accepted" },
+            "200": {
+              description: "Accepted. The same answer whether or not an account exists for the email.",
+              content: {
+                "application/json": {
+                  example: {
+                    success: true,
+                    message: "If an account exists for that email, we sent a password reset link.",
+                    sentTo: "sara.khan@example.com",
+                    linkValidMinutes: 60,
+                  },
+                },
+              },
+            },
             "400": { description: "Missing email" },
           },
         },

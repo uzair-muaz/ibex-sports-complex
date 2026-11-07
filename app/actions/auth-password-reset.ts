@@ -6,8 +6,9 @@ import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import { sendHtmlEmail } from "@/lib/email";
 import { getBaseUrl } from "@/lib/utils";
+import { RESET_LINK_MINUTES, normaliseResetEmail } from "@/lib/password-reset-rules";
 
-const RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+const RESET_TTL_MS = RESET_LINK_MINUTES * 60 * 1000;
 
 function hashToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -25,7 +26,7 @@ function buildResetEmailHtml(params: {
     <h1 style="margin:0 0 16px;font-size:22px;color:#fafafa;">Reset your password</h1>
     <p style="margin:0 0 16px;line-height:1.5;color:#a1a1aa;">
       Hi ${params.name}, use the button below to set a new password for your account.
-      This link expires in 1 hour.
+      This link expires in ${RESET_LINK_MINUTES % 60 === 0 ? `${RESET_LINK_MINUTES / 60} hour${RESET_LINK_MINUTES === 60 ? "" : "s"}` : `${RESET_LINK_MINUTES} minutes`}.
     </p>
     <p style="margin:24px 0;">
       <a href="${params.resetUrl}"
@@ -49,7 +50,7 @@ export async function requestPasswordReset(emailRaw: string): Promise<{
   success: true;
   message: string;
 }> {
-  const email = emailRaw?.trim().toLowerCase() || "";
+  const email = normaliseResetEmail(emailRaw);
   const generic = {
     success: true as const,
     message:

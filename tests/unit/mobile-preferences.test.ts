@@ -105,3 +105,12 @@ describe("FAQs", () => {
     expect(validateSettingsPatch({ faqs: Array(31).fill({ question: "Question?", answer: "Answer." }) }).ok).toBe(false);
   });
 });
+
+describe("password reset answer", () => {
+  it("link time and the email as entered, normalised", async () => {
+    const { RESET_LINK_MINUTES, normaliseResetEmail } = await import("@/lib/password-reset-rules");
+    expect(RESET_LINK_MINUTES).toBe(60);
+    expect(normaliseResetEmail("  Sara.Khan@Example.COM ")).toBe("sara.khan@example.com");
+    expect(normaliseResetEmail(undefined)).toBe("");
+  });
+});
