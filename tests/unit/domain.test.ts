@@ -1,16 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  LOYALTY_MIN_REDEEM_POINTS,
-  maxRedeemablePoints,
-  pointsForDuration,
-  pkrFromPoints,
-} from "@/lib/loyalty-rules";
-import {
-  canUseMembershipForSlot,
-  customerCanCancelBooking,
-  isWeekendDateKey,
-  membershipAdvanceHoursRequired,
-} from "@/lib/membership-rules";
+import { customerCanCancelBooking, isWeekendDateKey } from "@/lib/membership-rules";
+import { checkHoursForSlot } from "@/lib/membership-hours";
 import {
   isCustomerRole,
   isStaffRole,
@@ -21,22 +11,7 @@ import {
   isTrustedApiActor,
 } from "@/lib/trusted-api-actor";
 
-describe("loyalty-rules", () => {
-  it("awards 10 points per hour", () => {
-    expect(pointsForDuration(1)).toBe(10);
-    expect(pointsForDuration(1.5)).toBe(15);
-  });
-
-  it("converts points to PKR 1:1", () => {
-    expect(pkrFromPoints(100)).toBe(100);
-  });
-
-  it("enforces min redeem and 50% cap", () => {
-    expect(maxRedeemablePoints(50, 10_000)).toBe(0);
-    expect(maxRedeemablePoints(LOYALTY_MIN_REDEEM_POINTS, 10_000)).toBe(100);
-    expect(maxRedeemablePoints(10_000, 1_000)).toBe(500);
-  });
-});
+// Points rules are tested with App Settings values in mobile-loyalty.test.ts.
 
 describe("membership-rules", () => {
   it("detects weekends", () => {
@@ -45,19 +20,22 @@ describe("membership-rules", () => {
     expect(isWeekendDateKey("2026-08-10")).toBe(false); // Mon
   });
 
-  it("requires more advance notice on weekends", () => {
-    expect(membershipAdvanceHoursRequired("2026-08-10")).toBe(2);
-    expect(membershipAdvanceHoursRequired("2026-08-08")).toBe(24);
-  });
-
-  it("blocks weekday-only membership on Saturday", () => {
-    const result = canUseMembershipForSlot({
-      weekdayOnly: true,
-      date: "2026-08-08",
-      startTime: 18,
-      now: new Date(2026, 7, 1, 12, 0, 0),
-    });
-    expect(result.ok).toBe(false);
+  it("notice before a booking paid with hours comes from App Settings", () => {
+    const m = {
+      id: "m1",
+      planName: "Gold",
+      weekdayOnly: false,
+      validUntil: new Date("2026-12-31T00:00:00+05:00"),
+      hoursBySport: [{ sport: "PADEL", total: 10, remaining: 10 }],
+      rules: { weekdayAdvanceHours: 2, weekendAdvanceHours: 24 },
+    };
+    const now = Date.parse("2026-08-07T19:00:00+05:00"); // Fri 7 pm
+    // Sat 6 pm is 23 hours away: weekend needs 24.
+    expect(checkHoursForSlot(m, { sport: "PADEL", dateKey: "2026-08-08", startHour: 18 }, now).reasonCode).toBe("TOO_SOON");
+    // The super admin lowers weekend notice to 12 hours: now it's fine.
+    expect(checkHoursForSlot({ ...m, rules: { weekdayAdvanceHours: 2, weekendAdvanceHours: 12 } }, { sport: "PADEL", dateKey: "2026-08-08", startHour: 18 }, now).canUse).toBe(true);
+    // Weekday-only plan on a Saturday.
+    expect(checkHoursForSlot({ ...m, weekdayOnly: true }, { sport: "PADEL", dateKey: "2026-08-08", startHour: 18 }, now).reasonCode).toBe("WEEKDAYS_ONLY");
   });
 
   it("allows cancel when far enough before start", () => {
@@ -67,6 +45,7 @@ describe("membership-rules", () => {
         status: "confirmed",
         date: "2026-08-10",
         startTime: 18,
+        noticeMinutes: 240,
         now,
       }),
     ).toBe(true);
@@ -75,9 +54,14 @@ describe("membership-rules", () => {
         status: "confirmed",
         date: "2026-08-10",
         startTime: 12,
+        noticeMinutes: 240,
         now,
       }),
     ).toBe(false);
+    // The super admin shortens the notice to 1 hour: 2 hours before is now fine.
+    expect(
+      customerCanCancelBooking({ status: "confirmed", date: "2026-08-10", startTime: 12, noticeMinutes: 60, now }),
+    ).toBe(true);
   });
 });
 

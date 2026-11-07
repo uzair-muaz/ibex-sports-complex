@@ -65,7 +65,7 @@ describe("app settings", () => {
 
   it("refuses bad admin changes", () => {
     expect(validateSettingsPatch({ cancellationNoticeMinutes: -1 }).ok).toBe(false);
-    expect(validateSettingsPatch({ sports: [{ sport: "FUTSAL", durationsMinutes: [60] }] }).ok).toBe(false);
+    expect(validateSettingsPatch({ sports: [{ sport: "FUTSAL", durationsMinutes: [30] }] }).ok).toBe(false); // under 1 hour
     expect(validateSettingsPatch({ sports: [{ sport: "PADEL", durationsMinutes: [75] }] }).ok).toBe(false);
     expect(validateSettingsPatch({ sports: [{ sport: "TENNIS" }] }).ok).toBe(false);
     expect(validateSettingsPatch({ venue: { email: "nope" } }).ok).toBe(false);

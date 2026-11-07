@@ -12,9 +12,8 @@ export function formatAdminBookingEndLabel(
 }
 
 /**
- * Ordered 30-minute slot start times for admin create/edit booking grids.
- * Covers noon → end of overnight window (4 AM), then 4 AM → noon so bookings
- * that run past 4 AM (e.g. 3:30–5:00 AM) are visible and selectable.
+ * All 48 half-hour start times (bookings are taken all day, every day),
+ * listed from noon so evening and overnight times come first.
  */
 export function getAdminBookingTimeSlotStarts(): number[] {
   const slots: number[] = [];

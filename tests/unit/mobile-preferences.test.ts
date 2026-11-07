@@ -143,3 +143,16 @@ describe("catalog gaps (G-2, G-3, G-5)", () => {
     expect(sportFeaturesText([])).toBeNull();
   });
 });
+
+describe("nothing hard-coded: membership rules and lengths come from App Settings", () => {
+  it("membership rules are saved and checked", async () => {
+    const { validateSettingsPatch, DEFAULT_APP_SETTINGS, minDurationMinutesFor } = await import("@/lib/app-settings");
+    expect(DEFAULT_APP_SETTINGS.membership).toEqual({ weekdayAdvanceHours: 2, weekendAdvanceHours: 24, carryOverGraceDays: 7 });
+    expect(validateSettingsPatch({ membership: { weekendAdvanceHours: 12 } })).toEqual({ ok: true, value: { membership: { weekendAdvanceHours: 12 } } });
+    expect(validateSettingsPatch({ membership: { carryOverGraceDays: 400 } }).ok).toBe(false);
+    expect(validateSettingsPatch({ membership: { weekdayAdvanceHours: 1.5 } }).ok).toBe(false);
+    // The super admin may give Futsal a 60-minute length now.
+    expect(minDurationMinutesFor("FUTSAL")).toBe(60);
+    expect(validateSettingsPatch({ sports: [{ sport: "FUTSAL", durationsMinutes: [60, 90], defaultDurationMinutes: 60 }] }).ok).toBe(true);
+  });
+});

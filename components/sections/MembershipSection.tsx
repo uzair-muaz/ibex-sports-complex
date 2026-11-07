@@ -13,35 +13,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  CUSTOMER_CANCEL_MIN_HOURS_BEFORE_START,
-  MEMBERSHIP_LAPSE_GRACE_DAYS,
-  MEMBERSHIP_PLAN_SEEDS,
-  MEMBERSHIP_VALIDITY_DAYS,
-  MEMBERSHIP_WEEKDAY_ADVANCE_HOURS,
-  MEMBERSHIP_WEEKEND_ADVANCE_HOURS,
-} from "@/lib/membership-rules";
-
-const CONTACT_PHONE = "+923255429429";
-const WHATSAPP_URL = `https://wa.me/${CONTACT_PHONE.replace(/\D/g, "")}`;
 
 const SPORT: Record<string, string> = { PADEL: "Padel", PICKLEBALL: "Pickleball", FUTSAL: "Futsal", CRICKET: "Cricket" };
 
 type ShownPlan = { name: string; price: number; hours: number; hoursLabel: string; highlight: boolean; features: string[] };
-
-/** Shown until the plans made in Admin → Memberships → Plans have loaded. */
-const FALLBACK_PLANS: ShownPlan[] = MEMBERSHIP_PLAN_SEEDS.map((plan) => ({
-  name: plan.name,
-  price: plan.price,
-  hours: plan.hours,
-  hoursLabel: `${plan.hours} hrs/month`,
-  highlight: plan.slug === "gold",
-  features: [
-    `${plan.hours} court hours`,
-    plan.weekdayOnly ? "Weekday access" : "Full week access",
-    ...(plan.priorityBadge ? ["Priority member badge"] : []),
-  ],
-}));
 
 type PublicPlan = {
   id: string;
@@ -70,14 +45,31 @@ function toShownPlan(p: PublicPlan): ShownPlan {
   };
 }
 
-const TERMS = [
-  `Valid for ${MEMBERSHIP_VALIDITY_DAYS} days from date of purchase.`,
-  `Slot booking must be confirmed at least ${MEMBERSHIP_WEEKDAY_ADVANCE_HOURS} hours in advance on weekdays.`,
-  `Slot booking must be confirmed at least ${MEMBERSHIP_WEEKEND_ADVANCE_HOURS} hours in advance on weekends.`,
-  `Unused hours carry forward on renewal (grace ${MEMBERSHIP_LAPSE_GRACE_DAYS} days after expiry).`,
-  `Online cancel allowed until ${CUSTOMER_CANCEL_MIN_HOURS_BEFORE_START} hours before start.`,
-  "Membership purchase is currently activated by staff after WhatsApp confirmation (online payments coming soon).",
-];
+type PlansAnswer = {
+  plans: PublicPlan[];
+  whatsAppUrl: string | null;
+  phone: string | null;
+  rules: {
+    weekdayAdvanceHours: number;
+    weekendAdvanceHours: number;
+    carryOverGraceDays: number;
+    cancellationNoticeMinutes: number;
+  };
+};
+
+const hrs = (n: number) => `${n} hour${n === 1 ? "" : "s"}`;
+
+/** Terms built from Admin → App Settings, so they always match the real rules. */
+function termsFrom(r: PlansAnswer["rules"]): string[] {
+  return [
+    "Valid for the number of days shown on each plan, from the date of purchase.",
+    `Slot booking must be confirmed at least ${hrs(r.weekdayAdvanceHours)} in advance on weekdays.`,
+    `Slot booking must be confirmed at least ${hrs(r.weekendAdvanceHours)} in advance on weekends.`,
+    `Unused hours carry forward on renewal (grace ${r.carryOverGraceDays} days after expiry).`,
+    `Online cancel allowed until ${hrs(Math.round((r.cancellationNoticeMinutes / 60) * 10) / 10)} before start.`,
+    "Membership purchase is currently activated by staff after WhatsApp confirmation (online payments coming soon).",
+  ];
+}
 
 export const MembershipSection = () => {
   const [getStartedOpen, setGetStartedOpen] = useState(false);
@@ -86,11 +78,15 @@ export const MembershipSection = () => {
     queryFn: async () => {
       const res = await fetch("/api/v1/membership/plans");
       if (!res.ok) throw new Error("plans");
-      return ((await res.json()) as { plans: PublicPlan[] }).plans;
+      return (await res.json()) as PlansAnswer;
     },
     staleTime: 5 * 60_000,
   });
-  const PLANS: ShownPlan[] = plansQuery.data?.length ? plansQuery.data.map(toShownPlan) : FALLBACK_PLANS;
+  // Only the plans the super admin made (Admin → Memberships → Plans); nothing written into the page.
+  const PLANS: ShownPlan[] = (plansQuery.data?.plans ?? []).map(toShownPlan);
+  const TERMS = plansQuery.data ? termsFrom(plansQuery.data.rules) : [];
+  const WHATSAPP_URL = plansQuery.data?.whatsAppUrl ?? null;
+  const CONTACT_PHONE = plansQuery.data?.phone ?? null;
 
   return (
     <section className="relative py-12 sm:py-16 md:py-24 lg:py-36 px-4 sm:px-6 overflow-hidden transition-colors duration-500">
@@ -112,6 +108,7 @@ export const MembershipSection = () => {
             >
               Open membership
             </a>
+            {WHATSAPP_URL && (
             <a
               href={WHATSAPP_URL}
               target="_blank"
@@ -121,6 +118,8 @@ export const MembershipSection = () => {
               <MessageCircle className="w-5 h-5" />
               WhatsApp
             </a>
+            )}
+            {CONTACT_PHONE && (
             <a
               href={`tel:${CONTACT_PHONE}`}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-4 transition-colors border border-zinc-700"
@@ -128,6 +127,7 @@ export const MembershipSection = () => {
               <Phone className="w-5 h-5" />
               {CONTACT_PHONE}
             </a>
+            )}
           </div>
           <p className="text-sm text-zinc-400 pt-1">
             We&apos;re here to help you choose the right plan.
@@ -171,6 +171,11 @@ export const MembershipSection = () => {
         </ScrollReveal>
 
         {/* Cards */}
+        {plansQuery.isSuccess && PLANS.length === 0 && (
+          <p className="text-zinc-400 text-base">
+            New membership plans are coming soon. Message us on WhatsApp to ask about them.
+          </p>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-5 lg:gap-4">
           {PLANS.map((plan, index) => (
             <motion.div
@@ -253,6 +258,7 @@ export const MembershipSection = () => {
         </div>
 
         {/* Terms */}
+        {TERMS.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -275,6 +281,7 @@ export const MembershipSection = () => {
             ))}
           </ul>
         </motion.div>
+        )}
       </div>
     </section>
   );

@@ -7,38 +7,8 @@ import connectDB from "@/lib/mongodb";
 import MembershipPlan from "@/models/MembershipPlan";
 import UserMembership from "@/models/UserMembership";
 import { cleanHoursBySport } from "@/lib/membership-plans";
-import {
-  MEMBERSHIP_LAPSE_GRACE_DAYS,
-  MEMBERSHIP_PLAN_SEEDS,
-  MEMBERSHIP_VALIDITY_DAYS,
-} from "@/lib/membership-rules";
-
-export async function ensureMembershipPlansSeeded() {
-  await connectDB();
-  // Only fill an empty list. Plans are made and edited by the super admin
-  // (Admin → Memberships → Plans), so a deleted plan never comes back.
-  if ((await MembershipPlan.estimatedDocumentCount()) > 0) return;
-  for (const seed of MEMBERSHIP_PLAN_SEEDS) {
-    await MembershipPlan.findOneAndUpdate(
-      { slug: seed.slug },
-      {
-        $setOnInsert: {
-          slug: seed.slug,
-          name: seed.name,
-          price: seed.price,
-          hours: seed.hours,
-          weekdayOnly: seed.weekdayOnly,
-          guestPassesPerPeriod: seed.guestPassesPerPeriod,
-          priorityBadge: seed.priorityBadge,
-          courtTypes: seed.courtTypes,
-          sortOrder: seed.sortOrder,
-          isActive: true,
-        },
-      },
-      { upsert: true, new: true },
-    );
-  }
-}
+import { MEMBERSHIP_VALIDITY_DAYS } from "@/lib/membership-rules";
+import { getAppSettings } from "@/lib/app-settings";
 
 export async function getActiveMembershipForUser(userId: string) {
   await connectDB();
@@ -88,7 +58,7 @@ export async function activateMembership(params: {
   const carry = new Map<string, number>();
   if (existing) {
     const graceEnd = new Date(existing.validUntil);
-    graceEnd.setDate(graceEnd.getDate() + MEMBERSHIP_LAPSE_GRACE_DAYS);
+    graceEnd.setDate(graceEnd.getDate() + (await getAppSettings()).membership.carryOverGraceDays);
     const withinGraceOrActive =
       existing.validUntil >= now || graceEnd >= now;
     if (params.carryForwardHours !== false && withinGraceOrActive) {

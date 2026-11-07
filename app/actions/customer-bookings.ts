@@ -1,6 +1,7 @@
 "use server";
 
 import connectDB from "@/lib/mongodb";
+import { getAppSettings } from "@/lib/app-settings";
 import Booking from "@/models/Booking";
 import {
   customerCanCancelBooking,
@@ -84,6 +85,7 @@ export async function getMyBookingById(
     booking: JSON.parse(JSON.stringify(booking)),
     canCancel: customerCanCancelBooking({
       status: booking.status,
+      noticeMinutes: (await getAppSettings()).cancellationNoticeMinutes,
       date: booking.date,
       startTime: booking.startTime,
     }),
@@ -112,6 +114,7 @@ export async function cancelMyBooking(
   if (
     !customerCanCancelBooking({
       status: booking.status,
+      noticeMinutes: (await getAppSettings()).cancellationNoticeMinutes,
       date: booking.date,
       startTime: booking.startTime,
     })

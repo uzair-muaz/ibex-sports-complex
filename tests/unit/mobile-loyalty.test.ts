@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { maxRedeemablePoints, maxUsablePoints, pointsDiscountPkr, pointsEarnedFor } from "@/lib/loyalty-rules";
+import { maxUsablePoints, pointsDiscountPkr, pointsEarnedFor } from "@/lib/loyalty-rules";
 import { DEFAULT_APP_SETTINGS, type LoyaltyRules } from "@/lib/app-settings";
 import { mapTransaction, publicRules } from "@/lib/api/loyalty-view";
 
@@ -17,8 +17,9 @@ const pdf: LoyaltyRules = {
 
 describe("points rules from settings", () => {
   it("default settings give exactly the website's old answers", () => {
-    for (const [balance, price] of [[0, 9000], [99, 9000], [100, 9000], [5000, 9000], [5000, 150]]) {
-      expect(maxUsablePoints(balance, price, today)).toBe(maxRedeemablePoints(balance, price));
+    // Old website answers: from 100 points, up to 50% of the fee.
+    for (const [balance, price, expected] of [[0, 9000, 0], [99, 9000, 0], [100, 9000, 100], [5000, 9000, 4500], [5000, 150, 0]]) {
+      expect(maxUsablePoints(balance, price, today)).toBe(expected);
     }
     expect(pointsEarnedFor(today, { paidTotal: 9000, durationMinutes: 90 })).toBe(15);
   });

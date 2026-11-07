@@ -6,7 +6,6 @@ import MembershipPlan from "@/models/MembershipPlan";
 import UserMembership from "@/models/UserMembership";
 import {
   activateMembership,
-  ensureMembershipPlansSeeded,
   getActiveMembershipForUser,
 } from "@/lib/membership";
 import { revalidatePath } from "next/cache";
@@ -18,7 +17,6 @@ import {
 } from "@/lib/action-auth";
 
 export async function listMembershipPlans() {
-  await ensureMembershipPlansSeeded();
   const plans = await MembershipPlan.find({ isActive: true, "hoursBySport.0": { $exists: true } })
     .sort({ sortOrder: 1 })
     .lean();
@@ -37,7 +35,6 @@ export async function getMyMembership(opts?: {
     return { success: false as const, error: gate.error };
   }
 
-  await ensureMembershipPlansSeeded();
   const membership = await getActiveMembershipForUser(gate.userId);
   const history = await UserMembership.find({ userId: gate.userId })
     .populate("planId")
@@ -70,8 +67,7 @@ export async function adminActivateMembership(
   }
 
   try {
-    await ensureMembershipPlansSeeded();
-    const membership = await activateMembership({
+      const membership = await activateMembership({
       userId: input.userId,
       planId: input.planId,
       carryForwardHours: input.carryForwardHours,

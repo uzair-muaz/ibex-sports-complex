@@ -54,6 +54,16 @@ export type BankAccount = {
   iban: string | null;
 };
 
+/** Membership rules shown on the website and used when paying with hours. */
+export type MembershipRules = {
+  /** Hours before the start a booking paid with hours must be made, Mon–Fri. */
+  weekdayAdvanceHours: number;
+  /** Same, Sat–Sun. */
+  weekendAdvanceHours: number;
+  /** Days after a plan ends when unused hours still carry over to a new one. */
+  carryOverGraceDays: number;
+};
+
 export type PaymentRules = {
   minAdvancePercent: number;
   /** Where customers send the advance. Empty until the super admin adds them. */
@@ -68,6 +78,7 @@ export type ResolvedAppSettings = {
   cancellationNoticeMinutes: number;
   loyalty: LoyaltyRules;
   payments: PaymentRules;
+  membership: MembershipRules;
   /** Super admin's FAQs, or null to use the built-in ones (lib/faqs.ts). */
   faqs: Faq[] | null;
 };
@@ -76,9 +87,13 @@ export type Faq = { question: string; answer: string };
 
 export const SPORT_KEYS: SportKey[] = ["PADEL", "PICKLEBALL", "FUTSAL", "CRICKET"];
 
-/** Shortest booking the server accepts today (app/actions/bookings.ts). */
-export function minDurationMinutesFor(sport: SportKey): number {
-  return sport === "FUTSAL" ? 90 : 60;
+/**
+ * Shortest length the super admin may allow for a sport. Same for every sport
+ * (a booking is at least 1 hour); each sport's real lengths are set in App Settings.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function minDurationMinutesFor(_sport: SportKey): number {
+  return 60;
 }
 
 /** Today's values, taken from what the website already shows and allows. */
@@ -162,6 +177,7 @@ export const DEFAULT_APP_SETTINGS: ResolvedAppSettings = {
     transferNote: "Write your booking reference in the transfer description.",
     verificationNote: "Our team checks payments by hand. You will get a notification.",
   },
+  membership: { weekdayAdvanceHours: 2, weekendAdvanceHours: 24, carryOverGraceDays: 7 },
   faqs: null,
 };
 
@@ -171,6 +187,7 @@ type StoredSettings = {
   cancellationNoticeMinutes?: number | null;
   loyalty?: ILoyaltySetting | null;
   payments?: IPaymentSetting | null;
+  membership?: Partial<MembershipRules> | null;
   faqs?: Faq[] | null;
 };
 
@@ -252,6 +269,11 @@ export function resolveAppSettings(stored: StoredSettings | null | undefined): R
       transferNote: pick(stored?.payments?.transferNote, d.payments.transferNote),
       verificationNote: pick(stored?.payments?.verificationNote, d.payments.verificationNote),
     },
+    membership: {
+      weekdayAdvanceHours: pick(stored?.membership?.weekdayAdvanceHours, d.membership.weekdayAdvanceHours),
+      weekendAdvanceHours: pick(stored?.membership?.weekendAdvanceHours, d.membership.weekendAdvanceHours),
+      carryOverGraceDays: pick(stored?.membership?.carryOverGraceDays, d.membership.carryOverGraceDays),
+    },
     faqs:
       Array.isArray(stored?.faqs) && stored.faqs.length > 0
         ? stored.faqs.map((f) => ({ question: f.question, answer: f.answer }))
@@ -265,6 +287,7 @@ export type SettingsPatch = {
   cancellationNoticeMinutes?: number;
   loyalty?: Partial<LoyaltyRules>;
   payments?: Partial<PaymentRules>;
+  membership?: Partial<MembershipRules>;
   /** null = go back to the built-in FAQs. */
   faqs?: Faq[] | null;
 };
@@ -416,6 +439,24 @@ export function validateSettingsPatch(input: unknown): CheckResult {
     if (Object.keys(pay).length > 0) out.payments = pay;
   }
 
+  if (body.membership !== undefined) {
+    if (!body.membership || typeof body.membership !== "object") return { ok: false, error: "membership must be an object." };
+    const m = body.membership as Record<string, unknown>;
+    const rules: Partial<MembershipRules> = {};
+    const limits: Record<keyof MembershipRules, [number, string]> = {
+      weekdayAdvanceHours: [168, "Weekday notice must be 0–168 hours."],
+      weekendAdvanceHours: [168, "Weekend notice must be 0–168 hours."],
+      carryOverGraceDays: [90, "Carry-over days must be 0–90."],
+    };
+    for (const key of Object.keys(limits) as (keyof MembershipRules)[]) {
+      if (m[key] === undefined) continue;
+      const [max, error] = limits[key];
+      if (!isInt(m[key]) || (m[key] as number) < 0 || (m[key] as number) > max) return { ok: false, error };
+      rules[key] = m[key] as number;
+    }
+    if (Object.keys(rules).length > 0) out.membership = rules;
+  }
+
   if (body.faqs !== undefined) {
     if (body.faqs === null) {
       out.faqs = null;
@@ -544,6 +585,7 @@ export async function updateAppSettings(
     cancellationNoticeMinutes: patch.cancellationNoticeMinutes ?? current.cancellationNoticeMinutes,
     loyalty: { ...current.loyalty, ...(patch.loyalty || {}) },
     payments: { ...current.payments, ...(patch.payments || {}) },
+    membership: { ...current.membership, ...(patch.membership || {}) },
     faqs: patch.faqs !== undefined ? patch.faqs : current.faqs,
     updatedBy,
   };

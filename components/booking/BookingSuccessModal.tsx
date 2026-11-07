@@ -24,6 +24,8 @@ type BookingSuccessModalProps = {
     discountAmount?: number;
   } | null;
   selectedQuote: AvailableStartTimeQuote | null;
+  /** From Admin → App Settings; the number is left out until it has loaded. */
+  advancePercent?: number | null;
   onDone: () => void;
 };
 
@@ -31,6 +33,7 @@ export function BookingSuccessModal({
   open,
   createdBooking,
   selectedQuote,
+  advancePercent,
   onDone,
 }: BookingSuccessModalProps) {
   return (
@@ -56,7 +59,7 @@ export function BookingSuccessModal({
                 </div>
                 <h3 className="text-2xl md:text-3xl font-bold">Booking Confirmed!</h3>
                 <p className="text-zinc-400 text-sm md:text-base">
-                  Your booking is confirmed. Please pay 50% advance.
+                  Your booking is confirmed. Please pay {typeof advancePercent === "number" ? `the ${advancePercent}% advance` : "the advance"}.
                 </p>
               </div>
 

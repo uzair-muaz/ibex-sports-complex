@@ -105,6 +105,8 @@ export interface BookingConfirmationEmailData {
   totalPrice: number;
   bookingId: string;
   baseUrl: string;
+  /** Advance % from Admin → App Settings. */
+  advancePercent?: number;
 }
 
 /**
@@ -142,6 +144,7 @@ async function sendViaResend(
       discountAmount: data.discountAmount,
       totalPrice: data.totalPrice,
       bookingId: data.bookingId,
+      advancePercent: (data as { advancePercent?: number }).advancePercent,
       entryVerificationUrl,
       feedbackUrl,
       entryQRCode, // Data URL for inline display
@@ -233,6 +236,7 @@ async function sendViaSES(
       discountAmount: data.discountAmount,
       totalPrice: data.totalPrice,
       bookingId: data.bookingId,
+      advancePercent: (data as { advancePercent?: number }).advancePercent,
       entryVerificationUrl,
       feedbackUrl,
       entryQRCode: 'cid:entry-qr-code',

@@ -29,6 +29,8 @@ export interface BookingEmailData {
   feedbackUrl: string;
   entryQRCode: string; // CID reference for inline attachment (e.g., "cid:entry-qr-code")
   feedbackQRCode: string; // CID reference for inline attachment (e.g., "cid:feedback-qr-code")
+  /** Advance % from Admin → App Settings (left out of the text if unknown). */
+  advancePercent?: number;
 }
 
 /**
@@ -90,7 +92,7 @@ export function generateBookingConfirmationEmail(data: BookingEmailData): string
                 Your booking has been confirmed! We're excited to have you at IBEX Sports Complex.
               </p>
               <p style="margin: 0 0 12px 0; font-size: 13px; line-height: 1.6; color: #7dd3fc;">
-                Please pay <strong>50% advance</strong> to confirm your slot. Bookings without advance may be cancelled.
+                Please pay <strong>${typeof data.advancePercent === 'number' ? `${data.advancePercent}% advance` : 'the advance'}</strong> to confirm your slot. Bookings without advance may be cancelled.
               </p>
               <p style="margin: 0 0 30px 0; font-size: 13px; line-height: 1.6; color: #a1a1aa;">
                 <strong style="color: #e4e4e7;">Please note:</strong> Advance payments are <strong style="color: #e4e4e7;">non-refundable</strong> once made.

@@ -40,6 +40,8 @@ import {
   takeSportHours,
 } from '@/lib/membership-hours';
 import { notifyBookingCancelled } from '@/lib/notifications/events';
+import { bookingLengthError } from '@/lib/booking-length';
+import { getAppSettings } from '@/lib/app-settings';
 
 async function getActiveDiscountsForBusinessDate(bookingDateKey: string) {
   const discountsRaw = await Discount.find({ isActive: true }).lean();
@@ -209,12 +211,12 @@ export async function createBooking(
       throw new Error('Phone number is required');
     }
 
-    // Validate minimum booking time (1 hour for most courts, 1.5 hours for Futsal)
-    const minDuration = input.courtType === 'FUTSAL' ? 1.5 : 1;
-    if (input.duration < minDuration) {
-      throw new Error(input.courtType === 'FUTSAL' 
-        ? 'Minimum booking time for Futsal is 90 minutes' 
-        : 'Minimum booking time is 1 hour');
+    // Booking length from Admin → App Settings: customers pick one of the sport's
+    // lengths; staff may use any 30-minute step from the shortest.
+    const isStaffBooking = sessionRole === 'admin' || sessionRole === 'super_admin';
+    const lengthError = await bookingLengthError(input.courtType, input.duration, { exactList: !isStaffBooking });
+    if (lengthError) {
+      throw new Error(lengthError);
     }
 
     // Validate duration increments (can be 1, 1.5, 2, 2.5, etc.)
@@ -437,6 +439,7 @@ export async function createBooking(
       totalPrice: booking.totalPrice,
       bookingId: booking._id.toString(),
       baseUrl: getBaseUrl(),
+      advancePercent: (await getAppSettings()).payments.minAdvancePercent,
     }).catch((error) => {
       // Log error but don't fail the booking creation
       console.error('Failed to send confirmation email:', error);
@@ -503,16 +506,9 @@ export async function getAvailableStartTimes(
       return { success: false, error: 'Duration must be greater than 0', startTimes: [] };
     }
 
-    const minDuration = input.courtType === 'FUTSAL' ? 1.5 : 1;
-    if (input.duration < minDuration) {
-      return {
-        success: false,
-        error:
-          input.courtType === 'FUTSAL'
-            ? 'Minimum booking time for Futsal is 90 minutes'
-            : 'Minimum booking time is 1 hour',
-        startTimes: [],
-      };
+    const lengthError = await bookingLengthError(input.courtType, input.duration, { exactList: false });
+    if (lengthError) {
+      return { success: false, error: lengthError, startTimes: [] };
     }
 
     if (input.duration % 0.5 !== 0) {
@@ -628,16 +624,9 @@ export async function getQuickSlotCourtAvailability(
       return { success: false, error: 'Duration must be greater than 0', slots: [] };
     }
 
-    const minDuration = input.courtType === 'FUTSAL' ? 1.5 : 1;
-    if (input.duration < minDuration) {
-      return {
-        success: false,
-        error:
-          input.courtType === 'FUTSAL'
-            ? 'Minimum booking time for Futsal is 90 minutes'
-            : 'Minimum booking time is 1 hour',
-        slots: [],
-      };
+    const lengthError = await bookingLengthError(input.courtType, input.duration, { exactList: false });
+    if (lengthError) {
+      return { success: false, error: lengthError, slots: [] };
     }
 
     if (input.duration % 0.5 !== 0) {

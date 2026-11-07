@@ -67,6 +67,14 @@ export async function listPublicPlans() {
   return {
     plans: (plans as unknown as PlanRow[]).map(toPublicPlan),
     whatsAppUrl: whatsAppUrlFor(settings.venue.whatsApp),
+    phone: settings.venue.phone || null,
+    // Rules from Admin → App Settings, for the terms under the plans.
+    rules: {
+      weekdayAdvanceHours: settings.membership.weekdayAdvanceHours,
+      weekendAdvanceHours: settings.membership.weekendAdvanceHours,
+      carryOverGraceDays: settings.membership.carryOverGraceDays,
+      cancellationNoticeMinutes: settings.cancellationNoticeMinutes,
+    },
   };
 }
 

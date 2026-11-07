@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronRight, Clock, Info, Zap } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 
 import { BookingSectionHeader } from "@/components/booking/BookingSectionHeader";
 import { BookingChipSelector } from "@/components/booking/BookingChipSelector";
@@ -29,7 +30,7 @@ import {
   getQuickSlotCourtAvailability,
   type AvailableStartTimeQuote,
 } from "../actions/bookings";
-import { maxRedeemablePoints, maxUsablePoints } from "@/lib/loyalty-rules";
+import { maxUsablePoints } from "@/lib/loyalty-rules";
 import { hoursCover } from "@/lib/membership-hours-rules";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
@@ -72,11 +73,16 @@ type CreatedBooking = {
   discountAmount?: number;
 };
 
-const durationPresets: { hours: number; label: string }[] = [
-  { hours: 1, label: "60 mins" },
-  { hours: 1.5, label: "90 mins" },
-  { hours: 2, label: "2 hours" },
-];
+/** Booking lengths for each sport come from Admin → App Settings (via GET /api/v1/sports). */
+type SportBookingRules = {
+  sport: CourtType;
+  booking: { durationsMinutes: number[]; defaultDurationMinutes: number };
+};
+
+function durationLabel(minutes: number): string {
+  if (minutes % 60 !== 0 || minutes === 60) return `${minutes} mins`;
+  return `${minutes / 60} hours`;
+}
 
 const sportHeadingMap: Record<CourtType, { title: string; subtitle: string }> =
   {
@@ -176,6 +182,31 @@ export default function BookingClient() {
     null,
   );
   const [selectedDurationHours, setSelectedDurationHours] = useState<number>(1);
+
+  const sportRulesQuery = useQuery({
+    queryKey: ["public", "sport-booking-rules"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/sports?includeHidden=true");
+      if (!res.ok) throw new Error("Could not load booking lengths");
+      return ((await res.json()) as { sports: SportBookingRules[] }).sports;
+    },
+    staleTime: 5 * 60_000,
+  });
+  // Advance % from Admin → App Settings.
+  const paymentRulesQuery = useQuery({
+    queryKey: ["public", "payment-instructions"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/payments/instructions");
+      if (!res.ok) throw new Error("Could not load payment rules");
+      return (await res.json()) as { minAdvancePercent: number };
+    },
+    staleTime: 5 * 60_000,
+  });
+  const advancePercent = paymentRulesQuery.data?.minAdvancePercent ?? null;
+  const selectedSportRules = sportRulesQuery.data?.find((s) => s.sport === selectedCourtType) ?? null;
+  const durationReady =
+    !!selectedSportRules &&
+    selectedSportRules.booking.durationsMinutes.includes(Math.round(selectedDurationHours * 60));
 
   const [selectedQuote, setSelectedQuote] =
     useState<AvailableStartTimeQuote | null>(null);
@@ -279,11 +310,11 @@ export default function BookingClient() {
 
   const maxLoyaltyRedeem = useMemo(() => {
     if (!selectedQuote) return 0;
-    // Same rules as the server (Admin → App Settings); old rules if not loaded.
+    // Same rules as the server (Admin → App Settings).
     const rules = loyaltyQuery.data?.rules;
     return rules
       ? maxUsablePoints(loyaltyBalance, priceAfterHours, rules)
-      : maxRedeemablePoints(loyaltyBalance, priceAfterHours);
+      : 0; // points can be used once the rules from App Settings have loaded
   }, [loyaltyBalance, selectedQuote, priceAfterHours, loyaltyQuery.data?.rules]);
 
   useEffect(() => {
@@ -298,7 +329,8 @@ export default function BookingClient() {
 
   const { availableStartTimes, isLoadingAvailability, refreshAvailability } =
     useBookingAvailability({
-      selectedCourtType,
+      // Wait until the sport's lengths have loaded, so we never ask for a length it doesn't allow.
+      selectedCourtType: durationReady ? selectedCourtType : null,
       dateString,
       selectedDurationHours,
       onBeforeLoad: handleAvailabilityBeforeLoad,
@@ -316,6 +348,8 @@ export default function BookingClient() {
     [selectedTypeCourts],
   );
 
+  // Court prices are saved per hour, except Futsal, saved per 90 minutes (see lib/pricing-utils.ts).
+  const priceUnit = selectedCourtType === "FUTSAL" ? "90 MIN" : "HR";
   const courtPricing = useMemo(() => {
     const fallback = activeCourt?.pricePerHour || 0;
     const periods = Array.isArray(activeCourt?.pricingPeriods)
@@ -400,18 +434,23 @@ export default function BookingClient() {
     }
   }, [selectedQuote, dateString, todayBusinessKey, nowBusinessHourDecimal]);
 
-  const visibleDurationPresets = useMemo(() => {
-    if (selectedCourtType === "FUTSAL") {
-      return durationPresets.filter((d) => d.hours >= 1.5);
-    }
-    return durationPresets;
-  }, [selectedCourtType]);
+  const visibleDurationPresets = useMemo(
+    () =>
+      (selectedSportRules?.booking.durationsMinutes ?? []).map((m) => ({
+        hours: m / 60,
+        label: durationLabel(m),
+      })),
+    [selectedSportRules],
+  );
 
+  // Pick the sport's default length when the sport changes (or the current one isn't allowed).
   useEffect(() => {
-    if (selectedCourtType === "FUTSAL" && selectedDurationHours < 1.5) {
-      setSelectedDurationHours(1.5);
+    if (!selectedSportRules) return;
+    const allowed = selectedSportRules.booking.durationsMinutes;
+    if (!allowed.includes(Math.round(selectedDurationHours * 60))) {
+      setSelectedDurationHours(selectedSportRules.booking.defaultDurationMinutes / 60);
     }
-  }, [selectedCourtType, selectedDurationHours]);
+  }, [selectedSportRules, selectedDurationHours]);
 
   useEffect(() => {
     if (!showCheckoutModal) return;
@@ -606,7 +645,7 @@ export default function BookingClient() {
             subtitle="Real-time availability for our premium courts."
           />
           <div className="mb-6 rounded-2xl border border-[#2DD4BF]/40 bg-[#2DD4BF]/10 px-4 py-3 text-sm text-zinc-200">
-            A 50% advance payment is required to confirm bookings. Reservations
+            {advancePercent !== null ? `A ${advancePercent}% advance payment` : "An advance payment"} is required to confirm bookings. Reservations
             without advance may be cancelled. All advance payments are
             non-refundable.
             {!isCustomerLoggedIn ? (
@@ -728,7 +767,7 @@ export default function BookingClient() {
                           Off-Peak
                         </div>
                         <div className="text-lg font-semibold text-white tracking-tight leading-none mb-1">
-                          PKR {courtPricing.offPeak.toLocaleString()}/HR
+                          PKR {courtPricing.offPeak.toLocaleString()}/{priceUnit}
                         </div>
                         <div className="text-[9px] font-black text-zinc-500 uppercase tracking-wider">
                           {courtPricing.offPeakHours}
@@ -744,7 +783,7 @@ export default function BookingClient() {
                           Peak Hours
                         </div>
                         <div className="text-lg font-semibold text-white tracking-tight leading-none mb-1">
-                          PKR {courtPricing.peak.toLocaleString()}/HR
+                          PKR {courtPricing.peak.toLocaleString()}/{priceUnit}
                         </div>
                         <div className="text-[9px] font-black text-zinc-500 uppercase tracking-wider">
                           {courtPricing.peakHours}
@@ -759,10 +798,10 @@ export default function BookingClient() {
                     </div>
                     <div>
                       <div className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">
-                        Price per Hour
+                        {priceUnit === "HR" ? "Price per Hour" : "Price per 90 min"}
                       </div>
                       <div className="text-lg font-semibold text-white tracking-tight leading-none">
-                        PKR {courtPricing.basePrice.toLocaleString()}/HR
+                        PKR {courtPricing.basePrice.toLocaleString()}/{priceUnit}
                       </div>
                     </div>
                   </div>
@@ -774,7 +813,7 @@ export default function BookingClient() {
                   </div>
                   <div>
                     <div className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">
-                      Price per Hour
+                      {priceUnit === "HR" ? "Price per Hour" : "Price per 90 min"}
                     </div>
                     <div className="text-lg font-semibold text-white tracking-tight leading-none">
                       Loading...
@@ -799,6 +838,9 @@ export default function BookingClient() {
               activeKey={selectedDurationHours.toString()}
               onSelect={(hours) => setSelectedDurationHours(Number(hours))}
             />
+            {sportRulesQuery.isError && (
+              <p className="text-sm text-red-400">Couldn&apos;t load booking lengths. Please refresh the page.</p>
+            )}
           </div>
 
           <BookingSlotsGrid
@@ -1040,6 +1082,7 @@ export default function BookingClient() {
         open={formStatus === "success"}
         createdBooking={createdBooking}
         selectedQuote={selectedQuote}
+        advancePercent={advancePercent}
         onDone={resetAfterSuccess}
       />
 

@@ -26,9 +26,10 @@ import type { BankAccount, Faq, ResolvedAppSettings, SportRules } from "@/lib/ap
 
 const { Text } = Typography;
 
-/** Same rule as the server: Futsal from 90 minutes, others from 60. */
-function durationOptions(sport: SportRules["sport"]) {
-  const min = sport === "FUTSAL" ? 90 : 60;
+/** Any length from 1 hour to 6 hours, in 30-minute steps. The super admin picks each sport's list. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function durationOptions(_sport: SportRules["sport"]) {
+  const min = 60;
   const out: { value: number; label: string }[] = [];
   for (let m = min; m <= 360; m += 30) {
     const h = m / 60;
@@ -121,6 +122,7 @@ export default function AdminAppSettingsPage() {
         cancellationNoticeMinutes: draft.cancellationNoticeMinutes,
         loyalty: draft.loyalty,
         payments: draft.payments,
+        membership: draft.membership,
         sports: draft.sports.map((s) => ({
           sport: s.sport,
           label: s.label,
@@ -300,6 +302,30 @@ export default function AdminAppSettingsPage() {
                 onChange={(e) => setPayments({ verificationNote: e.target.value })}
               />
             </Form.Item>
+          </Card>
+
+          <Card title="Membership rules">
+            <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-3">
+              {(
+                [
+                  ["weekdayAdvanceHours", "Notice to book with hours, Mon–Fri (hours)", 168],
+                  ["weekendAdvanceHours", "Notice to book with hours, Sat–Sun (hours)", 168],
+                  ["carryOverGraceDays", "Days after a plan ends that unused hours carry over", 90],
+                ] as const
+              ).map(([key, label, max]) => (
+                <Form.Item key={key} label={label}>
+                  <InputNumber
+                    min={0}
+                    max={max}
+                    value={draft.membership[key]}
+                    onChange={(v) =>
+                      typeof v === "number" &&
+                      setDraft({ ...draft, membership: { ...draft.membership, [key]: Math.round(v) } })
+                    }
+                  />
+                </Form.Item>
+              ))}
+            </div>
           </Card>
 
           <Card title="Reward points">

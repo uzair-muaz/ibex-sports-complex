@@ -61,6 +61,8 @@ export interface IAppSettings extends Document {
   cancellationNoticeMinutes?: number;
   loyalty?: ILoyaltySetting;
   payments?: IPaymentSetting;
+  /** Membership rules (lib/app-settings.ts MembershipRules). */
+  membership?: { weekdayAdvanceHours?: number; weekendAdvanceHours?: number; carryOverGraceDays?: number };
   /** Support FAQs. Empty/missing = the built-in ones (lib/faqs.ts). */
   faqs?: { question: string; answer: string }[] | null;
   updatedBy?: string | null;
@@ -143,6 +145,17 @@ const AppSettingsSchema = new Schema<IAppSettings>(
     cancellationNoticeMinutes: { type: Number, min: 0, max: 10080 },
     loyalty: { type: LoyaltySettingSchema, default: undefined },
     payments: { type: PaymentSettingSchema, default: undefined },
+    membership: {
+      type: new Schema(
+        {
+          weekdayAdvanceHours: { type: Number, min: 0, max: 168 },
+          weekendAdvanceHours: { type: Number, min: 0, max: 168 },
+          carryOverGraceDays: { type: Number, min: 0, max: 90 },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
     faqs: {
       type: [{ _id: false, question: { type: String, required: true }, answer: { type: String, required: true } }],
       default: undefined,

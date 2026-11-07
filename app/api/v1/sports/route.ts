@@ -5,7 +5,11 @@ import { getAppSettings } from "@/lib/app-settings";
 import { mobileSports, type CourtSource } from "@/lib/api/catalog";
 import { publicBaseUrl } from "@/lib/api/base-url";
 
-/** Sports shown in the app, with their booking rules. Hidden sports (showInApp false) are left out. */
+/**
+ * Sports shown in the app, with their booking rules. Hidden sports (showInApp
+ * false) are left out, unless ?includeHidden=true (the website's booking page
+ * needs every sport's booking lengths).
+ */
 export async function GET(request: Request) {
   try {
     await connectDB();
@@ -13,7 +17,9 @@ export async function GET(request: Request) {
       getAppSettings(),
       Court.find({ isActive: true }).lean(),
     ]);
-    const sports = mobileSports(settings, courts as unknown as CourtSource[], await publicBaseUrl());
+    const sports = mobileSports(settings, courts as unknown as CourtSource[], await publicBaseUrl(), {
+      includeHidden: new URL(request.url).searchParams.get("includeHidden") === "true",
+    });
     return apiOk({ sports }, request, {
       headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
     });

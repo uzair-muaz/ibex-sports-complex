@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import {
   AnimatedPhoneIcon,
   AnimatedMapPinIcon,
-  AnimatedClockIcon,
   AnimatedInstagramIcon,
   AnimatedFacebookIcon,
 } from "@/components/ui/AnimatedIcons";
@@ -104,34 +103,8 @@ export const GetInTouchSection = () => {
             </div>
           </div>
 
-          {/* Opening Hours Card */}
-          <div className="group bg-zinc-900 text-white p-5 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl flex flex-col justify-between border border-white/10 hover:border-[#2DD4BF]/50 transition-colors">
-            <div>
-              <div className="mb-4 sm:mb-6">
-                <AnimatedClockIcon className="w-7 h-7 sm:w-8 sm:h-8" color="#2DD4BF" />
-              </div>
-              <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-2">
-                Opening Hours
-              </h3>
-            </div>
-            <ul className="space-y-4 font-mono text-xs md:text-sm text-zinc-400">
-              <li className="flex justify-between border-b border-white/10 pb-2">
-                <span>Mon - Fri</span>
-                <span className="text-white">12:00 PM - 4:00 AM</span>
-              </li>
-              <li className="flex justify-between border-b border-white/10 pb-2">
-                <span>Saturday</span>
-                <span className="text-white">12:00 PM - 4:00 AM</span>
-              </li>
-              <li className="flex justify-between pt-2">
-                <span>Sunday</span>
-                <span className="text-white">12:00 PM - 4:00 AM</span>
-              </li>
-            </ul>
-          </div>
-
           {/* Social Links Card */}
-          <div className="md:col-span-2 bg-[#2DD4BF] p-5 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0 text-[#0F172A] relative overflow-hidden group">
+          <div className="md:col-span-3 bg-[#2DD4BF] p-5 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0 text-[#0F172A] relative overflow-hidden group">
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
             <div className="relative z-10">
               <h3 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
