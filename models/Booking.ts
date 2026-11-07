@@ -43,6 +43,8 @@ export interface IBooking extends Document {
   walletCreditUsed?: number;
   /** Mobile app guests: SHA-256 of their guestAccessToken (never the token). */
   guestAccessTokenHash?: string | null;
+  /** Mobile app guests: scrambled IP address, only to limit fake bookings. */
+  guestIpHash?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -206,6 +208,11 @@ const BookingSchema: Schema = new Schema(
       default: null,
       select: false,
       index: { sparse: true },
+    },
+    guestIpHash: {
+      type: String,
+      required: false,
+      select: false,
     },
   },
   {

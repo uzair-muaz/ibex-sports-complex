@@ -21,6 +21,8 @@ import type { ApiUser } from "@/lib/api/types";
 const ACTIVE_STATUSES = ["pending_payment", "confirmed", "completed"];
 /** Most upcoming bookings one guest (same email or phone) may hold at once. */
 export const GUEST_ACTIVE_BOOKING_LIMIT = 3;
+/** Most guest bookings from one internet address in 24 hours. */
+export const GUEST_DAILY_IP_LIMIT = 5;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type AppBookingBody = {
@@ -49,6 +51,17 @@ export function newGuestAccessToken(): string {
 
 export function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/** The caller's internet address, scrambled with our secret so the real one is never stored. */
+export function hashClientIp(request: Request): string | null {
+  const ip =
+    request.headers.get("x-real-ip")?.trim() ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "";
+  if (!ip) return null;
+  const secret = process.env.NEXTAUTH_SECRET || process.env.API_JWT_SECRET || "";
+  return crypto.createHmac("sha256", secret).update(`ip:${ip}`).digest("hex");
 }
 
 /** Same request = same court, start, length and choices. */
@@ -113,6 +126,8 @@ export async function createAppBooking(params: {
   body: AppBookingBody;
   user: ApiUser | null;
   idempotencyKey: string | null;
+  /** From hashClientIp(request); used for the guest limit. */
+  clientIpHash?: string | null;
 }): Promise<AppBookingResult> {
   const { body, user } = params;
   await connectDB();
@@ -198,12 +213,20 @@ export async function createAppBooking(params: {
         date: { $gte: today },
         $or: [{ userEmail: contact.email }, { userPhone: contact.phone }],
       });
-      if (active >= GUEST_ACTIVE_BOOKING_LIMIT) {
+      const fromThisDevice = params.clientIpHash
+        ? await Booking.countDocuments({
+            guestIpHash: params.clientIpHash,
+            createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          })
+        : 0;
+      if (active >= GUEST_ACTIVE_BOOKING_LIMIT || fromThisDevice >= GUEST_DAILY_IP_LIMIT) {
         await undo();
         return fail(
           429,
           "GUEST_LIMIT_REACHED",
-          `Guests can hold up to ${GUEST_ACTIVE_BOOKING_LIMIT} upcoming bookings. Please sign in to book more.`,
+          active >= GUEST_ACTIVE_BOOKING_LIMIT
+            ? `Guests can hold up to ${GUEST_ACTIVE_BOOKING_LIMIT} upcoming bookings. Please sign in to book more.`
+            : "Too many guest bookings from this device today. Please sign in to book more.",
         );
       }
     }
@@ -309,6 +332,7 @@ export async function createAppBooking(params: {
       advancePercent: quote.advancePercent,
       walletCreditUsed: quote.wallet?.used ?? 0,
       guestAccessTokenHash: guestAccessToken ? hashToken(guestAccessToken) : undefined,
+      guestIpHash: contact.userId ? undefined : (params.clientIpHash ?? undefined),
     });
 
     if (scopeKey) {

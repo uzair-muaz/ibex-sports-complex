@@ -26,6 +26,30 @@ const proofExample = {
 const idParam = { name: "id", in: "path", required: true, schema: { type: "string" } };
 
 export const paymentPaths = {
+  "/api/v1/bookings/guest": {
+    get: {
+      tags: ["Bookings"],
+      summary: "Guest: bookings made on this phone",
+      description: [
+        "Send the saved guest codes in a header: `X-Guest-Tokens: gt_…,gt_…` (up to 50; never put them in the address). Unknown codes are ignored.",
+        "Answer: `{items: [Booking]}` — upcoming first (soonest first), then past (newest first). Same booking object as everywhere else; guests can't cancel in the app.",
+        "When the guest signs in with the same email (Google/Apple, or POST /account/claim-bookings), the booking moves to their account and the code stops working here.",
+      ].join("\n"),
+      parameters: [{ name: "X-Guest-Tokens", in: "header", required: false, schema: { type: "string" } }],
+      responses: { "200": json("Guest bookings", { items: [] }) },
+    },
+  },
+  "/api/v1/bookings/guest/{id}": {
+    get: {
+      tags: ["Bookings"],
+      summary: "Guest: one booking (needs its code in X-Guest-Tokens or X-Guest-Token)",
+      parameters: [idParam, { name: "X-Guest-Tokens", in: "header", required: false, schema: { type: "string" } }],
+      responses: {
+        "200": json("Booking", { booking: { id: "…", reference: "IBX-2109", status: "reserved" } }),
+        "404": err("Not found or not your code", "BOOKING_NOT_FOUND", "Booking not found"),
+      },
+    },
+  },
   "/api/v1/payments/instructions": {
     get: {
       tags: ["Payments"],

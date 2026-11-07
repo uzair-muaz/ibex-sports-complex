@@ -10,7 +10,7 @@ import {
 } from "@/app/actions/bookings";
 import { createTrustedApiActor } from "@/lib/action-auth";
 import { apiError, apiOk } from "@/lib/api/response";
-import { createAppBooking, type AppBookingBody } from "@/lib/api/create-app-booking";
+import { createAppBooking, hashClientIp, type AppBookingBody } from "@/lib/api/create-app-booking";
 
 /**
  * Public booking create.
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
         body,
         user: apiUser,
         idempotencyKey: request.headers.get("idempotency-key"),
+        clientIpHash: hashClientIp(request),
       });
       if (!result.ok) return apiError(result.error, result.status, request, { code: result.code });
       return apiOk(

@@ -145,7 +145,8 @@ export async function claimBookingsByEmail(opts?: {
       userEmail: email,
       $or: [{ userId: { $exists: false } }, { userId: null }],
     },
-    { $set: { userId: gate.userId } },
+    // The booking now belongs to the account, so its app guest code stops working.
+    { $set: { userId: gate.userId }, $unset: { guestAccessTokenHash: "" } },
   );
 
   revalidatePath("/account/bookings");

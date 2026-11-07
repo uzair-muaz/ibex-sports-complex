@@ -25,7 +25,11 @@ export async function bookingOwnerFilter(
 
   const token = request.headers.get("x-guest-token")?.trim();
   if (token && token.startsWith("gt_") && token.length <= 100) {
-    const filter = { guestAccessTokenHash: hashToken(token) };
+    // Still a guest booking (once claimed by an account, the code stops working).
+    const filter = {
+      guestAccessTokenHash: hashToken(token),
+      $or: [{ userId: { $exists: false } }, { userId: null }],
+    };
     const theirs = await Booking.exists({ _id: bookingId, ...filter });
     if (theirs) return { filter, userId: null };
   }
