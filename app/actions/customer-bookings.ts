@@ -9,6 +9,7 @@ import { refundLoyaltyForBooking } from "@/lib/loyalty";
 import { refundMembershipHours } from "@/lib/membership";
 import { revalidatePath } from "next/cache";
 import { resolveCustomerActor } from "@/lib/action-auth";
+import { creditWallet } from "@/lib/wallet";
 
 function bookingEndMs(date: string, startTime: number, duration: number) {
   const [y, m, d] = date.split("-").map(Number);
@@ -121,7 +122,30 @@ export async function cancelMyBooking(
   }
 
   booking.status = "cancelled";
+  // Money already paid (and wallet credit used) goes to the IBEX wallet — same rule as the app.
+  const refundAmount = Math.max(
+    0,
+    Math.round((booking.amountPaid ?? 0) + (booking.walletCreditUsed ?? 0)),
+  );
+  if (refundAmount > 0) {
+    booking.refundAmount = refundAmount;
+    booking.refundTo = "wallet";
+  }
+  booking.cancelledAt = new Date();
+  booking.cancelledBy = "customer";
   await booking.save();
+
+  if (refundAmount > 0 && booking.userId) {
+    // Unique per booking, so a second click can't refund twice.
+    await creditWallet({
+      userId: booking.userId,
+      amount: refundAmount,
+      reason: "booking_refund",
+      refKey: `cancel:${bookingId}`,
+      bookingId,
+      note: "Booking cancelled on the website",
+    });
+  }
 
   await refundLoyaltyForBooking(bookingId);
 

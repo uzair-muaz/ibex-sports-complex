@@ -7,6 +7,7 @@ import LoyaltyAccount from "@/models/LoyaltyAccount";
 import LoyaltyTransaction from "@/models/LoyaltyTransaction";
 import IdempotencyRecord from "@/models/IdempotencyRecord";
 import { resolveSlot } from "@/lib/api/slot";
+import { debitWallet, undoWalletDebit, walletBalance } from "@/lib/wallet";
 import { getAppSettings } from "@/lib/app-settings";
 import { computeQuote } from "@/lib/pricing/quote";
 import { acquireSlotLocks, releaseSlotLocks } from "@/lib/booking-locks";
@@ -181,12 +182,14 @@ export async function createAppBooking(params: {
   const bookingId = new mongoose.Types.ObjectId();
   let locked = false;
   let pointsTaken = 0;
+  let walletTaken = false;
 
   const undo = async () => {
     if (pointsTaken > 0 && contact.userId) {
       await LoyaltyAccount.updateOne({ userId: contact.userId }, { $inc: { balance: pointsTaken } }).catch(() => {});
       await LoyaltyTransaction.deleteOne({ bookingId, type: "redeem" }).catch(() => {});
     }
+    if (walletTaken) await undoWalletDebit(`booking:${bookingId}`).catch(() => {});
     if (locked) await releaseSlotLocks(bookingId).catch(() => {});
     if (scopeKey) await IdempotencyRecord.deleteOne({ scopeKey, status: "pending" }).catch(() => {});
   };
@@ -262,8 +265,11 @@ export async function createAppBooking(params: {
     // 7. Price (same maths as the quote).
     let customer: { pointsBalance: number; walletBalance: number } | null = null;
     if (contact.userId) {
-      const account = await LoyaltyAccount.findOne({ userId: contact.userId }).select("balance").lean();
-      customer = { pointsBalance: account?.balance ?? 0, walletBalance: 0 };
+      const [account, walletBal] = await Promise.all([
+        LoyaltyAccount.findOne({ userId: contact.userId }).select("balance").lean(),
+        walletBalance(contact.userId),
+      ]);
+      customer = { pointsBalance: account?.balance ?? 0, walletBalance: walletBal };
     }
     const quote = computeQuote({
       originalCourtFee: slot.originalPrice,
@@ -297,6 +303,23 @@ export async function createAppBooking(params: {
         bookingId,
         note: `Redeemed ${pointsUsed} points (app)`,
       });
+    }
+
+    // 8b. Take the wallet credit (only if the balance is still there).
+    const walletUsed = quote.wallet?.used ?? 0;
+    if (walletUsed > 0 && contact.userId) {
+      const debit = await debitWallet({
+        userId: contact.userId,
+        amount: walletUsed,
+        reason: "booking_payment",
+        refKey: `booking:${bookingId}`,
+        bookingId,
+      });
+      if (!debit.ok) {
+        await undo();
+        return fail(409, "WALLET_CHANGED", "Your wallet balance changed. Please check the price again.");
+      }
+      walletTaken = true;
     }
 
     // 9. Save the booking.

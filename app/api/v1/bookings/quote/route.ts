@@ -6,6 +6,7 @@ import { isCustomerRole } from "@/lib/authz";
 import { resolveSlot } from "@/lib/api/slot";
 import { computeQuote } from "@/lib/pricing/quote";
 import { slotStartIso } from "@/lib/api/availability";
+import { walletBalance } from "@/lib/wallet";
 
 /**
  * Price check before booking. Guests and signed-in customers.
@@ -37,9 +38,11 @@ export async function POST(request: Request) {
     let customer: { pointsBalance: number; walletBalance: number } | null = null;
     if (user && isCustomerRole(user.role)) {
       await connectDB();
-      const account = await LoyaltyAccount.findOne({ userId: user.id }).select("balance").lean();
-      // Wallet arrives in Phase 11; until then it is always 0.
-      customer = { pointsBalance: account?.balance ?? 0, walletBalance: 0 };
+      const [account, walletBal] = await Promise.all([
+        LoyaltyAccount.findOne({ userId: user.id }).select("balance").lean(),
+        walletBalance(user.id),
+      ]);
+      customer = { pointsBalance: account?.balance ?? 0, walletBalance: walletBal };
     }
 
     const quote = computeQuote({

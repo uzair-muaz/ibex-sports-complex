@@ -1,7 +1,13 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
 export type WalletTxnType = "credit" | "debit";
-export type WalletTxnReason = "booking_refund" | "late_payment_refund" | "booking_payment" | "admin_adjustment";
+export type WalletTxnReason =
+  | "booking_refund"
+  | "late_payment_refund"
+  | "booking_payment"
+  | "admin_adjustment"
+  /** Staff paid the customer's credit back to their bank (at the desk). */
+  | "bank_payout";
 
 /** One change to a wallet. `refKey` makes each refund happen only once. */
 export interface IWalletTransaction extends Document {
@@ -28,7 +34,7 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
     balanceAfter: { type: Number, default: null },
     reason: {
       type: String,
-      enum: ["booking_refund", "late_payment_refund", "booking_payment", "admin_adjustment"],
+      enum: ["booking_refund", "late_payment_refund", "booking_payment", "admin_adjustment", "bank_payout"],
       required: true,
     },
     refKey: { type: String, required: true, unique: true },

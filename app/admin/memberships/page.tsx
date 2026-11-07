@@ -19,6 +19,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminTableSkeleton } from "@/components/admin/loaders";
+import { WalletModal } from "@/components/admin/WalletModal";
 import {
   activateAdminMembership,
   adjustAdminLoyalty,
@@ -51,6 +52,9 @@ export default function AdminMembershipsPage() {
     null,
   );
   const [loyaltyUser, setLoyaltyUser] = useState<MembershipRosterRow | null>(
+    null,
+  );
+  const [walletUser, setWalletUser] = useState<MembershipRosterRow | null>(
     null,
   );
   const [plans, setPlans] = useState<Array<{ _id: string; name: string }>>([]);
@@ -135,6 +139,9 @@ export default function AdminMembershipsPage() {
           </Button>
           <Button size="small" onClick={() => setLoyaltyUser(row)}>
             Adjust points
+          </Button>
+          <Button size="small" onClick={() => setWalletUser(row)}>
+            Wallet
           </Button>
         </Space>
       ),
@@ -284,6 +291,8 @@ export default function AdminMembershipsPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <WalletModal user={walletUser} onClose={() => setWalletUser(null)} />
     </AdminLayout>
   );
 }
