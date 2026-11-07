@@ -35,6 +35,8 @@ type BookingCheckoutModalProps = {
   maxLoyaltyRedeem: number;
   useLoyalty: boolean;
   loyaltyPointsToRedeem: number;
+  /** PKR value of 1 point (Admin → App Settings). Default 1. */
+  pkrPerPoint?: number;
   hasMembership: boolean;
   membershipHoursRemaining: number;
   guestPassesRemaining: number;
@@ -66,6 +68,7 @@ export function BookingCheckoutModal({
   maxLoyaltyRedeem,
   useLoyalty,
   loyaltyPointsToRedeem,
+  pkrPerPoint = 1,
   hasMembership,
   membershipHoursRemaining,
   guestPassesRemaining,
@@ -85,7 +88,7 @@ export function BookingCheckoutModal({
     : Math.max(
         0,
         (selectedQuote?.totalPrice || 0) -
-          (useLoyalty ? loyaltyPointsToRedeem : 0),
+          (useLoyalty ? Math.floor(loyaltyPointsToRedeem * pkrPerPoint) : 0),
       );
 
   const showIdentityChooser = !isLoggedIn && identityStep === "choose";

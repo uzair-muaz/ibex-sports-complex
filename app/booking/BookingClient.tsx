@@ -29,7 +29,7 @@ import {
   getQuickSlotCourtAvailability,
   type AvailableStartTimeQuote,
 } from "../actions/bookings";
-import { maxRedeemablePoints } from "@/lib/loyalty-rules";
+import { maxRedeemablePoints, maxUsablePoints } from "@/lib/loyalty-rules";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
@@ -269,8 +269,12 @@ export default function BookingClient() {
 
   const maxLoyaltyRedeem = useMemo(() => {
     if (!selectedQuote) return 0;
-    return maxRedeemablePoints(loyaltyBalance, selectedQuote.totalPrice);
-  }, [loyaltyBalance, selectedQuote]);
+    // Same rules as the server (Admin → App Settings); old rules if not loaded.
+    const rules = loyaltyQuery.data?.rules;
+    return rules
+      ? maxUsablePoints(loyaltyBalance, selectedQuote.totalPrice, rules)
+      : maxRedeemablePoints(loyaltyBalance, selectedQuote.totalPrice);
+  }, [loyaltyBalance, selectedQuote, loyaltyQuery.data?.rules]);
 
   useEffect(() => {
     if (!useLoyalty) {
@@ -1006,6 +1010,7 @@ export default function BookingClient() {
         maxLoyaltyRedeem={maxLoyaltyRedeem}
         useLoyalty={useLoyalty}
         loyaltyPointsToRedeem={loyaltyPointsToRedeem}
+        pkrPerPoint={loyaltyQuery.data?.rules?.pkrPerPoint ?? 1}
         hasMembership={hasMembership}
         membershipHoursRemaining={membershipHoursRemaining}
         guestPassesRemaining={guestPassesRemaining}

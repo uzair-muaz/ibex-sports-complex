@@ -1,6 +1,7 @@
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import { isStaffRole } from "@/lib/authz";
+import { grantSignUpBonus } from "@/lib/loyalty-bonus";
 
 type GoogleTokenInfo = {
   sub?: string;
@@ -86,6 +87,7 @@ export async function findOrCreateGoogleUser(info: GoogleTokenInfo) {
       emailVerified: new Date(),
     });
     isNewAccount = true;
+    await grantSignUpBonus(String(user._id));
   }
 
   return { user, isNewAccount, isStaff: false as const };

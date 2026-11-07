@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import { normalizePakPhone } from "@/lib/phone";
+import { grantSignUpBonus } from "@/lib/loyalty-bonus";
 
 export type RegisterCustomerInput = {
   name: string;
@@ -81,6 +82,7 @@ export async function registerCustomer(
       phone,
       role: "user",
     });
+    await grantSignUpBonus(String(user._id));
 
     return {
       success: true,

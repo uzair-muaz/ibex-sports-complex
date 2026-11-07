@@ -480,9 +480,42 @@ export function getOpenApiDocument(baseUrl?: string) {
       "/api/v1/account/loyalty": {
         get: {
           tags: ["Account"],
-          summary: "Loyalty balance, hours played, ledger",
+          summary: "My reward points: balance, rules, history",
+          description: [
+            "**App: add `?format=app[&cursor=&limit=]`.** Answer: `{points, pendingPoints, pkrPerPoint, rules, history: {items, nextCursor}}`.",
+            "- rules come from Admin → App Settings (earnBasis per_pkr or per_hour, earnPoints, earnPerPkr, minRedeemPoints, maxRedeemPercent, signUpBonusPoints, earnOnMembershipHours). Web and app use the same values.",
+            "- history items: `{id, type, status, points, title, bookingId, date}`. type: earned, redeemed, returned, bonus, adjusted (staff change). status: pending (match not played yet), completed, applied (used on a booking). points is signed: + added, − taken.",
+            "- Pending items (bookings not yet marked completed by staff) come first on the first page; their date is when the match ends. Then the history, newest first, in pages (limit default 20, max 50).",
+            "- New accounts get the sign-up bonus once (0 = off, the default).",
+            "**Website (no format):** unchanged, plus `rules`.",
+          ].join("\n"),
           security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-          responses: { "200": { description: "OK" } },
+          parameters: [
+            { name: "format", in: "query", required: false, schema: { type: "string", enum: ["app"] } },
+            { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50 } },
+          ],
+          responses: {
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: {
+                    points: 1850,
+                    pendingPoints: 600,
+                    pkrPerPoint: 1,
+                    rules: { earnBasis: "per_pkr", earnPoints: 10, earnPerPkr: 100, minRedeemPoints: 500, maxRedeemPercent: 100, signUpBonusPoints: 200, earnOnMembershipHours: false },
+                    history: {
+                      items: [
+                        { id: "pending:6650c0ffee0000000000b001", type: "earned", status: "pending", points: 600, title: "Padel match · IBX-8821", bookingId: "6650c0ffee0000000000b001", date: "2026-11-05T19:30:00+05:00" },
+                      ],
+                      nextCursor: null,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
       "/api/v1/account/membership": {

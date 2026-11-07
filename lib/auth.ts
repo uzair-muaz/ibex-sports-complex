@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import connectDB from "./mongodb";
 import User from "@/models/User";
+import { grantSignUpBonus } from "@/lib/loyalty-bonus";
 
 const googleConfigured =
   !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
@@ -112,6 +113,7 @@ export const authOptions = {
             googleId: account.providerAccountId,
             emailVerified: profile?.email_verified ? new Date() : null,
           });
+          await grantSignUpBonus(String(dbUser._id));
         }
 
         (user as { id?: string; role?: string }).id = dbUser._id.toString();

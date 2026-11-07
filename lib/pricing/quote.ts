@@ -1,4 +1,5 @@
 import type { LoyaltyRules } from "@/lib/app-settings";
+import { maxUsablePoints, pointsDiscountPkr, pointsEarnedFor } from "@/lib/loyalty-rules";
 
 /**
  * The one price calculation for the mobile app (quote now, booking in Phase 5).
@@ -46,11 +47,7 @@ export type Quote = {
 
 /** Points this booking would earn, on the amount actually paid (total). */
 export function pointsToEarn(loyalty: LoyaltyRules, total: number, durationMinutes: number): number {
-  if (loyalty.earnPoints <= 0) return 0;
-  if (loyalty.earnBasis === "per_hour") {
-    return Math.round((durationMinutes / 60) * loyalty.earnPoints);
-  }
-  return Math.floor(Math.max(0, total) / loyalty.earnPerPkr) * loyalty.earnPoints;
+  return pointsEarnedFor(loyalty, { paidTotal: total, durationMinutes });
 }
 
 export function computeQuote(input: QuoteInput): Quote {
@@ -62,11 +59,10 @@ export function computeQuote(input: QuoteInput): Quote {
   let pointsDiscount = 0;
   if (input.customer) {
     const balance = Math.max(0, Math.floor(input.customer.pointsBalance));
-    const maxByFee = Math.floor((courtFee * (loyalty.maxRedeemPercent / 100)) / loyalty.pkrPerPoint);
-    const maxUsable = Math.min(balance, maxByFee);
-    const canUse = maxUsable > 0 && maxUsable >= loyalty.minRedeemPoints;
+    const maxUsable = maxUsablePoints(balance, courtFee, loyalty);
+    const canUse = maxUsable > 0;
     const used = input.usePoints && canUse ? maxUsable : 0;
-    pointsDiscount = Math.min(courtFee, Math.floor(used * loyalty.pkrPerPoint));
+    pointsDiscount = pointsDiscountPkr(used, courtFee, loyalty);
     points = {
       available: balance,
       canUse,

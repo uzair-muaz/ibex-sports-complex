@@ -3,6 +3,7 @@ import User from "@/models/User";
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
 import { nameFromAppleFullName, verifyAppleIdentityToken } from "@/lib/api/apple";
 import { buildSignInResponse, isStaffUser, staffAccountError } from "@/lib/api/auth-session";
+import { grantSignUpBonus } from "@/lib/loyalty-bonus";
 
 /**
  * Sign in with Apple (iPhone).
@@ -68,6 +69,7 @@ export async function POST(request: Request) {
         emailVerified: apple.emailVerified ? new Date() : null,
       });
       isNewAccount = true;
+      await grantSignUpBonus(String(user._id));
     }
 
     if (isStaffUser(user)) return staffAccountError(request);

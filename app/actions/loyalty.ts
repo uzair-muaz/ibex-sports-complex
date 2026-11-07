@@ -8,7 +8,7 @@ import {
   getLoyaltyBalance,
   getOrCreateLoyaltyAccount,
 } from "@/lib/loyalty";
-import { LOYALTY_MIN_REDEEM_POINTS, LOYALTY_POINTS_PER_HOUR } from "@/lib/loyalty-rules";
+import { getAppSettings } from "@/lib/app-settings";
 import { revalidatePath } from "next/cache";
 import {
   resolveCustomerActor,
@@ -27,21 +27,25 @@ export async function getMyLoyaltySummary(opts?: {
 
   await connectDB();
   await getOrCreateLoyaltyAccount(gate.userId);
-  const [balance, hoursPlayed, transactions] = await Promise.all([
+  const [balance, hoursPlayed, transactions, settings] = await Promise.all([
     getLoyaltyBalance(gate.userId),
     getHoursPlayed(gate.userId),
     LoyaltyTransaction.find({ userId: gate.userId })
       .sort({ createdAt: -1 })
       .limit(50)
       .lean(),
+    getAppSettings(),
   ]);
+  const rules = settings.loyalty;
 
   return {
     success: true as const,
     balance,
     hoursPlayed,
-    pointsPerHour: LOYALTY_POINTS_PER_HOUR,
-    minRedeem: LOYALTY_MIN_REDEEM_POINTS,
+    // Older fields kept for the website; `rules` has everything from App Settings.
+    pointsPerHour: rules.earnBasis === "per_hour" ? rules.earnPoints : 0,
+    minRedeem: rules.minRedeemPoints,
+    rules,
     transactions: JSON.parse(JSON.stringify(transactions)),
   };
 }

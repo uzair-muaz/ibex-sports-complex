@@ -1,3 +1,5 @@
+import type { LoyaltyRules } from "@/lib/app-settings";
+
 /** Locked loyalty rules — tweak here, not in call sites. */
 
 export const LOYALTY_POINTS_PER_HOUR = 10;
@@ -30,4 +32,39 @@ export function maxRedeemablePoints(
   if (capped < LOYALTY_MIN_REDEEM_POINTS) return 0;
   // Redeem in whole PKR amounts; keep multiple of min only as floor check
   return capped;
+}
+
+// ---------------------------------------------------------------------------
+// Rules from Admin → App Settings (web and app use the same values).
+// The constants above are today's defaults and stay for older callers.
+// Browser-safe: no database imports here.
+// ---------------------------------------------------------------------------
+
+
+/** Most points a booking can take, or 0 if below the minimum. */
+export function maxUsablePoints(balance: number, feeAfterPromo: number, rules: LoyaltyRules): number {
+  const safeBalance = Math.max(0, Math.floor(balance));
+  const maxByFee = Math.floor((Math.max(0, feeAfterPromo) * (rules.maxRedeemPercent / 100)) / rules.pkrPerPoint);
+  const max = Math.min(safeBalance, maxByFee);
+  return max > 0 && max >= rules.minRedeemPoints ? max : 0;
+}
+
+/** PKR discount for some points (never more than the fee). */
+export function pointsDiscountPkr(points: number, feeAfterPromo: number, rules: LoyaltyRules): number {
+  return Math.min(Math.max(0, feeAfterPromo), Math.floor(points * rules.pkrPerPoint));
+}
+
+/**
+ * Points a booking earns once played. `paidTotal` = what the customer pays
+ * (after promotions and points). Membership hours earn nothing unless the
+ * admin turns that on.
+ */
+export function pointsEarnedFor(
+  rules: LoyaltyRules,
+  b: { paidTotal: number; durationMinutes: number; usedMembershipHours?: boolean },
+): number {
+  if (rules.earnPoints <= 0) return 0;
+  if (b.usedMembershipHours && !rules.earnOnMembershipHours) return 0;
+  if (rules.earnBasis === "per_hour") return Math.round((b.durationMinutes / 60) * rules.earnPoints);
+  return Math.floor(Math.max(0, b.paidTotal) / rules.earnPerPkr) * rules.earnPoints;
 }

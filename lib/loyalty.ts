@@ -5,11 +5,8 @@ import connectDB from "@/lib/mongodb";
 import LoyaltyAccount from "@/models/LoyaltyAccount";
 import LoyaltyTransaction from "@/models/LoyaltyTransaction";
 import Booking from "@/models/Booking";
-import {
-  maxRedeemablePoints,
-  pointsForDuration,
-  pkrFromPoints,
-} from "@/lib/loyalty-rules";
+import { maxUsablePoints, pointsDiscountPkr, pointsEarnedFor } from "@/lib/loyalty-rules";
+import { getAppSettings } from "@/lib/app-settings";
 
 export async function getOrCreateLoyaltyAccount(userId: string) {
   await connectDB();
@@ -41,7 +38,13 @@ export async function awardLoyaltyForCompletedBooking(bookingId: string) {
     return { success: true as const, skipped: true, points: existing.points };
   }
 
-  const points = pointsForDuration(booking.duration);
+  // Rules from Admin → App Settings (default = 10 points per hour played).
+  const { loyalty } = await getAppSettings();
+  const points = pointsEarnedFor(loyalty, {
+    paidTotal: booking.totalPrice,
+    durationMinutes: Math.round(booking.duration * 60),
+    usedMembershipHours: !!booking.usedMembershipHours,
+  });
   if (points <= 0) {
     return { success: true as const, skipped: true, points: 0 };
   }
@@ -72,13 +75,11 @@ export async function redeemLoyaltyPoints(params: {
 }) {
   await connectDB();
   const current = await getOrCreateLoyaltyAccount(params.userId);
-  const allowed = maxRedeemablePoints(
-    current.balance,
-    params.totalPriceAfterPromo,
-  );
+  const { loyalty } = await getAppSettings();
+  const allowed = maxUsablePoints(current.balance, params.totalPriceAfterPromo, loyalty);
   const points = Math.min(params.points, allowed);
-  if (points < 100 && params.points > 0) {
-    throw new Error("Not enough points to redeem (minimum 100).");
+  if (points < loyalty.minRedeemPoints && params.points > 0) {
+    throw new Error(`Not enough points to redeem (minimum ${loyalty.minRedeemPoints}).`);
   }
   if (points <= 0) {
     return { points: 0, discountPkr: 0 };
@@ -102,7 +103,7 @@ export async function redeemLoyaltyPoints(params: {
     note: `Redeemed ${points} points`,
   });
 
-  return { points, discountPkr: pkrFromPoints(points) };
+  return { points, discountPkr: pointsDiscountPkr(points, params.totalPriceAfterPromo, loyalty) };
 }
 
 export async function refundLoyaltyForBooking(bookingId: string) {
