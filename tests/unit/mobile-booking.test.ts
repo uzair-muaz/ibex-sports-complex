@@ -3,6 +3,7 @@ import { bookingCoversCell, cellsFor } from "@/lib/booking-locks";
 import { bookingReference, bookingStartMs, mobileStatus, toMobileBooking } from "@/lib/api/booking-view";
 import { hashToken, newGuestAccessToken, requestHash, validateGuest } from "@/lib/api/create-app-booking";
 import { dayIndex } from "@/lib/booking-overlap";
+import { decodeCursor, encodeCursor, isUpcomingBooking, splitBookings } from "@/lib/api/my-bookings";
 
 const ctx = { cancellationNoticeMinutes: 240, minAdvancePercent: 50 };
 
@@ -135,5 +136,44 @@ describe("app booking input", () => {
     expect(requestHash(body)).toBe(requestHash({ ...body }));
     expect(requestHash(body)).not.toBe(requestHash({ ...body, durationMinutes: 60 }));
     expect(requestHash(body)).not.toBe(requestHash({ ...body, usePoints: false }));
+  });
+});
+
+describe("my bookings (app)", () => {
+  const now = Date.parse("2026-11-07T13:00:00Z"); // 18:00 venue time
+  const mk = (date: string, startTime: number, status: "pending_payment" | "confirmed" | "cancelled" | "completed", duration = 1) => ({
+    date,
+    startTime,
+    duration,
+    status,
+  });
+
+  it("upcoming = reserved or confirmed and not finished", () => {
+    expect(isUpcomingBooking(mk("2026-11-07", 17.5, "confirmed"), now)).toBe(true); // still playing
+    expect(isUpcomingBooking(mk("2026-11-07", 16, "confirmed"), now)).toBe(false); // ended 17:00
+    expect(isUpcomingBooking(mk("2026-11-08", 10, "pending_payment"), now)).toBe(true);
+    expect(isUpcomingBooking(mk("2026-11-08", 10, "cancelled"), now)).toBe(false);
+  });
+
+  it("upcoming soonest first, past newest first", () => {
+    const a = mk("2026-11-10", 18, "confirmed");
+    const b = mk("2026-11-08", 9, "pending_payment");
+    const c = mk("2026-11-01", 18, "completed");
+    const d = mk("2026-11-05", 18, "cancelled");
+    const { upcoming, past } = splitBookings([a, b, c, d], now);
+    expect(upcoming).toEqual([b, a]);
+    expect(past).toEqual([d, c]);
+  });
+
+  it("cursor round trip; junk cursor rejected", () => {
+    expect(decodeCursor(encodeCursor(40))).toBe(40);
+    expect(decodeCursor(null)).toBe(0);
+    expect(decodeCursor("hello")).toBeNull();
+  });
+
+  it("confirmed booking in the past shows as completed", () => {
+    const v = toMobileBooking({ ...base, status: "confirmed" }, { ...ctx, now: Date.parse("2026-12-01T00:00:00Z") });
+    expect(v.status).toBe("completed");
+    expect(v.cancellation.canCancel).toBe(false);
   });
 });

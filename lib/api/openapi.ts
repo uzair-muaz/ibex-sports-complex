@@ -410,14 +410,39 @@ export function getOpenApiDocument(baseUrl?: string) {
         get: {
           tags: ["Account"],
           summary: "List my upcoming and past bookings",
+          description: [
+            "**App: add `?format=app`.** Answer: `{upcoming: [Booking], past: {items: [Booking], nextCursor}}` — the same booking object as POST /bookings returns.",
+            "- upcoming = reserved or confirmed and not finished yet, soonest first (all of them, no pages).",
+            "- past = finished, cancelled or completed, newest first, in pages of `limit` (default 20, max 50). For the next page send `cursor=<nextCursor>`; nextCursor is null on the last page.",
+            "- A confirmed booking whose time has passed shows status `completed`.",
+            "Errors: 400 VALIDATION_ERROR (bad cursor or limit); 401 UNAUTHORIZED; 403 STAFF_ACCOUNT.",
+            "",
+            "**Website (no format):** unchanged.",
+          ].join("\n"),
           security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-          responses: { "200": { description: "OK" } },
+          parameters: [
+            { name: "format", in: "query", required: false, schema: { type: "string", enum: ["app"] } },
+            { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50 } },
+          ],
+          responses: {
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: { upcoming: [{ id: "6650c0ffee0000000000b001", reference: "IBX-8821", status: "reserved" }], past: { items: [], nextCursor: null } },
+                },
+              },
+            },
+          },
         },
       },
       "/api/v1/account/bookings/{id}": {
         get: {
           tags: ["Account"],
           summary: "Get one of my bookings",
+          description:
+            "**App: add `?format=app`** → `{booking}` (the app's booking object). 404 BOOKING_NOT_FOUND if it isn't yours. **Website (no format):** unchanged `{booking, canCancel}`.",
           security: [{ bearerAuth: [] }, { cookieAuth: [] }],
           parameters: [
             {
@@ -426,10 +451,11 @@ export function getOpenApiDocument(baseUrl?: string) {
               required: true,
               schema: { type: "string" },
             },
+            { name: "format", in: "query", required: false, schema: { type: "string", enum: ["app"] } },
           ],
           responses: {
             "200": { description: "OK" },
-            "404": { description: "Not found" },
+            "404": { description: "Not found (app: code BOOKING_NOT_FOUND)" },
           },
         },
         delete: {

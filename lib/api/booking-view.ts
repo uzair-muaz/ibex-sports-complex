@@ -112,7 +112,11 @@ export function toMobileBooking(
     sport,
     start: slotStartIso(b.date, b.startTime),
     durationMinutes: Math.round(b.duration * 60),
-    status: mobileStatus(b.status),
+    // A confirmed booking whose time has passed shows as completed (PDF §9).
+    status:
+      b.status === "confirmed" && now >= startMs + b.duration * 3_600_000
+        ? "completed"
+        : mobileStatus(b.status),
     price: { courtFee, pointsUsed: b.loyaltyPointsRedeemed ?? 0, pointsDiscount, total },
     payment: {
       status: paymentStatus,
