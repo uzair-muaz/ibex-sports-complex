@@ -1,12 +1,14 @@
 import { bffFetch } from "@/lib/bff/client";
-import type { ResolvedAppSettings, SettingsPatch } from "@/lib/app-settings";
+import type { Faq, ResolvedAppSettings, SettingsPatch } from "@/lib/app-settings";
+
+type SettingsAnswer = { settings: ResolvedAppSettings; builtInFaqs: Faq[] };
 
 export async function fetchAdminAppSettings() {
-  return bffFetch<{ settings: ResolvedAppSettings }>("/api/v1/admin/settings");
+  return bffFetch<SettingsAnswer>("/api/v1/admin/settings");
 }
 
 export async function saveAdminAppSettings(patch: SettingsPatch) {
-  return bffFetch<{ settings: ResolvedAppSettings }>("/api/v1/admin/settings", {
+  return bffFetch<SettingsAnswer>("/api/v1/admin/settings", {
     method: "PATCH",
     body: JSON.stringify(patch),
   });

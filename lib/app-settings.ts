@@ -68,7 +68,11 @@ export type ResolvedAppSettings = {
   cancellationNoticeMinutes: number;
   loyalty: LoyaltyRules;
   payments: PaymentRules;
+  /** Super admin's FAQs, or null to use the built-in ones (lib/faqs.ts). */
+  faqs: Faq[] | null;
 };
+
+export type Faq = { question: string; answer: string };
 
 export const SPORT_KEYS: SportKey[] = ["PADEL", "PICKLEBALL", "FUTSAL", "CRICKET"];
 
@@ -158,6 +162,7 @@ export const DEFAULT_APP_SETTINGS: ResolvedAppSettings = {
     transferNote: "Write your booking reference in the transfer description.",
     verificationNote: "Our team checks payments by hand. You will get a notification.",
   },
+  faqs: null,
 };
 
 type StoredSettings = {
@@ -166,6 +171,7 @@ type StoredSettings = {
   cancellationNoticeMinutes?: number | null;
   loyalty?: ILoyaltySetting | null;
   payments?: IPaymentSetting | null;
+  faqs?: Faq[] | null;
 };
 
 function pick<T>(value: T | null | undefined, fallback: T): T {
@@ -246,6 +252,10 @@ export function resolveAppSettings(stored: StoredSettings | null | undefined): R
       transferNote: pick(stored?.payments?.transferNote, d.payments.transferNote),
       verificationNote: pick(stored?.payments?.verificationNote, d.payments.verificationNote),
     },
+    faqs:
+      Array.isArray(stored?.faqs) && stored.faqs.length > 0
+        ? stored.faqs.map((f) => ({ question: f.question, answer: f.answer }))
+        : null,
   };
 }
 
@@ -255,6 +265,8 @@ export type SettingsPatch = {
   cancellationNoticeMinutes?: number;
   loyalty?: Partial<LoyaltyRules>;
   payments?: Partial<PaymentRules>;
+  /** null = go back to the built-in FAQs. */
+  faqs?: Faq[] | null;
 };
 
 type CheckResult = { ok: true; value: SettingsPatch } | { ok: false; error: string };
@@ -404,6 +416,25 @@ export function validateSettingsPatch(input: unknown): CheckResult {
     if (Object.keys(pay).length > 0) out.payments = pay;
   }
 
+  if (body.faqs !== undefined) {
+    if (body.faqs === null) {
+      out.faqs = null;
+    } else {
+      if (!Array.isArray(body.faqs) || body.faqs.length > 30) return { ok: false, error: "FAQs must be a list (up to 30)." };
+      const faqs: Faq[] = [];
+      for (const raw of body.faqs) {
+        const f = (raw ?? {}) as Record<string, unknown>;
+        const question = typeof f.question === "string" ? f.question.trim() : "";
+        const answer = typeof f.answer === "string" ? f.answer.trim() : "";
+        if (!question && !answer) continue;
+        if (question.length < 3 || question.length > 200) return { ok: false, error: "Each question must be 3–200 characters." };
+        if (answer.length < 3 || answer.length > 1500) return { ok: false, error: "Each answer must be 3–1500 characters." };
+        faqs.push({ question, answer });
+      }
+      out.faqs = faqs.length ? faqs : null;
+    }
+  }
+
   if (body.sports !== undefined) {
     if (!Array.isArray(body.sports)) return { ok: false, error: "sports must be a list." };
     const seen = new Set<string>();
@@ -513,6 +544,7 @@ export async function updateAppSettings(
     cancellationNoticeMinutes: patch.cancellationNoticeMinutes ?? current.cancellationNoticeMinutes,
     loyalty: { ...current.loyalty, ...(patch.loyalty || {}) },
     payments: { ...current.payments, ...(patch.payments || {}) },
+    faqs: patch.faqs !== undefined ? patch.faqs : current.faqs,
     updatedBy,
   };
 

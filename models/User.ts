@@ -16,6 +16,14 @@ export interface IUser extends Document {
   emailVerified?: Date | null;
   passwordResetTokenHash?: string | null;
   passwordResetExpires?: Date | null;
+  /** Player preferences (lib/preferences.ts). */
+  preferences?: {
+    primarySport?: string | null;
+    skillLevel?: string | null;
+    hand?: string | null;
+    courtSide?: string | null;
+    notifications?: { matchReminders?: boolean; paymentUpdates?: boolean; courtAvailability?: boolean; newsletter?: boolean };
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -85,6 +93,25 @@ const UserSchema: Schema = new Schema(
       required: false,
       default: null,
       select: false,
+    },
+    // Player preferences (lib/preferences.ts). Missing values use the defaults there.
+    preferences: {
+      type: new Schema(
+        {
+          primarySport: { type: String, default: null },
+          skillLevel: { type: String, default: null },
+          hand: { type: String, default: null },
+          courtSide: { type: String, default: null },
+          notifications: {
+            matchReminders: { type: Boolean },
+            paymentUpdates: { type: Boolean },
+            courtAvailability: { type: Boolean },
+            newsletter: { type: Boolean },
+          },
+        },
+        { _id: false },
+      ),
+      required: false,
     },
   },
   {

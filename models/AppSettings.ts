@@ -61,6 +61,8 @@ export interface IAppSettings extends Document {
   cancellationNoticeMinutes?: number;
   loyalty?: ILoyaltySetting;
   payments?: IPaymentSetting;
+  /** Support FAQs. Empty/missing = the built-in ones (lib/faqs.ts). */
+  faqs?: { question: string; answer: string }[] | null;
   updatedBy?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -141,6 +143,10 @@ const AppSettingsSchema = new Schema<IAppSettings>(
     cancellationNoticeMinutes: { type: Number, min: 0, max: 10080 },
     loyalty: { type: LoyaltySettingSchema, default: undefined },
     payments: { type: PaymentSettingSchema, default: undefined },
+    faqs: {
+      type: [{ _id: false, question: { type: String, required: true }, answer: { type: String, required: true } }],
+      default: undefined,
+    },
     updatedBy: { type: String, default: null },
   },
   { timestamps: true },

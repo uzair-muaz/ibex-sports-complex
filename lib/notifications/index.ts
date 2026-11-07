@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { allowedBySwitches, getPreferences } from "@/lib/preferences";
 import connectDB from "@/lib/mongodb";
 import Notification, { type NotificationType } from "@/models/Notification";
 import { sendHtmlEmail } from "@/lib/email";
@@ -46,12 +47,15 @@ function maskEmail(e: string) {
 }
 
 /**
- * Whether this customer wants this kind of message on this channel.
- * Phase 14 (preferences) plugs the customer's switches in here.
+ * Whether this customer wants this kind of message by push or email
+ * (their switches in Preferences). The in-app list always keeps everything.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function wants(_userId: string, _type: NotificationType | null, _channel: "push" | "email"): Promise<boolean> {
-  return true;
+async function wants(userId: string, type: NotificationType | null): Promise<boolean> {
+  try {
+    return allowedBySwitches(await getPreferences(userId), type);
+  } catch {
+    return true;
+  }
 }
 
 export async function notify(input: NotifyInput): Promise<NotifyResult> {
@@ -80,7 +84,7 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
     }
 
     const switches = sendSwitches();
-    if (userId && input.type && (await wants(userId, input.type, "push"))) {
+    if (userId && input.type && (await wants(userId, input.type))) {
       const sa = switches.push ? readServiceAccount() : null;
       if (sa) {
         const data: Record<string, string> = { type: input.type };
@@ -93,7 +97,7 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
       }
     }
 
-    if (input.email?.to && (!userId || (await wants(userId, input.type, "email")))) {
+    if (input.email?.to && (!userId || (await wants(userId, input.type)))) {
       if (switches.email) {
         const sent = await sendHtmlEmail(input.email);
         result.email = sent.success ? "sent" : "skipped";

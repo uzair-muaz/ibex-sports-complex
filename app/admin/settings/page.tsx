@@ -17,11 +17,12 @@ import {
 } from "antd";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminTableSkeleton } from "@/components/admin/loaders";
+import { FaqsCard } from "@/components/admin/FaqsCard";
 import {
   fetchAdminAppSettings,
   saveAdminAppSettings,
 } from "@/lib/tanstack/requests/admin-settings.requests";
-import type { BankAccount, ResolvedAppSettings, SportRules } from "@/lib/app-settings";
+import type { BankAccount, Faq, ResolvedAppSettings, SportRules } from "@/lib/app-settings";
 
 const { Text } = Typography;
 
@@ -43,6 +44,7 @@ export default function AdminAppSettingsPage() {
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [draft, setDraft] = useState<ResolvedAppSettings | null>(null);
   const [saving, setSaving] = useState(false);
+  const [builtInFaqs, setBuiltInFaqs] = useState<Faq[]>([]);
 
   const query = useQuery({
     queryKey: ["admin", "app-settings"],
@@ -57,6 +59,7 @@ export default function AdminAppSettingsPage() {
 
   useEffect(() => {
     if (query.data?.settings) setDraft(query.data.settings);
+    if (query.data?.builtInFaqs) setBuiltInFaqs(query.data.builtInFaqs);
   }, [query.data]);
 
   if (!isSuperAdmin) return null;
@@ -112,7 +115,8 @@ export default function AdminAppSettingsPage() {
     if (!draft) return;
     setSaving(true);
     try {
-      const { settings } = await saveAdminAppSettings({
+      const { settings, builtInFaqs: builtIn } = await saveAdminAppSettings({
+        faqs: draft.faqs,
         venue: draft.venue,
         cancellationNoticeMinutes: draft.cancellationNoticeMinutes,
         loyalty: draft.loyalty,
@@ -130,6 +134,7 @@ export default function AdminAppSettingsPage() {
         })),
       });
       setDraft(settings);
+      setBuiltInFaqs(builtIn);
       message.success("Settings saved");
     } catch (err) {
       message.error(err instanceof Error ? err.message : "Could not save");
@@ -447,6 +452,12 @@ export default function AdminAppSettingsPage() {
               </Form.Item>
             </Card>
           ))}
+
+          <FaqsCard
+            faqs={draft.faqs}
+            builtIn={builtInFaqs}
+            onChange={(faqs) => setDraft({ ...draft, faqs })}
+          />
         </Form>
       )}
     </AdminLayout>
