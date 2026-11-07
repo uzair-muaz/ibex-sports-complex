@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { maxUsablePoints, pointsDiscountPkr, pointsEarnedFor } from "@/lib/loyalty-rules";
 import { DEFAULT_APP_SETTINGS, type LoyaltyRules } from "@/lib/app-settings";
-import { mapTransaction, publicRules } from "@/lib/api/loyalty-view";
+import { loyaltyRulesView, mapTransaction, publicRules } from "@/lib/api/loyalty-view";
+import { getOpenApiDocument } from "@/lib/api/openapi";
 
 const today = DEFAULT_APP_SETTINGS.loyalty;
 const pdf: LoyaltyRules = {
@@ -78,5 +79,17 @@ describe("points history shown in the app", () => {
       signUpBonusPoints: 200,
       earnOnMembershipHours: false,
     });
+  });
+
+  it("public rules for guests: same values, plus pkrPerPoint", () => {
+    const view = loyaltyRulesView({ ...pdf, pkrPerPoint: 2 });
+    expect(view).toEqual({ pkrPerPoint: 2, rules: publicRules(pdf) });
+    expect(JSON.stringify(view)).not.toMatch(/balance|userId/);
+  });
+
+  it("public rules route is in the docs with no sign-in", () => {
+    const op = (getOpenApiDocument() as { paths: Record<string, { get?: { security?: unknown } }> }).paths["/api/v1/loyalty/rules"];
+    expect(op?.get).toBeDefined();
+    expect(op?.get?.security).toBeUndefined();
   });
 });

@@ -66,6 +66,11 @@ export function publicRules(r: LoyaltyRules) {
   };
 }
 
+/** Public points rules (no sign-in): same values as /account/loyalty. */
+export function loyaltyRulesView(r: LoyaltyRules) {
+  return { pkrPerPoint: r.pkrPerPoint, rules: publicRules(r) };
+}
+
 type BookingRow = {
   _id: { toString(): string };
   serialNumber?: number | null;

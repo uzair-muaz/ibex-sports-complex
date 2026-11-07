@@ -498,6 +498,32 @@ export function getOpenApiDocument(baseUrl?: string) {
           },
         },
       },
+      "/api/v1/loyalty/rules": {
+        get: {
+          tags: ["Account"],
+          summary: "Points rules (public, no sign-in)",
+          description: [
+            "For guests: checkout and the \"sign in to earn points\" sheet. Same values as `rules` and `pkrPerPoint` in `/account/loyalty`.",
+            "- Set by the super admin in Admin → App Settings. Don't hard-code them in the app.",
+            "- earnBasis `per_pkr`: earnPoints for every earnPerPkr PKR paid. `per_hour`: earnPoints per hour played. Points are added when staff mark the booking completed.",
+            "- Points can be used from minRedeemPoints, up to maxRedeemPercent of the court fee; 1 point = pkrPerPoint PKR.",
+            "- signUpBonusPoints: given once to new accounts (0 = off).",
+          ].join("\n"),
+          responses: {
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: {
+                    pkrPerPoint: 1,
+                    rules: { earnBasis: "per_pkr", earnPoints: 10, earnPerPkr: 100, minRedeemPoints: 500, maxRedeemPercent: 100, signUpBonusPoints: 200, earnOnMembershipHours: false },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       "/api/v1/account/loyalty": {
         get: {
           tags: ["Account"],
