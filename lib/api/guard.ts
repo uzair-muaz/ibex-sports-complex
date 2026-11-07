@@ -73,13 +73,15 @@ export async function requireApiCustomer(request: Request) {
   if (!user) {
     return {
       ok: false as const,
-      response: apiError("Unauthorized", 401, request),
+      response: apiError("Unauthorized", 401, request, { code: "UNAUTHORIZED" }),
     };
   }
   if (isStaffRole(user.role)) {
     return {
       ok: false as const,
-      response: apiError("Customer account required", 403, request),
+      response: apiError("Customer account required", 403, request, {
+        code: "STAFF_ACCOUNT",
+      }),
     };
   }
   return { ok: true as const, user };

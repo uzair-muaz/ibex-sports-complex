@@ -9,14 +9,23 @@ export type RegisterCustomerInput = {
   email: string;
   password: string;
   phone: string;
+  /** Mobile app rule is 8; the website still uses 6. */
+  minPasswordLength?: number;
 };
+
+export type RegisterErrorCode =
+  | "VALIDATION_ERROR"
+  | "INVALID_PHONE"
+  | "WEAK_PASSWORD"
+  | "EMAIL_IN_USE"
+  | "SERVER_ERROR";
 
 export type RegisterCustomerResult =
   | {
       success: true;
       user: { id: string; email: string; name: string; role: "user" };
     }
-  | { success: false; error: string };
+  | { success: false; error: string; code: RegisterErrorCode };
 
 function normalizePakPhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
@@ -38,19 +47,29 @@ export async function registerCustomer(
   const phone = normalizePakPhone(input.phone || "");
 
   if (name.length < 2) {
-    return { success: false, error: "Please enter your full name." };
+    return { success: false, error: "Please enter your full name.", code: "VALIDATION_ERROR" };
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { success: false, error: "Please enter a valid email address." };
+    return {
+      success: false,
+      error: "Please enter a valid email address.",
+      code: "VALIDATION_ERROR",
+    };
   }
   if (!phone) {
     return {
       success: false,
       error: "Please enter a valid Pakistani mobile number (03XXXXXXXXX).",
+      code: "INVALID_PHONE",
     };
   }
-  if (password.length < 6) {
-    return { success: false, error: "Password must be at least 6 characters." };
+  const minPassword = input.minPasswordLength ?? 6;
+  if (password.length < minPassword) {
+    return {
+      success: false,
+      error: `Password must be at least ${minPassword} characters.`,
+      code: "WEAK_PASSWORD",
+    };
   }
 
   try {
@@ -60,6 +79,7 @@ export async function registerCustomer(
       return {
         success: false,
         error: "An account with this email already exists. Sign in instead.",
+        code: "EMAIL_IN_USE",
       };
     }
 
@@ -86,6 +106,7 @@ export async function registerCustomer(
     return {
       success: false,
       error: "Unable to create account. Please try again.",
+      code: "SERVER_ERROR",
     };
   }
 }

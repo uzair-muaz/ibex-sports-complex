@@ -1,3 +1,5 @@
+import { authPaths, authSchemas } from "@/lib/api/openapi-auth";
+
 /**
  * OpenAPI 3.0 document for the public HTTP API (`/api/v1`).
  * Served at GET /api/v1/openapi — UI at /docs.
@@ -20,7 +22,10 @@ export function getOpenApiDocument(baseUrl?: string) {
         "",
         "## Authentication",
         "- **Web**: NextAuth session cookie (`credentials: include`).",
-        "- **Flutter / mobile**: Google Sign-In ID token → `POST /api/v1/auth/google` → `Authorization: Bearer <accessToken>`.",
+        "- **Flutter / mobile**: `POST /api/v1/auth/google`, `/auth/apple`, `/auth/login` or `/auth/register` → `Authorization: Bearer <accessToken>`. Renew with `POST /api/v1/auth/refresh`.",
+        "",
+        "## Errors",
+        "Errors look like `{ \"error\": \"message for people\", \"code\": \"CODE_FOR_THE_APP\" }`. Times are ISO with +05:00.",
         "",
         "Customer routes reject admin roles (403). Admin routes reject customers (401).",
         "Never pass raw user IDs from the client for ownership — identity comes from cookie or Bearer.",
@@ -42,7 +47,7 @@ export function getOpenApiDocument(baseUrl?: string) {
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
-          description: "Access token from POST /api/v1/auth/google",
+          description: "Access token from any /api/v1/auth sign-in address",
         },
         cookieAuth: {
           type: "apiKey",
@@ -55,9 +60,13 @@ export function getOpenApiDocument(baseUrl?: string) {
       schemas: {
         Error: {
           type: "object",
-          properties: { error: { type: "string" } },
+          properties: {
+            error: { type: "string" },
+            code: { type: "string", example: "WRONG_PASSWORD" },
+          },
           required: ["error"],
         },
+        ...authSchemas,
         ApiUser: {
           type: "object",
           properties: {
@@ -102,54 +111,6 @@ export function getOpenApiDocument(baseUrl?: string) {
       },
     },
     paths: {
-      "/api/v1/auth/google": {
-        post: {
-          tags: ["Auth"],
-          summary: "Exchange Google ID token for API access token",
-          description:
-            "Verify a Google ID token from the mobile/web SDK and return a Bearer JWT for subsequent API calls.",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["idToken"],
-                  properties: {
-                    idToken: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Authenticated",
-              content: {
-                "application/json": {
-                  schema: {
-                    type: "object",
-                    properties: {
-                      accessToken: { type: "string" },
-                      tokenType: { type: "string", example: "Bearer" },
-                      expiresIn: { type: "string", example: "30d" },
-                      user: { $ref: "#/components/schemas/ApiUser" },
-                    },
-                  },
-                },
-              },
-            },
-            "401": {
-              description: "Invalid token",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" },
-                },
-              },
-            },
-          },
-        },
-      },
       "/api/v1/auth/me": {
         get: {
           tags: ["Auth"],
@@ -228,65 +189,6 @@ export function getOpenApiDocument(baseUrl?: string) {
           responses: {
             "200": { description: "Password updated" },
             "400": { description: "Invalid or expired token" },
-          },
-        },
-      },
-      "/api/v1/auth/register": {
-        post: {
-          tags: ["Auth"],
-          summary: "Register a customer account (email + password)",
-          description:
-            "Creates a role=user account. Does not return a session cookie — web clients should call NextAuth credentials sign-in after success. Never creates staff roles.",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["name", "email", "password", "phone"],
-                  properties: {
-                    name: { type: "string", minLength: 2 },
-                    email: { type: "string", format: "email" },
-                    password: { type: "string", minLength: 6 },
-                    phone: {
-                      type: "string",
-                      description: "Pakistani mobile, e.g. 03XXXXXXXXX",
-                    },
-                  },
-                },
-              },
-            },
-          },
-          responses: {
-            "201": {
-              description: "Created",
-              content: {
-                "application/json": {
-                  schema: {
-                    type: "object",
-                    properties: {
-                      user: {
-                        type: "object",
-                        properties: {
-                          id: { type: "string" },
-                          email: { type: "string" },
-                          name: { type: "string" },
-                          role: { type: "string", example: "user" },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            "400": {
-              description: "Validation error or email already registered",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" },
-                },
-              },
-            },
           },
         },
       },
@@ -806,6 +708,7 @@ export function getOpenApiDocument(baseUrl?: string) {
           responses: { "200": { description: "OpenAPI 3.0 JSON" } },
         },
       },
+      ...authPaths,
     },
   } as const;
 }

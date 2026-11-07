@@ -1,6 +1,6 @@
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
-import type { ApiUser } from "@/lib/api/types";
+import { isStaffRole } from "@/lib/authz";
 
 type GoogleTokenInfo = {
   sub?: string;
@@ -56,11 +56,19 @@ export async function verifyGoogleIdToken(
   return data;
 }
 
-/** Upsert customer user from Google identity (never elevates admin roles). */
-export async function upsertUserFromGoogle(info: GoogleTokenInfo): Promise<ApiUser> {
+/**
+ * Find or create the customer for a verified Google identity.
+ * Staff accounts are returned untouched (the caller refuses them).
+ */
+export async function findOrCreateGoogleUser(info: GoogleTokenInfo) {
   await connectDB();
   const email = info.email!.trim().toLowerCase();
   let user = await User.findOne({ email });
+  let isNewAccount = false;
+
+  if (user && isStaffRole(user.role)) {
+    return { user, isNewAccount, isStaff: true as const };
+  }
 
   if (user) {
     if (info.sub && !user.googleId) user.googleId = info.sub;
@@ -77,14 +85,8 @@ export async function upsertUserFromGoogle(info: GoogleTokenInfo): Promise<ApiUs
       googleId: info.sub,
       emailVerified: new Date(),
     });
+    isNewAccount = true;
   }
 
-  return {
-    id: user._id.toString(),
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    phone: user.phone,
-    image: user.image,
-  };
+  return { user, isNewAccount, isStaff: false as const };
 }

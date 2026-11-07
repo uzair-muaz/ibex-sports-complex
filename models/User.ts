@@ -8,6 +8,7 @@ export interface IUser extends Document {
   image?: string;
   phone?: string;
   googleId?: string;
+  appleId?: string;
   emailVerified?: Date | null;
   passwordResetTokenHash?: string | null;
   passwordResetExpires?: Date | null;
@@ -49,6 +50,13 @@ const UserSchema: Schema = new Schema(
       trim: true,
     },
     googleId: {
+      type: String,
+      required: false,
+      sparse: true,
+      unique: true,
+    },
+    /** Apple's user id ("sub"). Apple may hide the real email, so we link by this. */
+    appleId: {
       type: String,
       required: false,
       sparse: true,
