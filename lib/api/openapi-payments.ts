@@ -26,6 +26,62 @@ const proofExample = {
 const idParam = { name: "id", in: "path", required: true, schema: { type: "string" } };
 
 export const paymentPaths = {
+  "/api/v1/account/bookings/{id}/cancellation": {
+    get: {
+      tags: ["Account"],
+      summary: "Can I cancel, and what do I get back? (nothing changes)",
+      description:
+        "refundAmount = money already paid (verified transfer or cash) plus wallet credit used; it goes to the IBEX wallet. Points and membership hours used always come back. Customers can cancel until cancellationNoticeMinutes before the start (Admin → App Settings; 240 today).",
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      parameters: [idParam],
+      responses: {
+        "200": json("Preview", {
+          canCancel: true,
+          cancelUntil: "2026-11-05T14:00:00+05:00",
+          refundAmount: 3575,
+          refundTo: "wallet",
+          pointsReturned: 1850,
+          hoursReturned: 0,
+        }),
+        "404": err("Not yours / not found", "BOOKING_NOT_FOUND", "Booking not found"),
+      },
+    },
+  },
+  "/api/v1/account/bookings/{id}/cancel": {
+    post: {
+      tags: ["Account"],
+      summary: "Cancel my booking (app). Body {reason, note?}",
+      description: [
+        "reason: weather, teammate_unavailable, schedule_conflict or other. note: optional, up to 300 characters.",
+        "Answer: `{booking}` with status cancelled and `refund: {amount, to: \"wallet\"}` (null when nothing was paid). A double tap can never refund twice.",
+        "If a transfer screenshot is verified after the cancel, that money also goes to the wallet.",
+        "Errors: 400 VALIDATION_ERROR; 404 BOOKING_NOT_FOUND; 409 ALREADY_CANCELLED, NOT_CANCELLABLE; 422 CANCEL_WINDOW_PASSED, ALREADY_STARTED.",
+        "The website keeps using DELETE /account/bookings/{id} (unchanged).",
+      ].join("\n"),
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      parameters: [idParam],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["reason"],
+              properties: {
+                reason: { type: "string", enum: ["weather", "teammate_unavailable", "schedule_conflict", "other"] },
+                note: { type: "string", maxLength: 300 },
+              },
+            },
+            example: { reason: "weather", note: "Rain forecast" },
+          },
+        },
+      },
+      responses: {
+        "200": json("Cancelled", { booking: { id: "…", status: "cancelled", refund: { amount: 3575, to: "wallet" } } }),
+        "422": err("Too late", "CANCEL_WINDOW_PASSED", "It's too late to cancel in the app. Please contact the venue."),
+      },
+    },
+  },
   "/api/v1/bookings/guest": {
     get: {
       tags: ["Bookings"],

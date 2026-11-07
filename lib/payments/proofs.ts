@@ -6,6 +6,7 @@ import PaymentProof, { type IPaymentProof } from "@/models/PaymentProof";
 import { getFileStorage } from "@/lib/storage";
 import { toPkIso } from "@/lib/api/time";
 import { getBaseUrl } from "@/lib/utils";
+import { creditWallet } from "@/lib/wallet";
 
 export const MAX_PROOF_BYTES = 5 * 1024 * 1024;
 export const MAX_PROOFS_PER_BOOKING = 10;
@@ -237,13 +238,33 @@ export async function submitAppProof(params: {
  * Each step is a single database update, so two staff clicking at once can't
  * double count.
  */
-async function applyVerifiedAmount(bookingId: mongoose.Types.ObjectId, amount: number, minAdvancePercent: number) {
+async function applyVerifiedAmount(
+  bookingId: mongoose.Types.ObjectId,
+  amount: number,
+  minAdvancePercent: number,
+  refKey: string,
+) {
   const updated = await Booking.findByIdAndUpdate(
     bookingId,
     { $inc: { amountReceivedOnline: amount, amountPaid: amount } },
     { new: true },
   ).lean();
   if (!updated) return null;
+  // Money that arrives after the customer cancelled goes straight to their wallet.
+  if (updated.status === "cancelled") {
+    if (updated.userId) {
+      await creditWallet({
+        userId: updated.userId,
+        amount,
+        reason: "late_payment_refund",
+        refKey,
+        bookingId,
+        note: "Payment verified after the booking was cancelled",
+      });
+      await Booking.updateOne({ _id: bookingId }, { $inc: { refundAmount: amount }, $set: { refundTo: "wallet" } });
+    }
+    return updated;
+  }
   const advance = advanceFor(updated, minAdvancePercent);
   const covered = (updated.amountReceivedOnline ?? 0) + (updated.walletCreditUsed ?? 0);
   if (updated.status === "pending_payment" && covered >= advance) {
@@ -283,7 +304,7 @@ export async function verifyProof(params: {
   if (!proof) {
     return { ok: false, status: 409, code: "PROOF_ALREADY_REVIEWED", error: "This proof was already checked." };
   }
-  await applyVerifiedAmount(proof.bookingId, amount, params.minAdvancePercent);
+  await applyVerifiedAmount(proof.bookingId, amount, params.minAdvancePercent, `proof:${proof._id}`);
   return { ok: true };
 }
 
@@ -355,7 +376,7 @@ export async function addWhatsAppProof(params: {
   }
 
   const note = typeof params.note === "string" ? params.note.trim().slice(0, 300) || null : null;
-  await PaymentProof.create({
+  const created = await PaymentProof.create({
     bookingId,
     userId: null,
     source: "whatsapp",
@@ -367,6 +388,11 @@ export async function addWhatsAppProof(params: {
     note,
     ...(fileFields ?? {}),
   });
-  await applyVerifiedAmount(booking._id as mongoose.Types.ObjectId, amount, params.minAdvancePercent);
+  await applyVerifiedAmount(
+    booking._id as mongoose.Types.ObjectId,
+    amount,
+    params.minAdvancePercent,
+    `proof:${created._id}`,
+  );
   return { ok: true, bookingId };
 }

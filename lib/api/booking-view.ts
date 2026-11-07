@@ -23,6 +23,8 @@ export type BookingSource = {
   amountReceivedOnline?: number;
   advanceRequired?: number | null;
   walletCreditUsed?: number | null;
+  refundAmount?: number | null;
+  refundTo?: "wallet" | null;
   createdAt?: Date | string;
 };
 
@@ -48,7 +50,7 @@ export type MobileBooking = {
     proofs: MobileProof[];
   };
   cancellation: { canCancel: boolean; cancelUntil: string | null };
-  refund: null;
+  refund: { amount: number; to: "wallet" } | null;
   hoursUsed: number;
   createdAt: string | null;
 };
@@ -154,7 +156,10 @@ export function toMobileBooking(
       proofs,
     },
     cancellation: { canCancel, cancelUntil: toPkIso(cancelUntilMs) },
-    refund: null,
+    refund:
+      b.status === "cancelled" && (b.refundAmount ?? 0) > 0
+        ? { amount: Math.round(b.refundAmount ?? 0), to: b.refundTo ?? "wallet" }
+        : null,
     hoursUsed: b.membershipHoursUsed ?? 0,
     createdAt: toPkIso(b.createdAt ?? null),
   };

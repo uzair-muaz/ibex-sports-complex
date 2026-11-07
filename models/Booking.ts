@@ -45,6 +45,14 @@ export interface IBooking extends Document {
   guestAccessTokenHash?: string | null;
   /** Mobile app guests: scrambled IP address, only to limit fake bookings. */
   guestIpHash?: string | null;
+  /** Mobile app cancel: who, when, why, and what went back. */
+  cancelledAt?: Date | null;
+  cancelledBy?: 'customer' | 'staff' | null;
+  cancelReason?: 'weather' | 'teammate_unavailable' | 'schedule_conflict' | 'other' | null;
+  cancelNote?: string | null;
+  /** Money returned on cancel (whole PKR) and where it went. */
+  refundAmount?: number | null;
+  refundTo?: 'wallet' | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -214,6 +222,16 @@ const BookingSchema: Schema = new Schema(
       required: false,
       select: false,
     },
+    cancelledAt: { type: Date, required: false },
+    cancelledBy: { type: String, enum: ['customer', 'staff'], required: false },
+    cancelReason: {
+      type: String,
+      enum: ['weather', 'teammate_unavailable', 'schedule_conflict', 'other'],
+      required: false,
+    },
+    cancelNote: { type: String, required: false, maxlength: 300 },
+    refundAmount: { type: Number, required: false, min: 0 },
+    refundTo: { type: String, enum: ['wallet'], required: false },
   },
   {
     timestamps: true,
