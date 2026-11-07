@@ -114,3 +114,32 @@ describe("password reset answer", () => {
     expect(normaliseResetEmail(undefined)).toBe("");
   });
 });
+
+describe("catalog gaps (G-2, G-3, G-5)", () => {
+  it("links use the phone's address only on a laptop", async () => {
+    const { chooseBaseUrl } = await import("@/lib/api/base-url");
+    expect(chooseBaseUrl("http://localhost:3000", "10.0.2.2:3000", null)).toBe("http://10.0.2.2:3000");
+    expect(chooseBaseUrl("http://localhost:3000", "192.168.1.20:3000", "http")).toBe("http://192.168.1.20:3000");
+    expect(chooseBaseUrl("https://staging.ibexsportscomplex.com", "evil.example", null)).toBe("https://staging.ibexsportscomplex.com");
+    expect(chooseBaseUrl("http://localhost:3000", "bad host/<x>", null)).toBe("http://localhost:3000");
+    expect(chooseBaseUrl("http://localhost:3000/", null, null)).toBe("http://localhost:3000");
+  });
+
+  it("Futsal shows 5,000 for 90 minutes, not 3,333 per hour", async () => {
+    const { startingPriceFor, startingPricePerHour, shortestMinutes } = await import("@/lib/api/catalog");
+    const futsal = { type: "FUTSAL", pricePerHour: 5000, isActive: true } as never;
+    expect(shortestMinutes({ durationsMinutes: [90, 180] } as never)).toBe(90);
+    expect(startingPriceFor(futsal, 90)).toBe(5000);
+    expect(startingPricePerHour(futsal)).toBe(3333);
+  });
+
+  it("sport card line comes from the courts' features", async () => {
+    const { sportFeaturesText } = await import("@/lib/api/catalog");
+    const glass = { key: "glass", label: "Panoramic glass" } as const;
+    const led = { key: "lighting", label: "LED lighting" } as const;
+    expect(sportFeaturesText([{ isIndoor: true, features: [glass, led] }, { isIndoor: true, features: [glass] }])).toBe("Indoor • Panoramic glass • LED lighting");
+    expect(sportFeaturesText([{ isIndoor: false }, { isIndoor: true }])).toBe("Indoor & outdoor");
+    expect(sportFeaturesText([{ isIndoor: false }])).toBeNull();
+    expect(sportFeaturesText([])).toBeNull();
+  });
+});

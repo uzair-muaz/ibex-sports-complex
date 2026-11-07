@@ -1,3 +1,4 @@
+import { publicBaseUrl } from "@/lib/api/base-url";
 import crypto from "crypto";
 import { notifyPaymentVerified, notifyProofRejected, notifyProofSubmitted } from "@/lib/notifications/events";
 import mongoose from "mongoose";
@@ -63,10 +64,10 @@ export function verifyFileLink(
 }
 
 /** Short-lived link the app can show in an image widget. */
-export function proofFileUrl(proofId: string, now = Date.now()): string {
+export function proofFileUrl(proofId: string, now = Date.now(), baseUrl = getBaseUrl()): string {
   const exp = Math.floor(now / 1000) + LINK_TTL_SECONDS;
   const sig = signFileLink(proofId, exp);
-  return `${getBaseUrl().replace(/\/$/, "")}/api/v1/payment-proofs/${proofId}/file?exp=${exp}&sig=${sig}`;
+  return `${baseUrl.replace(/\/$/, "")}/api/v1/payment-proofs/${proofId}/file?exp=${exp}&sig=${sig}`;
 }
 
 type ProofLike = Pick<
@@ -97,7 +98,8 @@ export type MobileProof = {
   rejectionReason: string | null;
 };
 
-export function toMobileProof(p: ProofLike): MobileProof {
+/** `baseUrl` from publicBaseUrl() so screenshot links work on Android and real phones too. */
+export function toMobileProof(p: ProofLike, baseUrl?: string): MobileProof {
   const id = p._id.toString();
   return {
     id,
@@ -105,7 +107,7 @@ export function toMobileProof(p: ProofLike): MobileProof {
     status: p.status,
     source: p.source,
     submittedAt: toPkIso(p.createdAt ?? null),
-    imageUrl: p.fileKey ? proofFileUrl(id) : null,
+    imageUrl: p.fileKey ? proofFileUrl(id, Date.now(), baseUrl) : null,
     fileType: p.fileType ?? null,
     transferReference: p.transferReference ?? null,
     transferredAt: toPkIso(p.transferredAt ?? null),
@@ -119,11 +121,14 @@ export async function proofsByBooking(bookingIds: Array<string | mongoose.Types.
   const map = new Map<string, MobileProof[]>();
   if (bookingIds.length === 0) return map;
   await connectDB();
-  const rows = await PaymentProof.find({ bookingId: { $in: bookingIds } }).sort({ createdAt: 1 }).lean();
+  const [rows, baseUrl] = await Promise.all([
+    PaymentProof.find({ bookingId: { $in: bookingIds } }).sort({ createdAt: 1 }).lean(),
+    publicBaseUrl(),
+  ]);
   for (const r of rows) {
     const key = r.bookingId.toString();
     if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(toMobileProof(r as unknown as ProofLike));
+    map.get(key)!.push(toMobileProof(r as unknown as ProofLike, baseUrl));
   }
   return map;
 }
@@ -232,7 +237,7 @@ export async function submitAppProof(params: {
     fileSize: file.data.length,
   });
   await notifyProofSubmitted({ bookingId: params.bookingId, proofId: proof._id.toString(), amount });
-  return { ok: true, proof: toMobileProof(proof.toObject() as unknown as ProofLike) };
+  return { ok: true, proof: toMobileProof(proof.toObject() as unknown as ProofLike, await publicBaseUrl()) };
 }
 
 /**

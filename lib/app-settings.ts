@@ -86,7 +86,7 @@ export const DEFAULT_APP_SETTINGS: ResolvedAppSettings = {
   venue: {
     name: "IBEX Sports Complex",
     branchName: "IBEX Islamabad",
-    hoursLabel: "Open daily 12 PM – 4 AM",
+    hoursLabel: "Open 24 hours",
     address:
       "Ibex Sports Complex, Toot Stop Near Orchid Marquee, Wild Life Park Road, Main Islamabad Expy, Islamabad, 42700",
     latitude: 33.5849499,

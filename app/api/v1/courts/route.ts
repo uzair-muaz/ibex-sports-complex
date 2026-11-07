@@ -6,7 +6,7 @@ import { getAppSettings } from "@/lib/app-settings";
 import { mobileCourtFields, type CourtSource } from "@/lib/api/catalog";
 import { pakistanNow, type BookingSpan } from "@/lib/booking-overlap";
 import { shiftDateKey } from "@/lib/date-time";
-import { getBaseUrl } from "@/lib/utils";
+import { publicBaseUrl } from "@/lib/api/base-url";
 
 type Sport = "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
 const SPORTS: Sport[] = ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"];
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
       byCourt.set(key, list);
     }
 
-    const baseUrl = getBaseUrl();
+    const baseUrl = await publicBaseUrl();
     const enriched = courts.map((court) => ({
       ...court,
       ...mobileCourtFields(court, {

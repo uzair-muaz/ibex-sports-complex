@@ -18,7 +18,7 @@ const err = (description: string, code: string, error: string) => ({
 const venueExample = {
   name: "IBEX Sports Complex",
   branchName: "IBEX Islamabad",
-  hoursLabel: "Open daily 12 PM – 4 AM",
+  hoursLabel: "Open 24 hours",
   address: "Ibex Sports Complex, Toot Stop Near Orchid Marquee, Wild Life Park Road, Main Islamabad Expy, Islamabad, 42700",
   latitude: 33.5849499,
   longitude: 73.1439709,
@@ -37,6 +37,9 @@ const sportExample = {
   badge: "Most Popular",
   courtCount: 2,
   fromPricePerHour: 4500,
+  fromPrice: 4500,
+  fromPriceMinutes: 60,
+  featuresText: "Indoor • Panoramic glass • LED lighting",
   booking: { durationsMinutes: [60, 90, 120], defaultDurationMinutes: 90, bookingWindowDays: 14 },
 };
 
@@ -52,6 +55,8 @@ const courtExample = {
   isIndoor: true,
   hasRacketRental: true,
   startingPricePerHour: 4500,
+  startingPrice: 4500,
+  startingPriceMinutes: 60,
   features: [{ key: "lighting", label: "LED lighting" }],
   highlight: { key: "video", label: "Match replay" },
   slotsOpenToday: 21,
@@ -138,7 +143,7 @@ export const catalogPaths = {
       tags: ["Venue"],
       summary: "Sports shown in the app, with booking rules",
       description:
-        "Hidden sports (showInApp false, e.g. Cricket) are left out. The app shows exactly durationsMinutes and selects defaultDurationMinutes. bookingWindowDays = how many days ahead customers can book. fromPricePerHour is null when the sport has no priced courts.",
+        "Hidden sports (showInApp false, e.g. Cricket) are left out. The app shows exactly durationsMinutes and selects defaultDurationMinutes. bookingWindowDays = how many days ahead customers can book. fromPricePerHour is null when the sport has no priced courts. fromPrice is the cheapest price for the sport's shortest booking (fromPriceMinutes), e.g. Futsal 5,000 for 90 min: show this on cards instead of a per-hour figure. featuresText is the card line, made from the features set on that sport's courts (Admin → Courts); null until set. imageUrl is a full link: on staging/live it uses the server's address; on a laptop it uses the address the phone called.",
       responses: { "200": ok("Sports", { sports: [sportExample] }) },
     },
   },
@@ -155,7 +160,7 @@ export const catalogPaths = {
       tags: ["Venue"],
       summary: "Active courts (optional ?sport=PADEL)",
       description:
-        "`?sport=` (app) or `?type=` (website). Each court has the website's fields plus the app's. imageUrl is the court photo, or the sport photo when none is set. startingPricePerHour is the cheapest hourly price (whole PKR). slotsOpenToday counts start times still free today for the sport's default duration; hasPeakSlotsOpen says whether any of them is peak.",
+        "`?sport=` (app) or `?type=` (website). Each court has the website's fields plus the app's. imageUrl is the court photo, or the sport photo when none is set. startingPricePerHour is the cheapest hourly price (whole PKR); startingPrice is the cheapest price for the sport's shortest booking (startingPriceMinutes), e.g. Futsal 5,000 for 90. surfaceLabel, features and highlight are set per court in Admin → Courts (feature key is one of the PDF icon keys); empty until set. slotsOpenToday counts start times still free today for the sport's default duration; hasPeakSlotsOpen says whether any of them is peak.",
       parameters: [
         {
           name: "sport",

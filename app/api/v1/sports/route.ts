@@ -3,7 +3,7 @@ import Court from "@/models/Court";
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
 import { getAppSettings } from "@/lib/app-settings";
 import { mobileSports, type CourtSource } from "@/lib/api/catalog";
-import { getBaseUrl } from "@/lib/utils";
+import { publicBaseUrl } from "@/lib/api/base-url";
 
 /** Sports shown in the app, with their booking rules. Hidden sports (showInApp false) are left out. */
 export async function GET(request: Request) {
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       getAppSettings(),
       Court.find({ isActive: true }).lean(),
     ]);
-    const sports = mobileSports(settings, courts as unknown as CourtSource[], getBaseUrl());
+    const sports = mobileSports(settings, courts as unknown as CourtSource[], await publicBaseUrl());
     return apiOk({ sports }, request, {
       headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
     });

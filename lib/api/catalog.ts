@@ -1,4 +1,4 @@
-import { getBookingStartPricingLabel, getPricePerHourForTime, type CourtLike } from "@/lib/pricing-utils";
+import { calculateOriginalPrice, getBookingStartPricingLabel, getPricePerHourForTime, type CourtLike } from "@/lib/pricing-utils";
 import { freeStartTimes, type BookingSpan } from "@/lib/booking-overlap";
 import type { ResolvedAppSettings, SportRules } from "@/lib/app-settings";
 import type { CourtFeature } from "@/models/Court";
@@ -25,6 +25,46 @@ export function startingPricePerHour(court: CourtLike): number {
   return Number.isFinite(min) ? roundPkr(min) : 0;
 }
 
+/**
+ * Cheapest price for a booking of `minutes` (the sport's shortest allowed length),
+ * e.g. Futsal 5,000 for 90 minutes. Easier to show than a per-hour figure for
+ * sports that are sold in 90-minute blocks.
+ */
+export function startingPriceFor(court: CourtLike, minutes: number): number {
+  let min = Infinity;
+  for (let i = 0; i < 48; i++) {
+    const { originalPrice } = calculateOriginalPrice(court, i * 0.5, minutes / 60);
+    if (Number.isFinite(originalPrice) && originalPrice > 0 && originalPrice < min) min = originalPrice;
+  }
+  return Number.isFinite(min) ? roundPkr(min) : 0;
+}
+
+/** Shortest booking length allowed for a sport (60 if unknown). */
+export function shortestMinutes(rules?: SportRules): number {
+  const list = rules?.durationsMinutes ?? [];
+  return list.length ? Math.min(...list) : 60;
+}
+
+/**
+ * The card line under a sport, e.g. "Indoor • Panoramic glass • LED lighting",
+ * made from what the super admin set on that sport's courts. null if nothing is set.
+ */
+export function sportFeaturesText(courts: Array<{ isIndoor?: boolean; features?: CourtFeature[]; highlight?: CourtFeature | null }>): string | null {
+  if (courts.length === 0) return null;
+  const parts: string[] = [];
+  const indoor = courts.filter((c) => c.isIndoor).length;
+  if (indoor === courts.length) parts.push("Indoor");
+  else if (indoor > 0) parts.push("Indoor & outdoor");
+  const count = new Map<string, number>();
+  for (const c of courts) {
+    const labels = new Set([...(c.features ?? []), ...(c.highlight ? [c.highlight] : [])].map((f) => f.label?.trim()).filter(Boolean));
+    for (const l of labels) count.set(l as string, (count.get(l as string) ?? 0) + 1);
+  }
+  const top = [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 2).map(([l]) => l);
+  parts.push(...top);
+  return parts.length ? parts.join(" • ") : null;
+}
+
 export type CourtSource = CourtLike & {
   _id: { toString(): string };
   name: string;
@@ -46,6 +86,9 @@ export type MobileCourtFields = {
   isIndoor: boolean;
   hasRacketRental: boolean;
   startingPricePerHour: number;
+  /** Cheapest price for the sport's shortest booking (e.g. Futsal 5,000 for 90 min). */
+  startingPrice: number;
+  startingPriceMinutes: number;
   features: CourtFeature[];
   highlight: CourtFeature | null;
   slotsOpenToday: number;
@@ -75,6 +118,8 @@ export function mobileCourtFields(
     isIndoor: !!court.isIndoor,
     hasRacketRental: !!court.hasRacketRental,
     startingPricePerHour: startingPricePerHour(court),
+    startingPrice: startingPriceFor(court, shortestMinutes(ctx.sportRules)),
+    startingPriceMinutes: shortestMinutes(ctx.sportRules),
     features: (court.features ?? []).map((f) => ({ key: f.key, label: f.label })),
     highlight: court.highlight?.key ? { key: court.highlight.key, label: court.highlight.label } : null,
     slotsOpenToday: free.length,
@@ -94,6 +139,8 @@ export function mobileSports(
     .map((s) => {
       const sportCourts = courts.filter((c) => c.type === s.sport);
       const prices = sportCourts.map((c) => startingPricePerHour(c)).filter((p) => p > 0);
+      const minutes = shortestMinutes(s);
+      const blockPrices = sportCourts.map((c) => startingPriceFor(c, minutes)).filter((p) => p > 0);
       return {
         sport: s.sport,
         label: s.label,
@@ -102,6 +149,9 @@ export function mobileSports(
         badge: s.badge,
         courtCount: sportCourts.length,
         fromPricePerHour: prices.length ? Math.min(...prices) : null,
+        fromPrice: blockPrices.length ? Math.min(...blockPrices) : null,
+        fromPriceMinutes: minutes,
+        featuresText: sportFeaturesText(sportCourts),
         booking: {
           durationsMinutes: s.durationsMinutes,
           defaultDurationMinutes: s.defaultDurationMinutes,
