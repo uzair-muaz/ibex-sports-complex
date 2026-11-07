@@ -277,7 +277,7 @@ export default function AdminPaymentsPage() {
         confirmLoading={busy}
         okButtonProps={{ disabled: !waRef.trim() || !waAmount }}
       >
-        <Space direction="vertical" style={{ width: "100%" }}>
+        <Space orientation="vertical" style={{ width: "100%" }}>
           <Input placeholder="Booking reference, e.g. IBX-2109" value={waRef} onChange={(e) => setWaRef(e.target.value)} />
           <InputNumber min={1} style={{ width: "100%" }} prefix="PKR" placeholder="Amount that arrived" value={waAmount} onChange={(v) => setWaAmount(v)} />
           <Input placeholder="Note (optional)" maxLength={300} value={waNote} onChange={(e) => setWaNote(e.target.value)} />
