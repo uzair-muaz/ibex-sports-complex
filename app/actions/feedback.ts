@@ -133,8 +133,10 @@ export async function getFeedbackByBookingId(bookingId: string) {
       };
     }
 
+    // Public page: only what it shows (not the whole booking).
     const feedback = await Feedback.findOne({ bookingId })
-      .populate('bookingId');
+      .select('bookingId rating comment userName userEmail userPhone createdAt')
+      .lean();
 
     if (!feedback) {
       return {
@@ -171,8 +173,11 @@ export async function getBookingById(bookingId: string) {
       };
     }
 
+    // Public page (feedback link): only what it needs to pre-fill the form.
     const booking = await Booking.findById(bookingId)
-      .populate('courtId');
+      .select('courtId date startTime status userName userEmail userPhone')
+      .populate('courtId', 'name type')
+      .lean();
 
     if (!booking) {
       return {

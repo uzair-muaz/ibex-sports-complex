@@ -697,8 +697,17 @@ export async function getQuickSlotCourtAvailability(
   }
 }
 
-export async function getBookingsByDate(date: string) {
+/** Fields the public entry-pass page (/booking/verify/[id]) shows. Nothing else leaves the server. */
+const ENTRY_PASS_FIELDS =
+  "courtId date startTime duration status userName userEmail userPhone totalPrice originalPrice discountAmount discounts amountPaid";
+
+/** Staff only: every booking on a day, with customer contact details. */
+export async function getBookingsByDate(date: string, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) {
+      return { success: false, error: gate.error, bookings: [] };
+    }
     await connectDB();
 
     const bookings = await Booking.find({
@@ -1290,7 +1299,11 @@ export async function getBookingForVerification(bookingId: string) {
     if (!bookingId || bookingId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(bookingId)) {
       return { success: false as const, error: "Invalid booking ID", booking: null };
     }
-    const booking = await Booking.findById(bookingId).populate("courtId");
+    // Public page (entry pass link): send only what the page shows.
+    const booking = await Booking.findById(bookingId)
+      .select(ENTRY_PASS_FIELDS)
+      .populate("courtId", "name type")
+      .lean();
     if (!booking) {
       return { success: false as const, error: "Booking not found", booking: null };
     }

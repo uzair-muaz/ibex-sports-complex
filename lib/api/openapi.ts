@@ -39,7 +39,13 @@ export function getOpenApiDocument(baseUrl?: string) {
         "Configure allowed origins with `API_CORS_ORIGINS` (comma-separated). Unlisted Origins do not receive `Access-Control-Allow-Origin`. All `/api/v1` routes support `OPTIONS`.",
       ].join("\n"),
     },
-    servers: [{ url: serverUrl, description: "API host" }],
+    servers: [
+      { url: serverUrl, description: "This server" },
+      ...[
+        { url: "https://staging.ibexsportscomplex.com", description: "Staging (test data; point the app here first)" },
+        { url: "https://ibexsportscomplex.com", description: "Live (only after the developer releases the mobile API)" },
+      ].filter((s) => s.url !== serverUrl),
+    ],
     tags: [
       { name: "Auth", description: "Mobile Google sign-in and session probe" },
       { name: "Venue", description: "Venue, sports, booking policy and courts (public)" },

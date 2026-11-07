@@ -1,5 +1,8 @@
-"use server";
-
+/**
+ * Server-only helpers. NOT a "use server" file on purpose: that would turn every
+ * export here (e.g. giving points) into an action anyone could call from a browser.
+ * The checked actions live in app/actions/.
+ */
 import connectDB from "@/lib/mongodb";
 import MembershipPlan from "@/models/MembershipPlan";
 import UserMembership from "@/models/UserMembership";
