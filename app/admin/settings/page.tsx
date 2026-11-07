@@ -21,7 +21,7 @@ import {
   fetchAdminAppSettings,
   saveAdminAppSettings,
 } from "@/lib/tanstack/requests/admin-settings.requests";
-import type { ResolvedAppSettings, SportRules } from "@/lib/app-settings";
+import type { BankAccount, ResolvedAppSettings, SportRules } from "@/lib/app-settings";
 
 const { Text } = Typography;
 
@@ -63,6 +63,30 @@ export default function AdminAppSettingsPage() {
 
   const setVenue = (key: keyof ResolvedAppSettings["venue"], value: unknown) =>
     setDraft((d) => (d ? { ...d, venue: { ...d.venue, [key]: value } } : d));
+
+  const setPayments = (patch: Partial<ResolvedAppSettings["payments"]>) =>
+    setDraft((d) => (d ? { ...d, payments: { ...d.payments, ...patch } } : d));
+  const setBankAccount = (i: number, patch: Partial<BankAccount>) =>
+    setDraft((d) =>
+      d
+        ? {
+            ...d,
+            payments: {
+              ...d.payments,
+              bankAccounts: d.payments.bankAccounts.map((a, j) => (j === i ? { ...a, ...patch } : a)),
+            },
+          }
+        : d,
+    );
+  const addBankAccount = () =>
+    setPayments({
+      bankAccounts: [
+        ...(draft?.payments.bankAccounts ?? []),
+        { bankName: "", accountTitle: "", accountNumber: "", iban: null },
+      ],
+    });
+  const removeBankAccount = (i: number) =>
+    setPayments({ bankAccounts: (draft?.payments.bankAccounts ?? []).filter((_, j) => j !== i) });
 
   const setLoyalty = (patch: Partial<ResolvedAppSettings["loyalty"]>) =>
     setDraft((d) => (d ? { ...d, loyalty: { ...d.loyalty, ...patch } } : d));
@@ -229,8 +253,46 @@ export default function AdminAppSettingsPage() {
                 value={draft.payments.minAdvancePercent}
                 onChange={(v) =>
                   typeof v === "number" &&
-                  setDraft({ ...draft, payments: { minAdvancePercent: Math.round(v) } })
+                  setDraft({ ...draft, payments: { ...draft.payments, minAdvancePercent: Math.round(v) } })
                 }
+              />
+            </Form.Item>
+
+            <Text strong>Bank accounts shown in the app</Text>
+            {draft.payments.bankAccounts.map((acc, i) => (
+              <div key={i} className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-5">
+                {(["bankName", "accountTitle", "accountNumber", "iban"] as const).map((field) => (
+                  <Input
+                    key={field}
+                    placeholder={
+                      { bankName: "Bank name", accountTitle: "Account title", accountNumber: "Account number", iban: "IBAN (optional)" }[field]
+                    }
+                    value={acc[field] ?? ""}
+                    onChange={(e) => setBankAccount(i, { [field]: e.target.value })}
+                  />
+                ))}
+                <Button danger onClick={() => removeBankAccount(i)}>
+                  Remove
+                </Button>
+              </div>
+            ))}
+            {draft.payments.bankAccounts.length < 5 && (
+              <Button className="mt-2" onClick={addBankAccount}>
+                Add bank account
+              </Button>
+            )}
+            <Form.Item className="mt-4" label="Note under the bank details">
+              <Input
+                maxLength={300}
+                value={draft.payments.transferNote}
+                onChange={(e) => setPayments({ transferNote: e.target.value })}
+              />
+            </Form.Item>
+            <Form.Item label="Note after the customer sends a screenshot">
+              <Input
+                maxLength={300}
+                value={draft.payments.verificationNote}
+                onChange={(e) => setPayments({ verificationNote: e.target.value })}
               />
             </Form.Item>
           </Card>

@@ -1,6 +1,7 @@
 import { slotStartIso } from "@/lib/api/availability";
 import { toPkIso } from "@/lib/api/time";
 import { dayIndex } from "@/lib/booking-overlap";
+import type { MobileProof } from "@/lib/payments/proofs";
 
 /** Fields we read from a Booking row. */
 export type BookingSource = {
@@ -44,7 +45,7 @@ export type MobileBooking = {
     amountVerified: number;
     walletCreditUsed: number;
     balanceDue: number;
-    proofs: unknown[];
+    proofs: MobileProof[];
   };
   cancellation: { canCancel: boolean; cancelUntil: string | null };
   refund: null;
@@ -68,6 +69,25 @@ export function bookingStartMs(date: string, startHour: number): number {
   return dayIndex(date) * 86_400_000 + startHour * 3_600_000 - 5 * 3_600_000;
 }
 
+/**
+ * paid → everything paid; proof_submitted → a screenshot is waiting for staff;
+ * verified → staff confirmed money (rest at the venue); rejected → the latest
+ * screenshot was rejected; awaiting_proof → nothing sent yet.
+ */
+export function mobilePaymentStatus(p: {
+  status: BookingSource["status"];
+  total: number;
+  paid: number;
+  amountVerified: number;
+  proofs: Pick<MobileProof, "status">[];
+}): MobilePaymentStatus {
+  if (p.total > 0 && p.paid >= p.total) return "paid";
+  if (p.proofs.some((x) => x.status === "submitted")) return "proof_submitted";
+  if (p.amountVerified > 0 || p.status === "confirmed" || p.status === "completed") return "verified";
+  if (p.proofs.length > 0 && p.proofs[p.proofs.length - 1].status === "rejected") return "rejected";
+  return "awaiting_proof";
+}
+
 export function toMobileBooking(
   b: BookingSource,
   ctx: {
@@ -75,6 +95,8 @@ export function toMobileBooking(
     cancellationNoticeMinutes: number;
     minAdvancePercent: number;
     now?: number;
+    /** This booking's payment proofs, oldest first. */
+    proofs?: MobileProof[];
   },
 ): MobileBooking {
   const now = ctx.now ?? Date.now();
@@ -94,9 +116,14 @@ export function toMobileBooking(
       ? b.advanceRequired
       : Math.ceil((total * ctx.minAdvancePercent) / 100);
 
-  let paymentStatus: MobilePaymentStatus = "awaiting_proof";
-  if (total > 0 && amountPaid + walletCreditUsed >= total) paymentStatus = "paid";
-  else if (b.status === "confirmed" || b.status === "completed") paymentStatus = "verified";
+  const proofs = ctx.proofs ?? [];
+  const paymentStatus = mobilePaymentStatus({
+    status: b.status,
+    total,
+    paid: amountPaid + walletCreditUsed,
+    amountVerified,
+    proofs,
+  });
 
   const startMs = bookingStartMs(b.date, b.startTime);
   const cancelUntilMs = startMs - ctx.cancellationNoticeMinutes * 60_000;
@@ -124,7 +151,7 @@ export function toMobileBooking(
       amountVerified,
       walletCreditUsed,
       balanceDue: Math.max(0, total - amountPaid - walletCreditUsed),
-      proofs: [],
+      proofs,
     },
     cancellation: { canCancel, cancelUntil: toPkIso(cancelUntilMs) },
     refund: null,

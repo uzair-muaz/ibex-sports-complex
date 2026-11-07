@@ -49,6 +49,9 @@ export interface ILoyaltySetting {
 
 export interface IPaymentSetting {
   minAdvancePercent?: number;
+  bankAccounts?: { bankName: string; accountTitle: string; accountNumber: string; iban?: string | null }[];
+  transferNote?: string;
+  verificationNote?: string;
 }
 
 export interface IAppSettings extends Document {
@@ -110,7 +113,23 @@ const LoyaltySettingSchema = new Schema<ILoyaltySetting>(
 );
 
 const PaymentSettingSchema = new Schema<IPaymentSetting>(
-  { minAdvancePercent: { type: Number, min: 0, max: 100 } },
+  {
+    minAdvancePercent: { type: Number, min: 0, max: 100 },
+    bankAccounts: {
+      type: [
+        {
+          _id: false,
+          bankName: { type: String, required: true },
+          accountTitle: { type: String, required: true },
+          accountNumber: { type: String, required: true },
+          iban: { type: String, default: null },
+        },
+      ],
+      default: undefined,
+    },
+    transferNote: { type: String },
+    verificationNote: { type: String },
+  },
   { _id: false },
 );
 

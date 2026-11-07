@@ -14,6 +14,7 @@ import {
   Space,
 } from "antd";
 import {
+  BankOutlined,
   BarChartOutlined,
   CalendarOutlined,
   TagOutlined,
@@ -78,6 +79,11 @@ export function AdminLayout({
         key: "/admin/bookings",
         icon: <CalendarOutlined />,
         label: "Bookings",
+      },
+      {
+        key: "/admin/payments",
+        icon: <BankOutlined />,
+        label: "Payments",
       },
       {
         key: "/admin/discounts",

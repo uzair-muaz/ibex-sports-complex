@@ -1,5 +1,6 @@
 import { authPaths, authSchemas } from "@/lib/api/openapi-auth";
 import { catalogPaths } from "@/lib/api/openapi-catalog";
+import { paymentPaths } from "@/lib/api/openapi-payments";
 
 /**
  * OpenAPI 3.0 document for the public HTTP API (`/api/v1`).
@@ -769,6 +770,7 @@ export function getOpenApiDocument(baseUrl?: string) {
       },
       ...authPaths,
       ...catalogPaths,
+      ...paymentPaths,
     },
   } as const;
 }

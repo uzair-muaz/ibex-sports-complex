@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import { getAppSettings } from "@/lib/app-settings";
+import { proofsByBooking } from "@/lib/payments/proofs";
 import { bookingStartMs, toMobileBooking, type BookingSource, type MobileBooking } from "@/lib/api/booking-view";
 
 export const PAST_PAGE_DEFAULT = 20;
@@ -63,7 +64,9 @@ export async function listMyAppBookings(params: {
   const now = Date.now();
   const { upcoming, past } = splitBookings(rows as unknown as BookingSource[], now);
   const page = past.slice(offset, offset + limit);
-  const view = (b: BookingSource) => toMobileBooking(b, { ...ctx, now });
+  const proofs = await proofsByBooking([...upcoming, ...page].map((b) => b._id.toString()));
+  const view = (b: BookingSource) =>
+    toMobileBooking(b, { ...ctx, now, proofs: proofs.get(b._id.toString()) ?? [] });
 
   return {
     upcoming: upcoming.map(view),
@@ -76,12 +79,21 @@ export async function listMyAppBookings(params: {
 
 /** One booking, only if it belongs to the user. */
 export async function getMyAppBooking(userId: string, bookingId: string): Promise<MobileBooking | null> {
+  return getAppBookingWhere(bookingId, { userId });
+}
+
+/** One booking in the app's shape, found by id plus an owner filter. */
+export async function getAppBookingWhere(
+  bookingId: string,
+  owner: Record<string, unknown>,
+): Promise<MobileBooking | null> {
   if (!mongoose.isValidObjectId(bookingId)) return null;
   await connectDB();
   const [row, ctx] = await Promise.all([
-    Booking.findOne({ _id: bookingId, userId }).populate("courtId", "name type").lean(),
+    Booking.findOne({ ...owner, _id: bookingId }).populate("courtId", "name type").lean(),
     viewContext(),
   ]);
   if (!row) return null;
-  return toMobileBooking(row as unknown as BookingSource, ctx);
+  const proofs = await proofsByBooking([bookingId]);
+  return toMobileBooking(row as unknown as BookingSource, { ...ctx, proofs: proofs.get(bookingId) ?? [] });
 }

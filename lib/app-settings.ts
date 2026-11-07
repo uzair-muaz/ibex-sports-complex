@@ -47,8 +47,19 @@ export type LoyaltyRules = {
   earnOnMembershipHours: boolean;
 };
 
+export type BankAccount = {
+  bankName: string;
+  accountTitle: string;
+  accountNumber: string;
+  iban: string | null;
+};
+
 export type PaymentRules = {
   minAdvancePercent: number;
+  /** Where customers send the advance. Empty until the super admin adds them. */
+  bankAccounts: BankAccount[];
+  transferNote: string;
+  verificationNote: string;
 };
 
 export type ResolvedAppSettings = {
@@ -141,7 +152,12 @@ export const DEFAULT_APP_SETTINGS: ResolvedAppSettings = {
     signUpBonusPoints: 0,
     earnOnMembershipHours: false,
   },
-  payments: { minAdvancePercent: 50 },
+  payments: {
+    minAdvancePercent: 50,
+    bankAccounts: [],
+    transferNote: "Write your booking reference in the transfer description.",
+    verificationNote: "Our team checks payments by hand. You will get a notification.",
+  },
 };
 
 type StoredSettings = {
@@ -221,6 +237,14 @@ export function resolveAppSettings(stored: StoredSettings | null | undefined): R
     loyalty,
     payments: {
       minAdvancePercent: pick(stored?.payments?.minAdvancePercent, d.payments.minAdvancePercent),
+      bankAccounts: (stored?.payments?.bankAccounts ?? d.payments.bankAccounts).map((a) => ({
+        bankName: a.bankName,
+        accountTitle: a.accountTitle,
+        accountNumber: a.accountNumber,
+        iban: a.iban || null,
+      })),
+      transferNote: pick(stored?.payments?.transferNote, d.payments.transferNote),
+      verificationNote: pick(stored?.payments?.verificationNote, d.payments.verificationNote),
     },
   };
 }
@@ -339,12 +363,45 @@ export function validateSettingsPatch(input: unknown): CheckResult {
       return { ok: false, error: "Payment settings must be an object." };
     }
     const p = body.payments as Record<string, unknown>;
+    const pay: Partial<PaymentRules> = {};
     if (p.minAdvancePercent !== undefined) {
       if (!isInt(p.minAdvancePercent) || p.minAdvancePercent < 0 || p.minAdvancePercent > 100) {
         return { ok: false, error: "Advance must be a whole % from 0 to 100." };
       }
-      out.payments = { minAdvancePercent: p.minAdvancePercent };
+      pay.minAdvancePercent = p.minAdvancePercent;
     }
+    if (p.bankAccounts !== undefined) {
+      if (!Array.isArray(p.bankAccounts) || p.bankAccounts.length > 5) {
+        return { ok: false, error: "Bank accounts must be a list of up to 5." };
+      }
+      const accounts: BankAccount[] = [];
+      for (const raw of p.bankAccounts) {
+        const a = (raw || {}) as Record<string, unknown>;
+        const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+        const acc = {
+          bankName: text(a.bankName),
+          accountTitle: text(a.accountTitle),
+          accountNumber: text(a.accountNumber),
+          iban: text(a.iban) || null,
+        };
+        if (!acc.bankName || !acc.accountTitle || !acc.accountNumber) {
+          return { ok: false, error: "Each bank account needs a bank name, account title and account number." };
+        }
+        if ([acc.bankName, acc.accountTitle, acc.accountNumber, acc.iban ?? ""].some((v) => v.length > 80)) {
+          return { ok: false, error: "Bank account details must be 80 characters or less." };
+        }
+        accounts.push(acc);
+      }
+      pay.bankAccounts = accounts;
+    }
+    for (const key of ["transferNote", "verificationNote"] as const) {
+      if (p[key] !== undefined) {
+        const v = typeof p[key] === "string" ? (p[key] as string).trim() : "";
+        if (!v || v.length > 300) return { ok: false, error: "Payment notes must be 1–300 characters." };
+        pay[key] = v;
+      }
+    }
+    if (Object.keys(pay).length > 0) out.payments = pay;
   }
 
   if (body.sports !== undefined) {
