@@ -225,44 +225,72 @@ export function getOpenApiDocument(baseUrl?: string) {
       "/api/v1/bookings/availability": {
         get: {
           tags: ["Bookings"],
-          summary: "Public availability quotes for a court type / date",
-          description:
-            "mode=times (default) returns priced start times; mode=quick returns per-slot court counts.",
+          summary: "Free times — one court (app) or a sport (website)",
+          description: [
+            "**App, one court:** `?courtId=&date=YYYY-MM-DD&durationMinutes=90`. Returns every start time of the day (courts are open 24 hours), free or taken (`available: false` — grey it out). Times already past (venue time) are left out. `price` is the full price for the duration after automatic discounts, whole PKR; `originalPrice` is before discounts. `rateType` is off_peak, standard or peak (at the start time).",
+            "Errors: 400 DATE_IN_PAST, DATE_OUT_OF_WINDOW (window counts today: 14 days = today + 13), INVALID_DURATION (must be one of the sport's durationsMinutes from GET /sports), VALIDATION_ERROR; 404 COURT_NOT_FOUND.",
+            "",
+            "**Website, a sport (unchanged):** `?courtType=&date=&duration=&mode=times|quick&excludeBookingId=`.",
+          ].join("\n"),
           parameters: [
-            {
-              name: "courtType",
-              in: "query",
-              required: true,
-              schema: {
-                type: "string",
-                enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
-              },
-            },
+            { name: "courtId", in: "query", schema: { type: "string" }, description: "App mode" },
+            { name: "durationMinutes", in: "query", schema: { type: "integer", example: 90 }, description: "App mode" },
             {
               name: "date",
               in: "query",
               required: true,
-              schema: { type: "string", example: "2026-08-15" },
+              schema: { type: "string", example: "2026-11-05" },
             },
             {
-              name: "duration",
+              name: "courtType",
               in: "query",
-              schema: { type: "number", default: 1 },
+              schema: { type: "string", enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"] },
+              description: "Website mode",
             },
+            { name: "duration", in: "query", schema: { type: "number", default: 1 }, description: "Website mode (hours)" },
             {
               name: "mode",
               in: "query",
               schema: { type: "string", enum: ["times", "quick"], default: "times" },
+              description: "Website mode",
             },
-            {
-              name: "excludeBookingId",
-              in: "query",
-              schema: { type: "string" },
-            },
+            { name: "excludeBookingId", in: "query", schema: { type: "string" }, description: "Website mode" },
           ],
           responses: {
-            "200": { description: "OK" },
-            "400": { description: "Validation error" },
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: {
+                    courtId: "6650c0ffee0000000000c001",
+                    date: "2026-11-05",
+                    durationMinutes: 90,
+                    slots: [
+                      { start: "2026-11-05T16:30:00+05:00", available: true, rateType: "off_peak", price: 8250, originalPrice: 8250 },
+                      { start: "2026-11-05T18:00:00+05:00", available: false, rateType: "peak", price: 9000, originalPrice: 9000 },
+                    ],
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Wrong date or duration",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                  example: { error: "You can book up to 14 days ahead.", code: "DATE_OUT_OF_WINDOW" },
+                },
+              },
+            },
+            "404": {
+              description: "Court not found or not active",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                  example: { error: "Court not found", code: "COURT_NOT_FOUND" },
+                },
+              },
+            },
           },
         },
       },
