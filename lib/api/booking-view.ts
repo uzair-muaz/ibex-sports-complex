@@ -18,6 +18,8 @@ export type BookingSource = {
   loyaltyPointsRedeemed?: number;
   loyaltyDiscountPkr?: number;
   membershipHoursUsed?: number;
+  usedMembershipHours?: boolean;
+  membershipDiscountPkr?: number;
   totalPrice: number;
   amountPaid?: number;
   amountReceivedOnline?: number;
@@ -40,7 +42,7 @@ export type MobileBooking = {
   start: string;
   durationMinutes: number;
   status: MobileBookingStatus;
-  price: { courtFee: number; pointsUsed: number; pointsDiscount: number; total: number };
+  price: { courtFee: number; hoursDiscount: number; pointsUsed: number; pointsDiscount: number; total: number };
   payment: {
     status: MobilePaymentStatus;
     advanceRequired: number;
@@ -110,6 +112,12 @@ export function toMobileBooking(
   const courtFee = Math.round((b.originalPrice ?? 0) - (b.discountAmount ?? 0));
   const pointsDiscount = Math.round(b.loyaltyDiscountPkr ?? 0);
   const total = Math.round(b.totalPrice ?? 0);
+  // Older bookings paid fully with hours didn't save the PKR covered.
+  const hoursDiscount = !b.usedMembershipHours
+    ? 0
+    : b.membershipDiscountPkr
+      ? Math.round(b.membershipDiscountPkr)
+      : Math.max(0, courtFee - pointsDiscount - total);
   const walletCreditUsed = Math.round(b.walletCreditUsed ?? 0);
   const amountVerified = Math.round(b.amountReceivedOnline ?? 0);
   const amountPaid = Math.round(b.amountPaid ?? 0);
@@ -146,7 +154,7 @@ export function toMobileBooking(
       b.status === "confirmed" && now >= startMs + b.duration * 3_600_000
         ? "completed"
         : mobileStatus(b.status),
-    price: { courtFee, pointsUsed: b.loyaltyPointsRedeemed ?? 0, pointsDiscount, total },
+    price: { courtFee, hoursDiscount, pointsUsed: b.loyaltyPointsRedeemed ?? 0, pointsDiscount, total },
     payment: {
       status: paymentStatus,
       advanceRequired,
@@ -160,7 +168,7 @@ export function toMobileBooking(
       b.status === "cancelled" && (b.refundAmount ?? 0) > 0
         ? { amount: Math.round(b.refundAmount ?? 0), to: b.refundTo ?? "wallet" }
         : null,
-    hoursUsed: b.membershipHoursUsed ?? 0,
+    hoursUsed: b.usedMembershipHours ? (b.membershipHoursUsed ?? 0) : 0,
     createdAt: toPkIso(b.createdAt ?? null),
   };
 }

@@ -108,8 +108,8 @@ export function getOpenApiDocument(baseUrl?: string) {
             userEmail: { type: "string", format: "email" },
             userPhone: { type: "string" },
             loyaltyPointsToRedeem: { type: "number" },
-            useMembershipHours: { type: "boolean" },
-            useGuestPass: { type: "boolean" },
+            useMembershipHours: { type: "boolean", description: "Use hours of this sport; uses what the member has, they pay the rest" },
+            useGuestPass: { type: "boolean", description: "Ignored (no guest passes any more)" },
           },
         },
       },
@@ -201,10 +201,10 @@ export function getOpenApiDocument(baseUrl?: string) {
           tags: ["Bookings"],
           summary: "Create a booking (guest or signed-in customer) — app or website",
           description: [
-            "**App (body has courtId + start):** `{courtId, start, durationMinutes, usePoints?, useWallet?}`; guests add `guest: {name, email, phone}`. Send an `Idempotency-Key` header (any unique string per tap of Book): sending it again returns the first booking (200) instead of a new one. Price is worked out exactly like POST /bookings/quote.",
+            "**App (body has courtId + start):** `{courtId, start, durationMinutes, useHours?, usePoints?, useWallet?}`; guests add `guest: {name, email, phone}`. Send an `Idempotency-Key` header (any unique string per tap of Book): sending it again returns the first booking (200) instead of a new one. Price is worked out exactly like POST /bookings/quote.",
             "Response 201: `{booking, guestAccessToken}`. guestAccessToken (`gt_…`) is only for guests: keep it on the phone to open the booking later. It is shown once and never stored in plain form.",
-            "Status is `reserved` until the advance is verified (nothing is auto-cancelled). If points cover the whole advance (toTransfer 0), the booking is `confirmed` straight away. No email is sent from the app path yet.",
-            "Errors: 400 VALIDATION_ERROR, INVALID_PHONE, PHONE_REQUIRED (signed-in customer with no phone in profile), DATE_IN_PAST, DATE_OUT_OF_WINDOW, INVALID_DURATION; 403 STAFF_ACCOUNT; 404 COURT_NOT_FOUND; 409 SLOT_UNAVAILABLE, POINTS_CHANGED, WALLET_CHANGED (wallet balance dropped since the quote: quote again), REQUEST_IN_PROGRESS; 422 IDEMPOTENCY_KEY_REUSED (same key, different booking); 429 GUEST_LIMIT_REACHED (a guest email/phone already holds 3 upcoming bookings, or 5 guest bookings from the same device in 24 hours).",
+            "Status is `reserved` until the advance is verified (nothing is auto-cancelled). If hours, points or wallet cover the whole advance (toTransfer 0), the booking is `confirmed` straight away. The booking's `hoursUsed` and `price.hoursDiscount` show the hours used. No email is sent from the app path yet.",
+            "Errors: 400 VALIDATION_ERROR, INVALID_PHONE, PHONE_REQUIRED (signed-in customer with no phone in profile), DATE_IN_PAST, DATE_OUT_OF_WINDOW, INVALID_DURATION; 403 STAFF_ACCOUNT; 404 COURT_NOT_FOUND; 409 SLOT_UNAVAILABLE, POINTS_CHANGED, HOURS_CHANGED (membership hours dropped since the quote), WALLET_CHANGED (wallet balance dropped since the quote: quote again), REQUEST_IN_PROGRESS; 422 IDEMPOTENCY_KEY_REUSED (same key, different booking), or with useHours: NO_MEMBERSHIP, SPORT_NOT_INCLUDED, NO_HOURS_LEFT, WEEKDAYS_ONLY, TOO_SOON, EXPIRES_BEFORE_BOOKING (same as quote hours.reasonCode); 429 GUEST_LIMIT_REACHED (a guest email/phone already holds 3 upcoming bookings, or 5 guest bookings from the same device in 24 hours).",
             "",
             "**Website (unchanged):** body `CreateBookingInput` (courtType, date, startTime, duration …). Guests may book without auth. Membership hours / loyalty redeem require a customer account.",
           ].join("\n"),
@@ -522,9 +522,108 @@ export function getOpenApiDocument(baseUrl?: string) {
       "/api/v1/account/membership": {
         get: {
           tags: ["Account"],
-          summary: "Active membership, history, and plan catalog",
+          summary: "My membership. App: add ?format=app for hours per sport",
+          description:
+            "With `?format=app` (PDF §15): `{ active: { planId, planName, startedAt, expiresAt, restriction, hoursBySport: [{sport, total, used, remaining}] } | null }`. Without it: the website's shape (membership, history, plans).",
           security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-          responses: { "200": { description: "OK" } },
+          parameters: [{ name: "format", in: "query", schema: { type: "string", enum: ["app"] } }],
+          responses: {
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: {
+                    active: {
+                      planId: "gold",
+                      planName: "Gold",
+                      startedAt: "2026-11-01T10:00:00+05:00",
+                      expiresAt: "2026-12-01T10:00:00+05:00",
+                      restriction: null,
+                      hoursBySport: [
+                        { sport: "PADEL", total: 10, used: 2.5, remaining: 7.5 },
+                        { sport: "FUTSAL", total: 6, used: 0, remaining: 6 },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/membership/plans": {
+        get: {
+          tags: ["Venue"],
+          summary: "Membership plans on sale (anyone) and the WhatsApp link to buy",
+          description: "Plans are made by the super admin (Admin → Memberships → Plans). Buying is on WhatsApp for now; staff then activate the plan.",
+          responses: {
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: {
+                    plans: [
+                      {
+                        id: "gold",
+                        name: "Gold",
+                        price: 60000,
+                        validityDays: 30,
+                        badge: "Best value",
+                        hours: [
+                          { sport: "PADEL", hours: 10 },
+                          { sport: "FUTSAL", hours: 6 },
+                        ],
+                        features: ["Priority booking"],
+                        restriction: null,
+                      },
+                    ],
+                    whatsAppUrl: "https://wa.me/923255429429",
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/admin/membership-plans": {
+        get: {
+          tags: ["Admin"],
+          summary: "Staff: every membership plan",
+          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+          responses: { "200": { description: "{ plans: [...] }" } },
+        },
+        post: {
+          tags: ["Admin"],
+          summary: "Super admin: make a plan",
+          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                example: {
+                  name: "Gold",
+                  price: 60000,
+                  validityDays: 30,
+                  hoursBySport: [
+                    { sport: "PADEL", hours: 10 },
+                    { sport: "FUTSAL", hours: 6 },
+                  ],
+                  weekdayOnly: false,
+                  badge: "Best value",
+                  features: ["Priority booking"],
+                },
+              },
+            },
+          },
+          responses: { "201": { description: "{ plan }" }, "400": { description: "VALIDATION_ERROR" }, "403": { description: "FORBIDDEN (not super admin)" } },
+        },
+      },
+      "/api/v1/admin/membership-plans/{id}": {
+        patch: {
+          tags: ["Admin"],
+          summary: "Super admin: change a plan (new activations only). { isActive: false } stops selling it.",
+          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "{ plan }" }, "404": { description: "PLAN_NOT_FOUND" } },
         },
       },
       "/api/v1/account/support": {

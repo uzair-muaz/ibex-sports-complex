@@ -31,10 +31,14 @@ import {
   refundLoyaltyForBooking,
 } from '@/lib/loyalty';
 import {
-  assertMembershipUsable,
-  deductMembershipForBooking,
-  refundMembershipHours,
-} from '@/lib/membership';
+  HOURS_REASON_TEXT,
+  checkHoursForSlot,
+  hoursCover,
+  loadMembershipForHours,
+  putBackSportHours,
+  returnHoursForBooking,
+  takeSportHours,
+} from '@/lib/membership-hours';
 
 async function getActiveDiscountsForBusinessDate(bookingDateKey: string) {
   const discountsRaw = await Discount.find({ isActive: true }).lean();
@@ -169,9 +173,9 @@ export interface CreateBookingInput {
   userPhone: string;
   /** Optional: redeem this many loyalty points (logged-in only) */
   loyaltyPointsToRedeem?: number;
-  /** Optional: pay with membership hours (logged-in only) */
+  /** Optional: pay with membership hours of this sport (logged-in only). Uses the hours they have; they pay the rest. */
   useMembershipHours?: boolean;
-  /** Optional: consume a guest pass with membership hours */
+  /** No longer used (there are no guest passes). Ignored. */
   useGuestPass?: boolean;
 }
 
@@ -181,6 +185,8 @@ export async function createBooking(
 ) {
   let newBookingId: mongoose.Types.ObjectId | null = null;
   let holdsLocks = false;
+  let hoursTaken: { membershipId: string; sport: string; hours: number } | null = null;
+  let bookingSaved = false;
   try {
     await connectDB();
 
@@ -324,27 +330,40 @@ export async function createBooking(
     let usedMembershipHours = false;
     let membershipId: mongoose.Types.ObjectId | undefined;
     let membershipHoursUsed = 0;
-    let usedGuestPass = false;
+    let membershipSport: string | undefined;
+    let membershipDiscountPkr = 0;
 
     if (input.useMembershipHours) {
       if (!shouldLinkUser || !sessionUserId) {
         throw new Error('Sign in required to use membership hours');
       }
-      const check = await assertMembershipUsable({
-        userId: sessionUserId,
-        date: input.date,
-        startTime: input.startTime,
-        duration: input.duration,
-        useGuestPass: input.useGuestPass,
+      const membership = await loadMembershipForHours(sessionUserId);
+      const check = checkHoursForSlot(membership, {
+        sport: input.courtType,
+        dateKey: input.date,
+        startHour: input.startTime,
       });
-      if (!check.ok) {
-        throw new Error(check.error);
+      if (!check.canUse || !membership) {
+        throw new Error(HOURS_REASON_TEXT[check.reasonCode ?? 'NO_MEMBERSHIP']);
       }
+      const cover = hoursCover({
+        available: check.available,
+        canUse: true,
+        useHours: true,
+        durationHours: input.duration,
+        courtFee: finalPrice,
+      });
+      const take = { membershipId: membership.id, sport: input.courtType, hours: cover.used };
+      if (!(await takeSportHours(take))) {
+        throw new Error('Your membership hours changed. Please try again.');
+      }
+      hoursTaken = take;
       usedMembershipHours = true;
-      membershipId = check.membership._id as mongoose.Types.ObjectId;
-      membershipHoursUsed = input.duration;
-      usedGuestPass = !!input.useGuestPass;
-      totalPrice = 0;
+      membershipId = new mongoose.Types.ObjectId(membership.id);
+      membershipHoursUsed = cover.used;
+      membershipSport = input.courtType;
+      membershipDiscountPkr = cover.discount;
+      totalPrice = finalPrice - cover.discount;
     }
 
     // Create booking with discount information
@@ -368,22 +387,17 @@ export async function createBooking(
       usedMembershipHours,
       membershipId,
       membershipHoursUsed,
-      usedGuestPass,
-      status: usedMembershipHours ? 'confirmed' : 'pending_payment',
-      amountPaid: usedMembershipHours ? 0 : 0,
+      membershipSport,
+      membershipDiscountPkr,
+      usedGuestPass: false,
+      // Nothing left to pay (hours covered it all) → confirmed straight away.
+      status: totalPrice === 0 ? 'confirmed' : 'pending_payment',
+      amountPaid: 0,
     });
     holdsLocks = false; // the booking now exists, so its locks are valid
-
-    if (usedMembershipHours && membershipId) {
-      await deductMembershipForBooking({
-        membershipId: membershipId.toString(),
-        duration: input.duration,
-        useGuestPass: usedGuestPass,
-      });
-    }
+    bookingSaved = true; // the hours now belong to the booking (cancel gives them back)
 
     if (
-      !usedMembershipHours &&
       shouldLinkUser &&
       sessionUserId &&
       input.loyaltyPointsToRedeem &&
@@ -393,14 +407,15 @@ export async function createBooking(
         userId: sessionUserId,
         points: input.loyaltyPointsToRedeem,
         bookingId: booking._id,
-        totalPriceAfterPromo: finalPrice,
+        totalPriceAfterPromo: finalPrice - membershipDiscountPkr,
       });
       loyaltyPointsRedeemed = redeemed.points;
       loyaltyDiscountPkr = redeemed.discountPkr;
-      totalPrice = Math.max(0, finalPrice - loyaltyDiscountPkr);
+      totalPrice = Math.max(0, finalPrice - membershipDiscountPkr - loyaltyDiscountPkr);
       booking.loyaltyPointsRedeemed = loyaltyPointsRedeemed;
       booking.loyaltyDiscountPkr = loyaltyDiscountPkr;
       booking.totalPrice = totalPrice;
+      if (totalPrice === 0) booking.status = 'confirmed';
       await booking.save();
     }
 
@@ -440,6 +455,9 @@ export async function createBooking(
     };
   } catch (error: any) {
     console.error('Booking creation error:', error);
+    if (hoursTaken && !bookingSaved) {
+      await putBackSportHours(hoursTaken).catch(() => {});
+    }
     if (holdsLocks && newBookingId) {
       await releaseSlotLocks(newBookingId).catch(() => {});
     }
@@ -927,13 +945,8 @@ export async function cancelBooking(bookingId: string, opts?: StaffActorOpts) {
 
     await refundLoyaltyForBooking(bookingId);
 
-    if (booking.usedMembershipHours && booking.membershipId) {
-      await refundMembershipHours({
-        membershipId: booking.membershipId.toString(),
-        hours: booking.membershipHoursUsed || booking.duration,
-        refundGuestPass: !!booking.usedGuestPass,
-      });
-    }
+    // Gives the hours back to the right sport, once.
+    await returnHoursForBooking(bookingId);
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');
@@ -1105,6 +1118,13 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
     if (updatedBooking.status === 'completed') {
       await awardLoyaltyForCompletedBooking(updatedBooking._id.toString()).catch(
         (err) => console.error('Loyalty award error:', err),
+      );
+    }
+
+    // Staff cancelled it: give membership hours back to the right sport (only once).
+    if (updatedBooking.status === 'cancelled') {
+      await returnHoursForBooking(updatedBooking._id).catch((err) =>
+        console.error('Membership hours return error:', err),
       );
     }
 

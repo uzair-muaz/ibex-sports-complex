@@ -61,10 +61,22 @@ export function pointsDiscountPkr(points: number, feeAfterPromo: number, rules: 
  */
 export function pointsEarnedFor(
   rules: LoyaltyRules,
-  b: { paidTotal: number; durationMinutes: number; usedMembershipHours?: boolean },
+  b: {
+    /** Money paid (after hours, points and promotions). */
+    paidTotal: number;
+    durationMinutes: number;
+    /** Minutes paid with membership hours. */
+    membershipMinutes?: number;
+    /** PKR the membership hours covered. */
+    membershipValuePkr?: number;
+  },
 ): number {
   if (rules.earnPoints <= 0) return 0;
-  if (b.usedMembershipHours && !rules.earnOnMembershipHours) return 0;
-  if (rules.earnBasis === "per_hour") return Math.round((b.durationMinutes / 60) * rules.earnPoints);
-  return Math.floor(Math.max(0, b.paidTotal) / rules.earnPerPkr) * rules.earnPoints;
+  const hourMinutes = Math.min(b.durationMinutes, Math.max(0, b.membershipMinutes ?? 0));
+  if (rules.earnBasis === "per_hour") {
+    const minutes = rules.earnOnMembershipHours ? b.durationMinutes : b.durationMinutes - hourMinutes;
+    return Math.round((minutes / 60) * rules.earnPoints);
+  }
+  const pkr = Math.max(0, b.paidTotal) + (rules.earnOnMembershipHours ? Math.max(0, b.membershipValuePkr ?? 0) : 0);
+  return Math.floor(pkr / rules.earnPerPkr) * rules.earnPoints;
 }

@@ -63,7 +63,7 @@ describe("booking view (what the app sees)", () => {
       start: "2026-11-20T18:00:00+05:00",
       durationMinutes: 90,
       status: "reserved",
-      price: { courtFee: 9000, pointsUsed: 0, pointsDiscount: 0, total: 9000 },
+      price: { courtFee: 9000, hoursDiscount: 0, pointsUsed: 0, pointsDiscount: 0, total: 9000 },
       payment: { status: "awaiting_proof", advanceRequired: 4500, amountVerified: 0, balanceDue: 9000, proofs: [] },
       cancellation: { canCancel: true, cancelUntil: "2026-11-20T14:00:00+05:00" },
       refund: null,
@@ -77,7 +77,7 @@ describe("booking view (what the app sees)", () => {
       ctx,
     );
     expect(v.status).toBe("confirmed");
-    expect(v.price).toEqual({ courtFee: 9000, pointsUsed: 1000, pointsDiscount: 1000, total: 8000 });
+    expect(v.price).toEqual({ courtFee: 9000, hoursDiscount: 0, pointsUsed: 1000, pointsDiscount: 1000, total: 8000 });
     expect(v.payment.status).toBe("verified");
   });
 

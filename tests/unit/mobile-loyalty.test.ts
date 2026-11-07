@@ -37,7 +37,7 @@ describe("points rules from settings", () => {
   });
 
   it("membership hours earn nothing unless turned on", () => {
-    const b = { paidTotal: 0, durationMinutes: 60, usedMembershipHours: true };
+    const b = { paidTotal: 0, durationMinutes: 60, membershipMinutes: 60, membershipValuePkr: 4500 };
     expect(pointsEarnedFor(today, b)).toBe(0);
     expect(pointsEarnedFor({ ...today, earnOnMembershipHours: true }, b)).toBe(10);
   });

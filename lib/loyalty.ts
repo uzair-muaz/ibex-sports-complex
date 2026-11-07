@@ -43,7 +43,10 @@ export async function awardLoyaltyForCompletedBooking(bookingId: string) {
   const points = pointsEarnedFor(loyalty, {
     paidTotal: booking.totalPrice,
     durationMinutes: Math.round(booking.duration * 60),
-    usedMembershipHours: !!booking.usedMembershipHours,
+    membershipMinutes: booking.usedMembershipHours
+      ? Math.round((booking.membershipHoursUsed || booking.duration) * 60)
+      : 0,
+    membershipValuePkr: booking.membershipDiscountPkr ?? 0,
   });
   if (points <= 0) {
     return { success: true as const, skipped: true, points: 0 };

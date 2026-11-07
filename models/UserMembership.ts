@@ -5,7 +5,10 @@ export type UserMembershipStatus = "active" | "expired" | "cancelled";
 export interface IUserMembership extends Document {
   userId: mongoose.Types.ObjectId;
   planId: mongoose.Types.ObjectId;
+  /** Sum of hoursBySport remaining (kept in step, for older screens). */
   hoursRemaining: number;
+  /** Hours per sport (Phase 12). Empty on old one-pool memberships. */
+  hoursBySport: { sport: string; total: number; remaining: number }[];
   guestPassesRemaining: number;
   validFrom: Date;
   validUntil: Date;
@@ -28,6 +31,17 @@ const UserMembershipSchema = new Schema(
       required: true,
     },
     hoursRemaining: { type: Number, required: true, min: 0 },
+    hoursBySport: {
+      type: [
+        {
+          _id: false,
+          sport: { type: String, enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"], required: true },
+          total: { type: Number, required: true, min: 0 },
+          remaining: { type: Number, required: true, min: 0 },
+        },
+      ],
+      default: [],
+    },
     guestPassesRemaining: { type: Number, default: 0, min: 0 },
     validFrom: { type: Date, required: true },
     validUntil: { type: Date, required: true },

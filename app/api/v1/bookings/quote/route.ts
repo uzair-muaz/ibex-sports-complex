@@ -7,11 +7,12 @@ import { resolveSlot } from "@/lib/api/slot";
 import { computeQuote } from "@/lib/pricing/quote";
 import { slotStartIso } from "@/lib/api/availability";
 import { walletBalance } from "@/lib/wallet";
+import { checkHoursForSlot, loadMembershipForHours, type HoursCheck } from "@/lib/membership-hours";
 
 /**
  * Price check before booking. Guests and signed-in customers.
- * Body: { courtId, start, durationMinutes, usePoints?, useWallet? }
- * Points and wallet are only for signed-in customers; guests get null for both.
+ * Body: { courtId, start, durationMinutes, useHours?, usePoints?, useWallet? }
+ * Hours, points and wallet are only for signed-in customers; guests get null for all three.
  * Nothing is saved or reserved.
  */
 export async function POST(request: Request) {
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
     courtId?: unknown;
     start?: unknown;
     durationMinutes?: unknown;
+    useHours?: unknown;
     usePoints?: unknown;
     useWallet?: unknown;
   } | null;
@@ -36,13 +38,20 @@ export async function POST(request: Request) {
 
     const user = await optionalApiUser(request);
     let customer: { pointsBalance: number; walletBalance: number } | null = null;
+    let hours: HoursCheck | null = null;
     if (user && isCustomerRole(user.role)) {
       await connectDB();
-      const [account, walletBal] = await Promise.all([
+      const [account, walletBal, membership] = await Promise.all([
         LoyaltyAccount.findOne({ userId: user.id }).select("balance").lean(),
         walletBalance(user.id),
+        loadMembershipForHours(user.id),
       ]);
       customer = { pointsBalance: account?.balance ?? 0, walletBalance: walletBal };
+      hours = checkHoursForSlot(membership, {
+        sport: slot.court.type,
+        dateKey: slot.dateKey,
+        startHour: slot.startHour,
+      });
     }
 
     const quote = computeQuote({
@@ -50,6 +59,8 @@ export async function POST(request: Request) {
       courtFee: slot.price,
       durationMinutes: slot.durationMinutes,
       customer,
+      hours,
+      useHours: body.useHours === true,
       usePoints: body.usePoints === true,
       useWallet: body.useWallet === true,
       loyalty: slot.settings.loyalty,

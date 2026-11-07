@@ -30,6 +30,7 @@ import {
   type AvailableStartTimeQuote,
 } from "../actions/bookings";
 import { maxRedeemablePoints, maxUsablePoints } from "@/lib/loyalty-rules";
+import { hoursCover } from "@/lib/membership-hours-rules";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
@@ -151,7 +152,6 @@ export default function BookingClient() {
   const [useLoyalty, setUseLoyalty] = useState(false);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
   const [useMembershipHours, setUseMembershipHours] = useState(false);
-  const [useGuestPass, setUseGuestPass] = useState(false);
   const canQuickCheck = userRole === "admin" || userRole === "super_admin";
 
   const courtsQuery = usePublicCourts();
@@ -161,12 +161,9 @@ export default function BookingClient() {
 
   const loyaltyBalance = loyaltyQuery.data?.balance ?? 0;
   const membership = membershipQuery.data?.membership as
-    | { hoursRemaining?: number; guestPassesRemaining?: number }
+    | { hoursBySport?: { sport: string; remaining: number }[] }
     | null
     | undefined;
-  const hasMembership = !!membership;
-  const membershipHoursRemaining = membership?.hoursRemaining || 0;
-  const guestPassesRemaining = membership?.guestPassesRemaining || 0;
 
   // Default to opening date if today is before it
   const getInitialDate = () => {
@@ -267,14 +264,27 @@ export default function BookingClient() {
     );
   }, [selectedCourtType, allCourts]);
 
+  // Membership hours for the chosen sport (Phase 12): use what they have, pay the rest.
+  const membershipHoursRemaining =
+    membership?.hoursBySport?.find((h) => h.sport === selectedCourtType)?.remaining ?? 0;
+  const hasMembership = membershipHoursRemaining > 0;
+  const membershipCover = hoursCover({
+    available: membershipHoursRemaining,
+    canUse: hasMembership,
+    useHours: useMembershipHours,
+    durationHours: selectedDurationHours,
+    courtFee: selectedQuote?.totalPrice ?? 0,
+  });
+  const priceAfterHours = Math.max(0, (selectedQuote?.totalPrice ?? 0) - membershipCover.discount);
+
   const maxLoyaltyRedeem = useMemo(() => {
     if (!selectedQuote) return 0;
     // Same rules as the server (Admin → App Settings); old rules if not loaded.
     const rules = loyaltyQuery.data?.rules;
     return rules
-      ? maxUsablePoints(loyaltyBalance, selectedQuote.totalPrice, rules)
-      : maxRedeemablePoints(loyaltyBalance, selectedQuote.totalPrice);
-  }, [loyaltyBalance, selectedQuote, loyaltyQuery.data?.rules]);
+      ? maxUsablePoints(loyaltyBalance, priceAfterHours, rules)
+      : maxRedeemablePoints(loyaltyBalance, priceAfterHours);
+  }, [loyaltyBalance, selectedQuote, priceAfterHours, loyaltyQuery.data?.rules]);
 
   useEffect(() => {
     if (!useLoyalty) {
@@ -285,13 +295,6 @@ export default function BookingClient() {
       prev > 0 ? Math.min(prev, maxLoyaltyRedeem) : maxLoyaltyRedeem,
     );
   }, [useLoyalty, maxLoyaltyRedeem]);
-
-  useEffect(() => {
-    if (useMembershipHours) {
-      setUseLoyalty(false);
-      setLoyaltyPointsToRedeem(0);
-    }
-  }, [useMembershipHours]);
 
   const { availableStartTimes, isLoadingAvailability, refreshAvailability } =
     useBookingAvailability({
@@ -553,15 +556,9 @@ export default function BookingClient() {
         userEmail: email,
         userPhone: normalizedPhone,
         loyaltyPointsToRedeem:
-          isCustomerLoggedIn && useLoyalty && !useMembershipHours
-            ? loyaltyPointsToRedeem
-            : undefined,
+          isCustomerLoggedIn && useLoyalty ? loyaltyPointsToRedeem : undefined,
         useMembershipHours:
-          isCustomerLoggedIn && useMembershipHours ? true : undefined,
-        useGuestPass:
-          isCustomerLoggedIn && useMembershipHours && useGuestPass
-            ? true
-            : undefined,
+          isCustomerLoggedIn && useMembershipHours && hasMembership ? true : undefined,
       });
 
       if (result.success) {
@@ -1013,13 +1010,12 @@ export default function BookingClient() {
         pkrPerPoint={loyaltyQuery.data?.rules?.pkrPerPoint ?? 1}
         hasMembership={hasMembership}
         membershipHoursRemaining={membershipHoursRemaining}
-        guestPassesRemaining={guestPassesRemaining}
+        membershipHoursUsed={membershipCover.used}
+        membershipDiscount={membershipCover.discount}
         useMembershipHours={useMembershipHours}
-        useGuestPass={useGuestPass}
         onUseLoyaltyChange={setUseLoyalty}
         onLoyaltyPointsChange={setLoyaltyPointsToRedeem}
         onUseMembershipChange={setUseMembershipHours}
-        onUseGuestPassChange={setUseGuestPass}
         onClose={() => setShowCheckoutModal(false)}
         onContinueAsGuest={() => setCheckoutIdentityStep("details")}
         onFieldChange={handleFieldChange}

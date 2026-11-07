@@ -6,7 +6,7 @@ import {
   customerCanCancelBooking,
 } from "@/lib/membership-rules";
 import { refundLoyaltyForBooking } from "@/lib/loyalty";
-import { refundMembershipHours } from "@/lib/membership";
+import { returnHoursForBooking } from "@/lib/membership-hours";
 import { revalidatePath } from "next/cache";
 import { resolveCustomerActor } from "@/lib/action-auth";
 import { creditWallet } from "@/lib/wallet";
@@ -149,13 +149,8 @@ export async function cancelMyBooking(
 
   await refundLoyaltyForBooking(bookingId);
 
-  if (booking.usedMembershipHours && booking.membershipId) {
-    await refundMembershipHours({
-      membershipId: booking.membershipId.toString(),
-      hours: booking.membershipHoursUsed || booking.duration,
-      refundGuestPass: !!booking.usedGuestPass,
-    });
-  }
+  // Gives the hours back to the right sport, once.
+  await returnHoursForBooking(bookingId);
 
   revalidatePath("/account/bookings");
   revalidatePath(`/account/bookings/${bookingId}`);

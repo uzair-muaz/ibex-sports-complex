@@ -74,6 +74,8 @@ type BookingRow = {
   duration: number;
   totalPrice: number;
   usedMembershipHours?: boolean;
+  membershipHoursUsed?: number;
+  membershipDiscountPkr?: number;
   courtId?: { type?: string } | null;
 };
 
@@ -96,7 +98,7 @@ export async function buildAppLoyalty(params: { userId: string; cursor?: string 
     LoyaltyAccount.findOne({ userId: params.userId }).select("balance").lean(),
     // Points are credited when staff mark the booking completed; until then they are pending.
     Booking.find({ userId: params.userId, status: { $in: ["pending_payment", "confirmed"] } })
-      .select("serialNumber date startTime duration totalPrice usedMembershipHours courtId")
+      .select("serialNumber date startTime duration totalPrice usedMembershipHours membershipHoursUsed membershipDiscountPkr courtId")
       .populate("courtId", "type")
       .lean(),
     LoyaltyTransaction.find({ userId: params.userId }).sort({ createdAt: -1, _id: -1 }).skip(offset).limit(limit).lean(),
@@ -109,7 +111,8 @@ export async function buildAppLoyalty(params: { userId: string; cursor?: string 
       points: pointsEarnedFor(rules, {
         paidTotal: b.totalPrice,
         durationMinutes: Math.round(b.duration * 60),
-        usedMembershipHours: !!b.usedMembershipHours,
+        membershipMinutes: b.usedMembershipHours ? Math.round((b.membershipHoursUsed || b.duration) * 60) : 0,
+        membershipValuePkr: b.membershipDiscountPkr ?? 0,
       }),
     }))
     .filter((x) => x.points > 0)

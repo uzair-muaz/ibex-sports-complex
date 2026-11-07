@@ -10,6 +10,7 @@ import {
   getActiveMembershipForUser,
 } from "@/lib/membership";
 import { revalidatePath } from "next/cache";
+import { cleanHoursBySport } from "@/lib/membership-plans";
 import {
   resolveCustomerActor,
   requireStaffActor,
@@ -18,7 +19,7 @@ import {
 
 export async function listMembershipPlans() {
   await ensureMembershipPlansSeeded();
-  const plans = await MembershipPlan.find({ isActive: true })
+  const plans = await MembershipPlan.find({ isActive: true, "hoursBySport.0": { $exists: true } })
     .sort({ sortOrder: 1 })
     .lean();
   return {
@@ -58,6 +59,8 @@ export async function adminActivateMembership(
     userId: string;
     planId: string;
     carryForwardHours?: boolean;
+    /** Hours per sport for this customer; defaults to the plan's. */
+    hoursBySport?: { sport: string; hours: number }[];
   },
   opts?: StaffActorOpts,
 ) {
@@ -68,7 +71,12 @@ export async function adminActivateMembership(
 
   try {
     await ensureMembershipPlansSeeded();
-    const membership = await activateMembership(input);
+    const membership = await activateMembership({
+      userId: input.userId,
+      planId: input.planId,
+      carryForwardHours: input.carryForwardHours,
+      hoursBySport: input.hoursBySport ? cleanHoursBySport(input.hoursBySport) : undefined,
+    });
     revalidatePath("/admin/users");
     revalidatePath("/account/membership");
     return {
@@ -220,6 +228,10 @@ export async function adminListMembershipRoster(
             planName: plan?.name || "Plan",
             planSlug: plan?.slug || null,
             hoursRemaining: membership.hoursRemaining,
+            hoursBySport: (membership.hoursBySport ?? []).map((h) => ({
+              sport: h.sport,
+              remaining: h.remaining,
+            })),
             guestPassesRemaining: membership.guestPassesRemaining,
             validUntil: membership.validUntil,
             status: membership.status,

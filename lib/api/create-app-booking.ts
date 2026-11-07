@@ -10,6 +10,14 @@ import { resolveSlot } from "@/lib/api/slot";
 import { debitWallet, undoWalletDebit, walletBalance } from "@/lib/wallet";
 import { getAppSettings } from "@/lib/app-settings";
 import { computeQuote } from "@/lib/pricing/quote";
+import {
+  checkHoursForSlot,
+  loadMembershipForHours,
+  putBackSportHours,
+  takeSportHours,
+  HOURS_REASON_TEXT,
+  type HoursCheck,
+} from "@/lib/membership-hours";
 import { acquireSlotLocks, releaseSlotLocks } from "@/lib/booking-locks";
 import { nextBookingSerial } from "@/lib/booking-serial";
 import { overlapsBooking, pakistanNow } from "@/lib/booking-overlap";
@@ -30,6 +38,7 @@ export type AppBookingBody = {
   courtId?: unknown;
   start?: unknown;
   durationMinutes?: unknown;
+  useHours?: unknown;
   usePoints?: unknown;
   useWallet?: unknown;
   guest?: { name?: unknown; email?: unknown; phone?: unknown } | null;
@@ -38,6 +47,8 @@ export type AppBookingBody = {
 export type AppBookingResult =
   | { ok: true; status: 200 | 201; booking: MobileBooking; guestAccessToken: string | null }
   | { ok: false; status: number; code: string; error: string };
+
+const HOURS_TEXT = HOURS_REASON_TEXT;
 
 const fail = (status: number, code: string, error: string): AppBookingResult => ({
   ok: false,
@@ -69,6 +80,7 @@ export function hashClientIp(request: Request): string | null {
 export function requestHash(body: AppBookingBody): string {
   const guest = body.guest ?? null;
   const stable = JSON.stringify([
+    ...(body.useHours === true ? ["hours"] : []),
     body.courtId ?? null,
     body.start ?? null,
     Number(body.durationMinutes) || null,
@@ -183,12 +195,14 @@ export async function createAppBooking(params: {
   let locked = false;
   let pointsTaken = 0;
   let walletTaken = false;
+  let hoursTaken: { membershipId: string; sport: string; hours: number } | null = null;
 
   const undo = async () => {
     if (pointsTaken > 0 && contact.userId) {
       await LoyaltyAccount.updateOne({ userId: contact.userId }, { $inc: { balance: pointsTaken } }).catch(() => {});
       await LoyaltyTransaction.deleteOne({ bookingId, type: "redeem" }).catch(() => {});
     }
+    if (hoursTaken) await putBackSportHours(hoursTaken).catch(() => {});
     if (walletTaken) await undoWalletDebit(`booking:${bookingId}`).catch(() => {});
     if (locked) await releaseSlotLocks(bookingId).catch(() => {});
     if (scopeKey) await IdempotencyRecord.deleteOne({ scopeKey, status: "pending" }).catch(() => {});
@@ -264,23 +278,51 @@ export async function createAppBooking(params: {
 
     // 7. Price (same maths as the quote).
     let customer: { pointsBalance: number; walletBalance: number } | null = null;
+    let hours: HoursCheck | null = null;
+    let membershipId: string | null = null;
     if (contact.userId) {
-      const [account, walletBal] = await Promise.all([
+      const [account, walletBal, membership] = await Promise.all([
         LoyaltyAccount.findOne({ userId: contact.userId }).select("balance").lean(),
         walletBalance(contact.userId),
+        body.useHours === true ? loadMembershipForHours(contact.userId) : Promise.resolve(null),
       ]);
       customer = { pointsBalance: account?.balance ?? 0, walletBalance: walletBal };
+      if (body.useHours === true) {
+        hours = checkHoursForSlot(membership, {
+          sport: slot.court.type,
+          dateKey: slot.dateKey,
+          startHour: slot.startHour,
+        });
+        if (!hours.canUse) {
+          await undo();
+          return fail(422, hours.reasonCode ?? "HOURS_NOT_USABLE", HOURS_TEXT[hours.reasonCode ?? "NO_MEMBERSHIP"]);
+        }
+        membershipId = membership!.id;
+      }
     }
     const quote = computeQuote({
       originalCourtFee: slot.originalPrice,
       courtFee: slot.price,
       durationMinutes: slot.durationMinutes,
       customer,
+      hours,
+      useHours: body.useHours === true,
       usePoints: body.usePoints === true,
       useWallet: body.useWallet === true,
       loyalty: settings.loyalty,
       minAdvancePercent: settings.payments.minAdvancePercent,
     });
+
+    // 8a. Take the membership hours (only if they're still there).
+    const hoursUsed = quote.hours?.used ?? 0;
+    if (hoursUsed > 0 && membershipId) {
+      const taken = { membershipId, sport: slot.court.type, hours: hoursUsed };
+      if (!(await takeSportHours(taken))) {
+        await undo();
+        return fail(409, "HOURS_CHANGED", "Your membership hours changed. Please check the price again.");
+      }
+      hoursTaken = taken;
+    }
 
     // 8. Take the points (only if the balance is still there).
     const pointsUsed = quote.points?.used ?? 0;
@@ -346,6 +388,11 @@ export async function createAppBooking(params: {
       originalPrice: quote.originalCourtFee,
       discounts,
       discountAmount: quote.promotionDiscount,
+      usedMembershipHours: hoursUsed > 0,
+      membershipId: hoursUsed > 0 ? membershipId : undefined,
+      membershipHoursUsed: hoursUsed,
+      membershipSport: hoursUsed > 0 ? slot.court.type : undefined,
+      membershipDiscountPkr: quote.hours?.discount ?? 0,
       loyaltyPointsRedeemed: pointsUsed,
       loyaltyDiscountPkr: quote.points?.discount ?? 0,
       totalPrice: quote.total,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Check, Clock, MessageCircle, Phone, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,20 +25,50 @@ import {
 const CONTACT_PHONE = "+923255429429";
 const WHATSAPP_URL = `https://wa.me/${CONTACT_PHONE.replace(/\D/g, "")}`;
 
-const PLANS = MEMBERSHIP_PLAN_SEEDS.map((plan) => ({
+const SPORT: Record<string, string> = { PADEL: "Padel", PICKLEBALL: "Pickleball", FUTSAL: "Futsal", CRICKET: "Cricket" };
+
+type ShownPlan = { name: string; price: number; hours: number; hoursLabel: string; highlight: boolean; features: string[] };
+
+/** Shown until the plans made in Admin → Memberships → Plans have loaded. */
+const FALLBACK_PLANS: ShownPlan[] = MEMBERSHIP_PLAN_SEEDS.map((plan) => ({
   name: plan.name,
   price: plan.price,
   hours: plan.hours,
+  hoursLabel: `${plan.hours} hrs/month`,
   highlight: plan.slug === "gold",
   features: [
     `${plan.hours} court hours`,
     plan.weekdayOnly ? "Weekday access" : "Full week access",
     ...(plan.priorityBadge ? ["Priority member badge"] : []),
-    ...(plan.guestPassesPerPeriod > 0
-      ? [`${plan.guestPassesPerPeriod} guest passes / period`]
-      : []),
   ],
 }));
+
+type PublicPlan = {
+  id: string;
+  name: string;
+  price: number;
+  validityDays: number;
+  badge: string | null;
+  hours: { sport: string; hours: number }[];
+  features: string[];
+  restriction: string | null;
+};
+
+function toShownPlan(p: PublicPlan): ShownPlan {
+  const total = p.hours.reduce((s, h) => s + h.hours, 0);
+  return {
+    name: p.name,
+    price: p.price,
+    hours: total,
+    hoursLabel: `${total} hrs · ${p.validityDays} days`,
+    highlight: !!p.badge,
+    features: [
+      ...p.hours.map((h) => `${h.hours}h ${SPORT[h.sport] ?? h.sport}`),
+      p.restriction ?? "Full week access",
+      ...p.features,
+    ],
+  };
+}
 
 const TERMS = [
   `Valid for ${MEMBERSHIP_VALIDITY_DAYS} days from date of purchase.`,
@@ -50,6 +81,16 @@ const TERMS = [
 
 export const MembershipSection = () => {
   const [getStartedOpen, setGetStartedOpen] = useState(false);
+  const plansQuery = useQuery({
+    queryKey: ["public", "membership-plans"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/membership/plans");
+      if (!res.ok) throw new Error("plans");
+      return ((await res.json()) as { plans: PublicPlan[] }).plans;
+    },
+    staleTime: 5 * 60_000,
+  });
+  const PLANS: ShownPlan[] = plansQuery.data?.length ? plansQuery.data.map(toShownPlan) : FALLBACK_PLANS;
 
   return (
     <section className="relative py-12 sm:py-16 md:py-24 lg:py-36 px-4 sm:px-6 overflow-hidden transition-colors duration-500">
@@ -160,7 +201,7 @@ export const MembershipSection = () => {
                 </h3>
                 <div className="flex items-center gap-2 text-zinc-500 text-xs sm:text-sm mb-4 sm:mb-6">
                   <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                  <span>{plan.hours} hrs/month</span>
+                  <span>{plan.hoursLabel}</span>
                 </div>
 
                 <div className="mb-4 sm:mb-6">
@@ -204,7 +245,7 @@ export const MembershipSection = () => {
 
                 <p className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-zinc-800 text-[10px] sm:text-xs text-zinc-500 flex items-center gap-1.5">
                   <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />
-                  ~PKR {Math.round(plan.price / plan.hours).toLocaleString()}/hr
+                  ~PKR {Math.round(plan.price / Math.max(1, plan.hours)).toLocaleString()}/hr
                 </p>
               </div>
             </motion.div>

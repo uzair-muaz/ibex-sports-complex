@@ -38,14 +38,15 @@ type BookingCheckoutModalProps = {
   /** PKR value of 1 point (Admin → App Settings). Default 1. */
   pkrPerPoint?: number;
   hasMembership: boolean;
+  /** Hours left for this booking's sport. */
   membershipHoursRemaining: number;
-  guestPassesRemaining: number;
+  /** Hours this booking would use, and the PKR they cover. */
+  membershipHoursUsed: number;
+  membershipDiscount: number;
   useMembershipHours: boolean;
-  useGuestPass: boolean;
   onUseLoyaltyChange: (value: boolean) => void;
   onLoyaltyPointsChange: (value: number) => void;
   onUseMembershipChange: (value: boolean) => void;
-  onUseGuestPassChange: (value: boolean) => void;
   onClose: () => void;
   onContinueAsGuest: () => void;
   onFieldChange: (field: keyof FormData, value: string) => void;
@@ -71,25 +72,23 @@ export function BookingCheckoutModal({
   pkrPerPoint = 1,
   hasMembership,
   membershipHoursRemaining,
-  guestPassesRemaining,
+  membershipHoursUsed,
+  membershipDiscount,
   useMembershipHours,
-  useGuestPass,
   onUseLoyaltyChange,
   onLoyaltyPointsChange,
   onUseMembershipChange,
-  onUseGuestPassChange,
   onClose,
   onContinueAsGuest,
   onFieldChange,
   onSubmit,
 }: BookingCheckoutModalProps) {
-  const displayTotal = useMembershipHours
-    ? 0
-    : Math.max(
-        0,
-        (selectedQuote?.totalPrice || 0) -
-          (useLoyalty ? Math.floor(loyaltyPointsToRedeem * pkrPerPoint) : 0),
-      );
+  const displayTotal = Math.max(
+    0,
+    (selectedQuote?.totalPrice || 0) -
+      (useMembershipHours ? membershipDiscount : 0) -
+      (useLoyalty ? Math.floor(loyaltyPointsToRedeem * pkrPerPoint) : 0),
+  );
 
   const showIdentityChooser = !isLoggedIn && identityStep === "choose";
   const loginHref = "/login?callbackUrl=/booking";
@@ -290,28 +289,20 @@ export function BookingCheckoutModal({
                         className="mt-1"
                       />
                       <span>
-                        Use membership hours ({membershipHoursRemaining}h left)
-                        — covers this {durationHours}h slot fully
-                        {guestPassesRemaining > 0 ? (
-                          <span className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
-                            <input
-                              type="checkbox"
-                              checked={useGuestPass}
-                              disabled={!useMembershipHours}
-                              onChange={(e) =>
-                                onUseGuestPassChange(e.target.checked)
-                              }
-                            />
-                            Use guest pass ({guestPassesRemaining} left)
+                        Use membership hours ({membershipHoursRemaining}h left
+                        for this sport)
+                        {useMembershipHours && membershipHoursUsed > 0 ? (
+                          <span className="mt-1 block text-xs text-zinc-400">
+                            {membershipHoursUsed >= durationHours
+                              ? `Covers this ${durationHours}h booking fully`
+                              : `Covers ${membershipHoursUsed}h of ${durationHours}h — you pay the rest`}
                           </span>
                         ) : null}
                       </span>
                     </label>
                   ) : null}
 
-                  {isLoggedIn &&
-                  !useMembershipHours &&
-                  maxLoyaltyRedeem >= 100 ? (
+                  {isLoggedIn && maxLoyaltyRedeem > 0 ? (
                     <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2 text-sm text-zinc-200">
                       <label className="flex items-center gap-3">
                         <input

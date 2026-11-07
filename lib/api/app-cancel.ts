@@ -3,7 +3,7 @@ import connectDB from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import { getAppSettings } from "@/lib/app-settings";
 import { refundLoyaltyForBooking } from "@/lib/loyalty";
-import { refundMembershipHours } from "@/lib/membership";
+import { returnHoursForBooking } from "@/lib/membership-hours";
 import { creditWallet } from "@/lib/wallet";
 import { toPkIso } from "@/lib/api/time";
 import { bookingStartMs, type MobileBooking } from "@/lib/api/booking-view";
@@ -21,6 +21,7 @@ type CancelSource = {
   loyaltyPointsRedeemed?: number | null;
   usedMembershipHours?: boolean | null;
   membershipHoursUsed?: number | null;
+  membershipHoursReturnedAt?: Date | null;
   duration: number;
 };
 
@@ -45,7 +46,8 @@ export function cancellationPreview(
   const cancelUntilMs = startMs - cancellationNoticeMinutes * 60_000;
   // Money paid (bank transfer verified + cash) and wallet credit used both go to the wallet.
   const refundAmount = Math.max(0, Math.round((b.amountPaid ?? 0) + (b.walletCreditUsed ?? 0)));
-  const hoursReturned = b.usedMembershipHours ? (b.membershipHoursUsed || b.duration) : 0;
+  const hoursReturned =
+    b.usedMembershipHours && !b.membershipHoursReturnedAt ? (b.membershipHoursUsed || b.duration) : 0;
 
   let reasonCode: CancelPreview["reasonCode"] = null;
   if (b.status === "cancelled") reasonCode = "ALREADY_CANCELLED";
@@ -75,7 +77,7 @@ const ERRORS: Record<NonNullable<CancelPreview["reasonCode"]>, { status: number;
 };
 
 const SELECT =
-  "status date startTime duration amountPaid walletCreditUsed loyaltyPointsRedeemed usedMembershipHours membershipHoursUsed membershipId usedGuestPass userId";
+  "status date startTime duration amountPaid walletCreditUsed loyaltyPointsRedeemed usedMembershipHours membershipHoursUsed membershipHoursReturnedAt membershipId usedGuestPass userId";
 
 export async function getCancellationPreview(userId: string, bookingId: string) {
   if (!mongoose.isValidObjectId(bookingId)) return null;
@@ -171,13 +173,7 @@ export async function cancelAppBooking(params: {
     });
   }
   await refundLoyaltyForBooking(params.bookingId);
-  if (booking.usedMembershipHours && booking.membershipId) {
-    await refundMembershipHours({
-      membershipId: booking.membershipId.toString(),
-      hours: preview.hoursReturned,
-      refundGuestPass: !!booking.usedGuestPass,
-    });
-  }
+  await returnHoursForBooking(params.bookingId);
 
   void import("@/lib/analytics/daily-rollup")
     .then(({ rebuildAnalyticsDaily }) => rebuildAnalyticsDaily([booking.date]))

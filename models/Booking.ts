@@ -29,6 +29,12 @@ export interface IBooking extends Document {
   usedMembershipHours?: boolean;
   membershipId?: mongoose.Types.ObjectId;
   membershipHoursUsed?: number;
+  /** Which sport's hours were used (Phase 12). Missing on older bookings (one shared pool). */
+  membershipSport?: string;
+  /** PKR the hours covered (Phase 12). */
+  membershipDiscountPkr?: number;
+  /** Set once the hours are given back on cancel, so they are never given back twice. */
+  membershipHoursReturnedAt?: Date;
   usedGuestPass?: boolean;
   totalPrice: number; // Final price after discounts
   amountPaid: number; // Total received (online + cash), kept for backward compatibility
@@ -182,6 +188,9 @@ const BookingSchema: Schema = new Schema(
       type: Boolean,
       default: false,
     },
+    membershipSport: { type: String, required: false },
+    membershipDiscountPkr: { type: Number, default: 0, min: 0 },
+    membershipHoursReturnedAt: { type: Date, required: false },
     totalPrice: {
       type: Number,
       required: true,

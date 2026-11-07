@@ -20,6 +20,8 @@ import type { ColumnsType } from "antd/es/table";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminTableSkeleton } from "@/components/admin/loaders";
 import { WalletModal } from "@/components/admin/WalletModal";
+import { MembershipPlansModal, SPORT_LABELS } from "@/components/admin/MembershipPlansModal";
+import { useSession } from "next-auth/react";
 import {
   activateAdminMembership,
   adjustAdminLoyalty,
@@ -57,8 +59,13 @@ export default function AdminMembershipsPage() {
   const [walletUser, setWalletUser] = useState<MembershipRosterRow | null>(
     null,
   );
-  const [plans, setPlans] = useState<Array<{ _id: string; name: string }>>([]);
+  type PlanOption = { _id: string; name: string; hoursBySport?: { sport: string; hours: number }[] };
+  const [plans, setPlans] = useState<PlanOption[]>([]);
   const [planId, setPlanId] = useState<string>();
+  const [hoursBySport, setHoursBySport] = useState<Record<string, number | null>>({});
+  const [plansOpen, setPlansOpen] = useState(false);
+  const { data: session } = useSession();
+  const isSuperAdmin = session?.user?.role === "super_admin";
   const [carry, setCarry] = useState(true);
   const [delta, setDelta] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -80,9 +87,7 @@ export default function AdminMembershipsPage() {
         fetchAdminMembershipRoster(rosterInput),
         fetchAdminMembershipPlans(),
       ]);
-      setPlans(
-        (planResult.plans || []) as Array<{ _id: string; name: string }>,
-      );
+      setPlans((planResult.plans || []) as PlanOption[]);
       return {
         rows: (roster.rows || []) as MembershipRosterRow[],
         totalCount: roster.totalCount ?? roster.rows?.length ?? 0,
@@ -106,14 +111,12 @@ export default function AdminMembershipsPage() {
     {
       title: "Hours left",
       key: "hours",
-      width: 110,
-      render: (_, row) => row.membership?.hoursRemaining ?? "—",
-    },
-    {
-      title: "Guest passes",
-      key: "passes",
-      width: 120,
-      render: (_, row) => row.membership?.guestPassesRemaining ?? "—",
+      render: (_, row) => {
+        const rows = row.membership?.hoursBySport ?? [];
+        if (!row.membership) return "—";
+        if (rows.length === 0) return `${row.membership.hoursRemaining} (old plan)`;
+        return rows.map((h) => `${SPORT_LABELS[h.sport] ?? h.sport} ${h.remaining}h`).join(" · ");
+      },
     },
     {
       title: "Valid until",
@@ -156,6 +159,9 @@ export default function AdminMembershipsPage() {
         userId: activateUser._id,
         planId,
         carryForwardHours: carry,
+        hoursBySport: Object.entries(hoursBySport)
+          .filter(([, h]) => (h ?? 0) > 0)
+          .map(([sport, h]) => ({ sport, hours: h as number })),
       });
       message.success("Membership activated");
       setActivateUser(null);
@@ -220,6 +226,7 @@ export default function AdminMembershipsPage() {
             { value: "none", label: "No membership" },
           ]}
         />
+        {isSuperAdmin && <Button onClick={() => setPlansOpen(true)}>Plans</Button>}
       </Space>
 
       {rosterQuery.isLoading ? (
@@ -256,11 +263,34 @@ export default function AdminMembershipsPage() {
           <Form.Item label="Plan" required>
             <Select
               value={planId}
-              onChange={setPlanId}
+              onChange={(id) => {
+                setPlanId(id);
+                const plan = plans.find((p) => p._id === id);
+                setHoursBySport(
+                  Object.fromEntries((plan?.hoursBySport ?? []).map((h) => [h.sport, h.hours])),
+                );
+              }}
               options={plans.map((p) => ({ value: p._id, label: p.name }))}
-              placeholder="Select plan"
+              placeholder={plans.length ? "Select plan" : "No plans with hours per sport yet"}
             />
           </Form.Item>
+          {planId && (
+            <Form.Item label="Hours per sport (change for this customer if needed)">
+              <Space wrap>
+                {Object.keys(SPORT_LABELS).map((sport) => (
+                  <InputNumber
+                    key={sport}
+                    min={0}
+                    step={0.5}
+                    prefix={SPORT_LABELS[sport]}
+                    value={hoursBySport[sport] ?? null}
+                    onChange={(v) => setHoursBySport((prev) => ({ ...prev, [sport]: v }))}
+                    style={{ width: 170 }}
+                  />
+                ))}
+              </Space>
+            </Form.Item>
+          )}
           <Form.Item label="Carry forward unused hours">
             <Switch checked={carry} onChange={setCarry} />
           </Form.Item>
@@ -293,6 +323,13 @@ export default function AdminMembershipsPage() {
       </Modal>
 
       <WalletModal user={walletUser} onClose={() => setWalletUser(null)} />
+      <MembershipPlansModal
+        open={plansOpen}
+        onClose={() => {
+          setPlansOpen(false);
+          void queryClient.invalidateQueries({ queryKey: rosterKeys.all });
+        }}
+      />
     </AdminLayout>
   );
 }
