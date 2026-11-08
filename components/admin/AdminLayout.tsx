@@ -17,6 +17,7 @@ import {
   BankOutlined,
   BarcodeOutlined,
   BarChartOutlined,
+  FileTextOutlined,
   CalendarOutlined,
   TagOutlined,
   MessageOutlined,
@@ -71,11 +72,18 @@ export function AdminLayout({
   const menuItems = useMemo(() => {
     const items = [];
     if (isSuperAdmin) {
-      items.push({
-        key: "/admin/analytics",
-        icon: <BarChartOutlined />,
-        label: "Analytics",
-      });
+      items.push(
+        {
+          key: "/admin/analytics",
+          icon: <BarChartOutlined />,
+          label: "Analytics",
+        },
+        {
+          key: "/admin/reports",
+          icon: <FileTextOutlined />,
+          label: "Reports",
+        },
+      );
     }
     items.push(
       {

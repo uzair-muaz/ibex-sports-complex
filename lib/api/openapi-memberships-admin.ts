@@ -76,6 +76,34 @@ export const membershipAdminPaths = {
       responses: { "200": { description: "Dry run counts" }, "201": { description: "Sent: `{broadcast: {id, inAppCount, pushSent, pushLogged, guestBookings}}`" }, "400": { description: "VALIDATION_ERROR, CONFIRM_NEEDED or NO_RECIPIENTS" }, "403": { description: "Super admin only" } },
     },
   },
+  "/api/v1/admin/reports": {
+    get: {
+      tags: ["Admin"],
+      summary: "Super admin: money, wallet, points, memberships and codes for a period",
+      description:
+        "`?from=YYYY-MM-DD&to=YYYY-MM-DD` (both days included, Pakistan time, at most 366 days). bookings count by game day: courtFees, autoDiscounts, promo, points, hours, total, cash, online, unsplit (older bookings with one paid amount), wallet, received, due, hoursUsed, bySport, bySource, autoDiscountUse, promoUse, cancelled {count, toWallet, paidBack}. wallet: balanceNow (held by customers now), credited/debited by reason in the period. points: balanceNow, pkrPerPoint, byType. memberships: sold, revenue, activeNow, byPlan, byMethod (by sale date).",
+      security: sec,
+      parameters: [
+        { name: "from", in: "query", required: true, schema: { type: "string", example: "2026-11-01" } },
+        { name: "to", in: "query", required: true, schema: { type: "string", example: "2026-11-30" } },
+      ],
+      responses: { "200": { description: "OK" }, "400": { description: "VALIDATION_ERROR" }, "403": { description: "Super admin only" } },
+    },
+  },
+  "/api/v1/admin/reports/export": {
+    get: {
+      tags: ["Admin"],
+      summary: "Super admin: download a spreadsheet (CSV)",
+      description: "`?kind=bookings|payments|wallet|points|memberships&from=&to=`. A CSV file Excel opens (up to 20,000 rows). Bookings by game day; the rest by when they happened.",
+      security: sec,
+      parameters: [
+        { name: "kind", in: "query", required: true, schema: { type: "string", enum: ["bookings", "payments", "wallet", "points", "memberships"] } },
+        { name: "from", in: "query", required: true, schema: { type: "string" } },
+        { name: "to", in: "query", required: true, schema: { type: "string" } },
+      ],
+      responses: { "200": { description: "text/csv file" }, "400": { description: "VALIDATION_ERROR" }, "403": { description: "Super admin only" } },
+    },
+  },
   "/api/v1/admin/customers/{id}": {
     get: {
       tags: ["Admin"],
