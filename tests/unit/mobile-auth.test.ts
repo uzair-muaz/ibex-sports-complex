@@ -12,6 +12,7 @@ import {
   refreshTokenLifetimeDays,
 } from "@/lib/api/refresh-tokens";
 import { appleAudiences, nameFromAppleFullName } from "@/lib/api/apple";
+import { googleAudiences } from "@/lib/api/google";
 
 describe("toPkIso", () => {
   it("formats UTC instants in Pakistan time with +05:00", () => {
@@ -124,5 +125,41 @@ describe("apple helpers", () => {
     if (b === undefined) delete process.env.APPLE_BUNDLE_ID;
     else process.env.APPLE_BUNDLE_ID = b;
     if (s !== undefined) process.env.APPLE_SERVICE_ID = s;
+  });
+});
+
+describe("googleAudiences", () => {
+  const keys = [
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_SERVER_CLIENT_ID",
+    "GOOGLE_IOS_CLIENT_ID",
+    "GOOGLE_ANDROID_CLIENT_ID",
+  ] as const;
+
+  function withEnv(values: Partial<Record<(typeof keys)[number], string>>, run: () => void) {
+    const saved = keys.map((k) => process.env[k]);
+    keys.forEach((k) => delete process.env[k]);
+    Object.assign(process.env, values);
+    try {
+      run();
+    } finally {
+      keys.forEach((k, i) => {
+        if (saved[i] === undefined) delete process.env[k];
+        else process.env[k] = saved[i];
+      });
+    }
+  }
+
+  it("accepts the app's Web client alongside the website's own", () => {
+    withEnv(
+      { GOOGLE_CLIENT_ID: "website-web", GOOGLE_SERVER_CLIENT_ID: "app-web", GOOGLE_IOS_CLIENT_ID: "ios" },
+      () => expect(googleAudiences()).toEqual(["website-web", "app-web", "ios"]),
+    );
+  });
+
+  it("skips unset and blank values", () => {
+    withEnv({ GOOGLE_CLIENT_ID: " ", GOOGLE_ANDROID_CLIENT_ID: "android" }, () =>
+      expect(googleAudiences()).toEqual(["android"]),
+    );
   });
 });
