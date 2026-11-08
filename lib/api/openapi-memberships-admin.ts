@@ -114,6 +114,18 @@ export const membershipAdminPaths = {
       responses: { "200": { description: "`{items, total, nextCursor}`" }, "403": { description: "Super admin only" } },
     },
   },
+  "/api/v1/admin/customers/{id}/block": {
+    post: {
+      tags: ["Admin"],
+      summary: "Super admin: block or unblock a customer",
+      description:
+        "Body `{blocked: true, reason}` or `{blocked: false}`. Blocked: signed out of the app (refresh tokens cancelled, push phones removed), can't sign in on the app or website, and can't book with that account, email or phone (403 ACCOUNT_BLOCKED). Bookings, wallet and points stay; the reply's `upcomingBookings` says how many bookings are still coming up. Recorded in the audit log.",
+      security: sec,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      requestBody: { required: true, content: { "application/json": { example: { blocked: true, reason: "Did not show up 3 times" } } } },
+      responses: { "200": { description: "`{blocked, upcomingBookings?}`" }, "400": { description: "VALIDATION_ERROR" }, "403": { description: "Super admin only" }, "404": { description: "USER_NOT_FOUND" } },
+    },
+  },
   "/api/v1/admin/customers/{id}": {
     get: {
       tags: ["Admin"],

@@ -2,7 +2,7 @@ import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
 import { nameFromAppleFullName, verifyAppleIdentityToken } from "@/lib/api/apple";
-import { buildSignInResponse, isStaffUser, staffAccountError } from "@/lib/api/auth-session";
+import { blockedAccountError, isBlockedUser, buildSignInResponse, isStaffUser, staffAccountError } from "@/lib/api/auth-session";
 import { grantSignUpBonus } from "@/lib/loyalty-bonus";
 
 /**
@@ -73,6 +73,7 @@ export async function POST(request: Request) {
     }
 
     if (isStaffUser(user)) return staffAccountError(request);
+    if (isBlockedUser(user)) return blockedAccountError(request);
 
     return apiOk(await buildSignInResponse(user, { isNewAccount, request }), request);
   } catch (err) {

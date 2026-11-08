@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
-import { buildSignInResponse, isStaffUser, staffAccountError } from "@/lib/api/auth-session";
+import { blockedAccountError, isBlockedUser, buildSignInResponse, isStaffUser, staffAccountError } from "@/lib/api/auth-session";
 
 /**
  * Mobile email + password sign-in.
@@ -44,6 +44,7 @@ export async function POST(request: Request) {
     }
     // Checked after the password, so nobody can learn which emails are staff.
     if (isStaffUser(user)) return staffAccountError(request);
+    if (isBlockedUser(user)) return blockedAccountError(request);
 
     return apiOk(await buildSignInResponse(user, { isNewAccount: false, request }), request);
   } catch (err) {

@@ -5,6 +5,7 @@ import { verifyMobileAccessToken } from "@/lib/api/mobile-jwt";
 import type { ApiUser } from "@/lib/api/types";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
+import { BLOCKED_CODE, BLOCKED_MESSAGE } from "@/lib/customer-block-rules";
 
 function bearerToken(request: Request): string | null {
   const header = request.headers.get("authorization") || "";
@@ -15,7 +16,18 @@ function bearerToken(request: Request): string | null {
 async function userFromSession(): Promise<ApiUser | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
+  // Customers: check the block on every request (website sessions last a long time).
+  let blocked = false;
+  if (!isStaffRole(session.user.role)) {
+    try {
+      await connectDB();
+      blocked = !!(await User.exists({ _id: session.user.id, blockedAt: { $type: "date" } }));
+    } catch {
+      /* keep going */
+    }
+  }
   return {
+    blocked,
     id: session.user.id,
     email: session.user.email,
     name: session.user.name,
@@ -35,7 +47,7 @@ async function userFromBearer(request: Request): Promise<ApiUser | null> {
   try {
     await connectDB();
     const dbUser = await User.findById(claims.sub).select(
-      "email name role phone image",
+      "email name role phone image blockedAt",
     );
     if (!dbUser) return null;
     return {
@@ -45,6 +57,7 @@ async function userFromBearer(request: Request): Promise<ApiUser | null> {
       role: dbUser.role,
       phone: dbUser.phone,
       image: dbUser.image,
+      blocked: !!dbUser.blockedAt,
     };
   } catch {
     return {
@@ -82,6 +95,12 @@ export async function requireApiCustomer(request: Request) {
       response: apiError("Customer account required", 403, request, {
         code: "STAFF_ACCOUNT",
       }),
+    };
+  }
+  if (user.blocked) {
+    return {
+      ok: false as const,
+      response: apiError(BLOCKED_MESSAGE, 403, request, { code: BLOCKED_CODE }),
     };
   }
   return { ok: true as const, user };

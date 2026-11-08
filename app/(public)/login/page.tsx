@@ -4,6 +4,7 @@ import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { BLOCKED_MESSAGE } from "@/lib/customer-block-rules";
 import { Loader2 } from "lucide-react";
 import { registerCustomerRequest } from "@/lib/tanstack/requests/auth.requests";
 import {
@@ -53,7 +54,7 @@ function LoginContent() {
   const [password, setPassword] = useState("");
   const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [loadingEmail, setLoadingEmail] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(searchParams.get("error") === "AccountBlocked" ? BLOCKED_MESSAGE : "");
 
   const safeCallback = useMemo(
     () => (callbackUrl.startsWith("/") ? callbackUrl : "/account"),
@@ -116,7 +117,9 @@ function LoginContent() {
 
       if (result?.error) {
         setError(
-          mode === "signup"
+          result.code === "account_blocked"
+            ? BLOCKED_MESSAGE
+            : mode === "signup"
             ? "Account created, but sign-in failed. Try signing in."
             : "Invalid email or password.",
         );

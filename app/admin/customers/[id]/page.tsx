@@ -15,6 +15,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Space,
   Statistic,
   Table,
@@ -65,6 +66,8 @@ export default function CustomerPageView() {
   const [delta, setDelta] = useState<number | null>(null);
   const [pointsNote, setPointsNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [blockOpen, setBlockOpen] = useState(false);
+  const [blockReason, setBlockReason] = useState("");
 
   const key = ["admin", "customer", id];
   const query = useQuery({
@@ -93,6 +96,34 @@ export default function CustomerPageView() {
     }
   };
 
+  const setBlocked = async (blocked: boolean) => {
+    if (!data) return;
+    setBusy(true);
+    try {
+      const r = await bffFetch<{ blocked: boolean; upcomingBookings?: number }>(`/api/v1/admin/customers/${data.customer.id}/block`, {
+        method: "POST",
+        body: JSON.stringify({ blocked, reason: blockReason }),
+      });
+      if (blocked) {
+        message.success(
+          r.upcomingBookings
+            ? `Blocked. They have ${r.upcomingBookings} upcoming booking(s) — cancel them from the Bookings tab if needed.`
+            : "Blocked. They can't sign in or book now.",
+          8,
+        );
+      } else {
+        message.success("Unblocked. They can sign in and book again.");
+      }
+      setBlockOpen(false);
+      setBlockReason("");
+      refresh();
+    } catch (e) {
+      message.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (query.isPending) return <AdminPageLoader />;
 
   return (
@@ -106,6 +137,14 @@ export default function CustomerPageView() {
         <Alert type="error" showIcon title={(query.error as Error | null)?.message ?? "Customer not found"} />
       ) : (
         <Space orientation="vertical" size="large" className="w-full">
+          {data.customer.blocked && (
+            <Alert
+              type="error"
+              showIcon
+              title={`Blocked on ${when(data.customer.blocked.at)}${data.customer.blocked.by ? ` by ${data.customer.blocked.by}` : ""}`}
+              description={`Reason: ${data.customer.blocked.reason}. They can't sign in or book (with this account, email or phone).`}
+            />
+          )}
           <Card>
             <Descriptions size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
               <Descriptions.Item label="Phone">{data.customer.phone || "—"}</Descriptions.Item>
@@ -117,6 +156,16 @@ export default function CustomerPageView() {
               <Button onClick={() => setWalletOpen(true)}>Wallet</Button>
               <Button onClick={() => setPointsOpen(true)}>Adjust points</Button>
               <Button onClick={() => setHoursOpen(true)}>Membership hours</Button>
+              {isSuperAdmin &&
+                (data.customer.blocked ? (
+                  <Popconfirm title="Unblock this customer?" okText="Unblock" onConfirm={() => setBlocked(false)}>
+                    <Button loading={busy}>Unblock</Button>
+                  </Popconfirm>
+                ) : (
+                  <Button danger onClick={() => setBlockOpen(true)}>
+                    Block
+                  </Button>
+                ))}
             </Space>
           </Card>
 
@@ -283,6 +332,29 @@ export default function CustomerPageView() {
         }}
       />
       <HoursBankModal user={hoursOpen ? userRef : null} canEdit={isSuperAdmin} onClose={() => setHoursOpen(false)} onChanged={refresh} />
+      <Modal
+        title={`Block ${data?.customer.name ?? ""}?`}
+        open={blockOpen}
+        onCancel={() => setBlockOpen(false)}
+        onOk={() => setBlocked(true)}
+        okText="Block"
+        okButtonProps={{ danger: true, disabled: blockReason.trim().length < 3 }}
+        confirmLoading={busy}
+      >
+        <Space orientation="vertical" className="mt-4 w-full">
+          <Text>
+            They will be signed out of the app and can&apos;t sign in or book — on the app or website, with this account, email or
+            phone. Their bookings, wallet and points stay as they are. You can unblock them any time.
+          </Text>
+          <Input.TextArea
+            rows={2}
+            maxLength={300}
+            placeholder="Reason (staff only), e.g. Did not show up 3 times"
+            value={blockReason}
+            onChange={(e) => setBlockReason(e.target.value)}
+          />
+        </Space>
+      </Modal>
       <Modal
         title={`Adjust points — ${data?.customer.name ?? ""}`}
         open={pointsOpen}

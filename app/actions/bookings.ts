@@ -2,6 +2,8 @@
 
 import { closureSpansByCourt } from "@/lib/closures";
 import { auditBooking, bookingSnap } from "@/lib/audit-booking";
+import { isBookingBlocked } from "@/lib/customer-block";
+import { BLOCKED_MESSAGE } from "@/lib/customer-block-rules";
 import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 import Booking from '@/models/Booking';
@@ -227,6 +229,14 @@ export async function createBooking(
     // Validate phone number
     if (!input.userPhone || input.userPhone.trim().length === 0) {
       throw new Error('Phone number is required');
+    }
+    // Customers blocked by the super admin can't book (staff can still book for them).
+    const staffBooking = sessionRole === 'admin' || sessionRole === 'super_admin';
+    if (
+      !staffBooking &&
+      (await isBookingBlocked({ userId: sessionUserId ?? null, email: input.userEmail, phone: input.userPhone }))
+    ) {
+      throw new Error(BLOCKED_MESSAGE);
     }
 
     // Booking length from Admin → App Settings: customers pick one of the sport's

@@ -1,6 +1,6 @@
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
 import { verifyGoogleIdToken, findOrCreateGoogleUser } from "@/lib/api/google";
-import { buildSignInResponse, staffAccountError } from "@/lib/api/auth-session";
+import { blockedAccountError, isBlockedUser, buildSignInResponse, staffAccountError } from "@/lib/api/auth-session";
 
 /**
  * Flutter / mobile Google sign-in.
@@ -27,6 +27,7 @@ export async function POST(request: Request) {
   try {
     const { user, isNewAccount, isStaff } = await findOrCreateGoogleUser(info);
     if (isStaff) return staffAccountError(request);
+    if (isBlockedUser(user)) return blockedAccountError(request);
     return apiOk(await buildSignInResponse(user, { isNewAccount, request }), request);
   } catch (err) {
     console.error("POST /api/v1/auth/google:", err);

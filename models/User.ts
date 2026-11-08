@@ -24,6 +24,10 @@ export interface IUser extends Document {
     courtSide?: string | null;
     notifications?: { matchReminders?: boolean; paymentUpdates?: boolean; courtAvailability?: boolean; newsletter?: boolean };
   };
+  /** Blocked by the super admin: can't sign in or book. */
+  blockedAt?: Date | null;
+  blockedReason?: string | null;
+  blockedBy?: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -113,6 +117,10 @@ const UserSchema: Schema = new Schema(
       ),
       required: false,
     },
+    // Blocked by the super admin (lib/customer-block.ts).
+    blockedAt: { type: Date, default: null },
+    blockedReason: { type: String, default: null, maxlength: 300 },
+    blockedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
   },
   {
     timestamps: true,
@@ -121,6 +129,7 @@ const UserSchema: Schema = new Schema(
 
 UserSchema.index({ createdAt: -1 });
 UserSchema.index({ role: 1, name: 1 });
+UserSchema.index({ blockedAt: 1 }, { partialFilterExpression: { blockedAt: { $type: "date" } } });
 
 const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>("User", UserSchema);

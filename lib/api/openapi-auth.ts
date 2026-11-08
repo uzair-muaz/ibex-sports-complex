@@ -53,7 +53,7 @@ const json = (schema: Record<string, unknown>, example?: Record<string, unknown>
 });
 
 const staff = errorResponse(
-  "Staff / admin accounts cannot use the customer app",
+  "Staff / admin accounts cannot use the customer app (STAFF_ACCOUNT), or the super admin blocked this customer (ACCOUNT_BLOCKED: show the message and sign out)",
   "STAFF_ACCOUNT",
   "Staff accounts cannot sign in to the customer app. Please use the website admin panel.",
 );

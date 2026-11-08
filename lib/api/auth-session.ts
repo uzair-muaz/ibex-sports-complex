@@ -1,6 +1,7 @@
 import { decodeJwt } from "jose";
 import { isStaffRole } from "@/lib/authz";
 import { apiError } from "@/lib/api/response";
+import { BLOCKED_CODE, BLOCKED_MESSAGE } from "@/lib/customer-block-rules";
 import { signMobileAccessToken } from "@/lib/api/mobile-jwt";
 import { issueRefreshToken } from "@/lib/api/refresh-tokens";
 import { toMobileUser, type MobileUser, type MobileUserSource } from "@/lib/api/mobile-user";
@@ -34,6 +35,15 @@ export function staffAccountError(request: Request) {
     request,
     { code: "STAFF_ACCOUNT" },
   );
+}
+
+/** 403 for a customer the super admin blocked. */
+export function blockedAccountError(request: Request) {
+  return apiError(BLOCKED_MESSAGE, 403, request, { code: BLOCKED_CODE });
+}
+
+export function isBlockedUser(user: { blockedAt?: Date | null }) {
+  return !!user.blockedAt;
 }
 
 export function isStaffUser(user: { role?: string | null }) {

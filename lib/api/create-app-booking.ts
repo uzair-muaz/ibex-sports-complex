@@ -1,3 +1,5 @@
+import { isBookingBlocked } from "@/lib/customer-block";
+import { BLOCKED_CODE, BLOCKED_MESSAGE } from "@/lib/customer-block-rules";
 import crypto from "crypto";
 import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
@@ -168,6 +170,10 @@ export async function createAppBooking(params: {
     const g = validateGuest(body.guest);
     if (!g.ok) return fail(400, g.code, g.error);
     contact = g.contact;
+  }
+  // Blocked by the super admin (by account, email or phone).
+  if (await isBookingBlocked({ userId: contact.userId, email: contact.email, phone: contact.phone })) {
+    return fail(403, BLOCKED_CODE, BLOCKED_MESSAGE);
   }
 
   // 2. Same Idempotency-Key again? Return the first booking (before checking

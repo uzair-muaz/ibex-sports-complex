@@ -2,7 +2,7 @@ import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
 import { consumeRefreshToken } from "@/lib/api/refresh-tokens";
-import { buildSignInResponse, isStaffUser, staffAccountError } from "@/lib/api/auth-session";
+import { blockedAccountError, isBlockedUser, buildSignInResponse, isStaffUser, staffAccountError } from "@/lib/api/auth-session";
 
 /**
  * Swap a refresh token for a new access token AND a new refresh token.
@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       return apiError("Please sign in again.", 401, request, { code: "REFRESH_EXPIRED" });
     }
     if (isStaffUser(user)) return staffAccountError(request);
+    if (isBlockedUser(user)) return blockedAccountError(request);
 
     return apiOk(await buildSignInResponse(user, { isNewAccount: false, request }), request);
   } catch (err) {

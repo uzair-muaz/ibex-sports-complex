@@ -90,7 +90,8 @@ export async function buildCustomerPage(userId: string) {
   if (!mongoose.isValidObjectId(userId)) return null;
   await connectDB();
   const user = await User.findById(userId)
-    .select("name email phone city role createdAt googleId appleId password")
+    .select("name email phone city role createdAt googleId appleId password blockedAt blockedReason blockedBy")
+    .populate("blockedBy", "name")
     .lean();
   if (!user || isStaffRole(user.role)) return null;
 
@@ -121,6 +122,13 @@ export async function buildCustomerPage(userId: string) {
       phone: user.phone ?? null,
       city: user.city ?? null,
       joined: toPkIso(user.createdAt),
+      blocked: user.blockedAt
+        ? {
+            at: toPkIso(user.blockedAt),
+            reason: user.blockedReason ?? "",
+            by: (user.blockedBy as unknown as { name?: string } | null)?.name ?? null,
+          }
+        : null,
       signIn: [user.password ? "Email" : null, user.googleId ? "Google" : null, user.appleId ? "Apple" : null].filter(
         (v): v is string => !!v,
       ),

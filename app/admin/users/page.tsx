@@ -224,11 +224,18 @@ export default function UsersPage() {
       dataIndex: "name",
       key: "name",
       minWidth: 120,
-      render: (name: string, user: { _id: string; role: string }) =>
+      render: (name: string, user: { _id: string; role: string; blockedAt?: string | null }) =>
         user.role === "user" ? (
-          <Link href={`/admin/customers/${user._id}`} className="font-medium">
-            {name}
-          </Link>
+          <span>
+            <Link href={`/admin/customers/${user._id}`} className="font-medium">
+              {name}
+            </Link>
+            {user.blockedAt && (
+              <Tag color="red" className="ml-2">
+                Blocked
+              </Tag>
+            )}
+          </span>
         ) : (
           <span className="font-medium">{name}</span>
         ),
