@@ -98,6 +98,7 @@ export function EditBookingForm({
           label="Status"
           name="status"
           rules={[{ required: true, message: "Please select a status" }]}
+          extra="Cancelled gives the money paid back to the customer's wallet (guests: marked as paid back by cash or bank). To keep the money, use Cancel in the bookings list."
         >
           <Select
             options={[

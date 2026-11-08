@@ -646,8 +646,9 @@ export default function BookingClient() {
           />
           <div className="mb-6 rounded-2xl border border-[#2DD4BF]/40 bg-[#2DD4BF]/10 px-4 py-3 text-sm text-zinc-200">
             {advancePercent !== null ? `A ${advancePercent}% advance payment` : "An advance payment"} is required to confirm bookings. Reservations
-            without advance may be cancelled. All advance payments are
-            non-refundable.
+            without advance may be cancelled. If you cancel in time from
+            your account, what you paid goes to your IBEX wallet for your
+            next booking.
             {!isCustomerLoggedIn ? (
               <>
                 {" "}

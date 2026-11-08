@@ -95,7 +95,7 @@ export function generateBookingConfirmationEmail(data: BookingEmailData): string
                 Please pay <strong>${typeof data.advancePercent === 'number' ? `${data.advancePercent}% advance` : 'the advance'}</strong> to confirm your slot. Bookings without advance may be cancelled.
               </p>
               <p style="margin: 0 0 30px 0; font-size: 13px; line-height: 1.6; color: #a1a1aa;">
-                <strong style="color: #e4e4e7;">Please note:</strong> Advance payments are <strong style="color: #e4e4e7;">non-refundable</strong> once made.
+                <strong style="color: #e4e4e7;">Please note:</strong> If you cancel in time from your IBEX account, what you paid goes to your <strong style="color: #e4e4e7;">IBEX wallet</strong> for your next booking.
               </p>
 
               <!-- Booking Details Card -->

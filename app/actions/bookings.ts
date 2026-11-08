@@ -16,6 +16,7 @@ import { safeRevalidatePath } from '@/lib/safe-revalidate';
 import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
 import { acquireSlotLocks, releaseSlotLocks } from '@/lib/booking-locks';
+import { staffCancelBooking, type StaffRefundChoice } from '@/lib/staff-cancel';
 import { nextBookingSerial } from '@/lib/booking-serial';
 import {
   getApplicableDiscounts,
@@ -28,7 +29,6 @@ import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from '@/lib/date-time';
 import {
   awardLoyaltyForCompletedBooking,
   redeemLoyaltyPoints,
-  refundLoyaltyForBooking,
 } from '@/lib/loyalty';
 import {
   HOURS_REASON_TEXT,
@@ -36,10 +36,8 @@ import {
   hoursCover,
   loadMembershipForHours,
   putBackSportHours,
-  returnHoursForBooking,
   takeSportHours,
 } from '@/lib/membership-hours';
-import { notifyBookingCancelled } from '@/lib/notifications/events';
 import { bookingLengthError } from '@/lib/booking-length';
 import { getAppSettings } from '@/lib/app-settings';
 
@@ -922,47 +920,30 @@ export async function getBookingsPaginated(input: GetBookingsPaginatedInput, opt
   }
 }
 
-export async function cancelBooking(bookingId: string, opts?: StaffActorOpts) {
+export async function cancelBooking(
+  bookingId: string,
+  opts?: StaffActorOpts,
+  refund?: { choice?: StaffRefundChoice; note?: string },
+) {
   try {
     const gate = await requireStaffActor(opts);
     if (!gate.ok) return { success: false, error: gate.error };
-    await connectDB();
-
-    const booking = await Booking.findById(bookingId);
-    if (!booking) {
-      throw new Error('Booking not found');
-    }
-    if (booking.status === 'cancelled') {
-      return {
-        success: true,
-        booking: JSON.parse(JSON.stringify(booking)),
-      };
-    }
-
-    booking.status = 'cancelled';
-    await booking.save();
-
-    await refundLoyaltyForBooking(bookingId);
-
-    // Gives the hours back to the right sport, once.
-    await returnHoursForBooking(bookingId);
-    await notifyBookingCancelled({ bookingId, by: "venue" });
+    const result = await staffCancelBooking({ bookingId, staffId: gate.userId, refund: refund?.choice, note: refund?.note });
+    if (!result.ok) return { success: false, error: result.error };
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');
     safeRevalidatePath('/account/bookings');
-    scheduleAnalyticsDailyRebuild([booking.date]);
-
+    const booking = await Booking.findById(bookingId).lean();
+    if (booking) scheduleAnalyticsDailyRebuild([booking.date]);
     return {
       success: true,
       booking: JSON.parse(JSON.stringify(booking)),
+      refund: result,
     };
   } catch (error: any) {
     console.error('Cancel booking error:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to cancel booking',
-    };
+    return { success: false, error: error.message || 'Failed to cancel booking' };
   }
 }
 
@@ -981,6 +962,10 @@ export interface UpdateBookingInput {
   amountPaid?: number;
   amountReceivedOnline?: number;
   amountReceivedCash?: number;
+  /** With status "cancelled": what to give back (wallet, paid_back, none). Default: wallet (guests: paid_back). */
+  cancelRefund?: StaffRefundChoice;
+  /** With status "cancelled": reason (needed when the money is kept). */
+  cancelNote?: string;
 }
 
 export async function updateBooking(input: UpdateBookingInput, opts?: StaffActorOpts) {
@@ -989,10 +974,24 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
-    const { bookingId, ...updateData } = input;
-    const existingForRollup = await Booking.findById(bookingId).select("date status").lean();
+    const { bookingId, cancelRefund, cancelNote, ...updateData } = input;
+
+    // Cancelling goes through the shared staff cancel, so money, points and hours come back the same way.
+    if (updateData.status === 'cancelled') {
+      const cancelled = await staffCancelBooking({ bookingId, staffId: gate.userId, refund: cancelRefund, note: cancelNote });
+      if (!cancelled.ok) return { success: false, error: cancelled.error };
+      delete updateData.status;
+      const others = Object.values(updateData).some((v) => v !== undefined);
+      if (!others) {
+        safeRevalidatePath('/admin');
+        safeRevalidatePath('/booking');
+        safeRevalidatePath('/account/bookings');
+        const fresh = await Booking.findById(bookingId).populate('courtId');
+        return { success: true, booking: JSON.parse(JSON.stringify(fresh)), refund: cancelled };
+      }
+    }
+    const existingForRollup = await Booking.findById(bookingId).select("date").lean();
     const previousDate = existingForRollup?.date as string | undefined;
-    const previousStatus = existingForRollup?.status as string | undefined;
 
     // If email is provided, lowercase it
     if (updateData.userEmail) {
@@ -1122,16 +1121,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
       );
     }
 
-    // Staff cancelled it: give membership hours back to the right sport (only once).
-    if (updatedBooking.status === 'cancelled') {
-      await returnHoursForBooking(updatedBooking._id).catch((err) =>
-        console.error('Membership hours return error:', err),
-      );
-      // Only when staff just changed it to cancelled; sent once per booking.
-      if (previousStatus && previousStatus !== 'cancelled') {
-        await notifyBookingCancelled({ bookingId: updatedBooking._id, by: 'venue' });
-      }
-    }
+    // Cancelling was handled above by staffCancelBooking (money, points, hours, message).
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');

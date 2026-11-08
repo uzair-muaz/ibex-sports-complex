@@ -460,6 +460,7 @@ export default function DiscountsPage() {
       onRefresh={() => discountsQuery.refetch()}
       isLoading={isRefreshing}
       actionButton={
+        isSuperAdmin && (
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -471,6 +472,7 @@ export default function DiscountsPage() {
         >
           <span className="hidden sm:inline">Add Discount</span>
         </Button>
+        )
       }
     >
       {isInitialLoading ? (
@@ -486,6 +488,7 @@ export default function DiscountsPage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onToggleActive={handleToggleActive}
+          canEdit={isSuperAdmin}
         />
       )}
 

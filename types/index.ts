@@ -74,6 +74,8 @@ export interface Booking {
   usedGuestPass?: boolean;
   totalPrice: number;
   amountPaid: number;
+  /** Wallet credit used to pay for this booking. */
+  walletCreditUsed?: number;
   amountReceivedOnline?: number;
   amountReceivedCash?: number;
   createdAt: string;

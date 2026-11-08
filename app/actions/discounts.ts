@@ -333,7 +333,7 @@ export interface CreateDiscountInput {
 
 export async function createDiscount(input: CreateDiscountInput, opts?: StaffActorOpts) {
   try {
-    const gate = await requireStaffActor(opts);
+    const gate = await requireStaffActor(opts, { superAdmin: true });
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
@@ -474,7 +474,7 @@ export interface UpdateDiscountInput {
 
 export async function updateDiscount(input: UpdateDiscountInput, opts?: StaffActorOpts) {
   try {
-    const gate = await requireStaffActor(opts);
+    const gate = await requireStaffActor(opts, { superAdmin: true });
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
@@ -659,7 +659,7 @@ export async function updateDiscount(input: UpdateDiscountInput, opts?: StaffAct
 
 export async function deleteDiscount(discountId: string, opts?: StaffActorOpts) {
   try {
-    const gate = await requireStaffActor(opts);
+    const gate = await requireStaffActor(opts, { superAdmin: true });
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
@@ -687,7 +687,7 @@ export async function deleteDiscount(discountId: string, opts?: StaffActorOpts) 
 
 export async function toggleDiscountActive(discountId: string, opts?: StaffActorOpts) {
   try {
-    const gate = await requireStaffActor(opts);
+    const gate = await requireStaffActor(opts, { superAdmin: true });
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
