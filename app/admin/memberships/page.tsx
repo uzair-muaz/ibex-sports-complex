@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -102,7 +104,11 @@ export default function AdminMembershipsPage() {
   });
 
   const columns: ColumnsType<MembershipRosterRow> = [
-    { title: "Name", dataIndex: "name" },
+    {
+      title: "Name",
+      dataIndex: "name",
+      render: (name: string, row) => <Link href={`/admin/customers/${row._id}`}>{name}</Link>,
+    },
     { title: "Email", dataIndex: "email" },
     {
       title: "Plan",

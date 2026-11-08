@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -222,7 +224,14 @@ export default function UsersPage() {
       dataIndex: "name",
       key: "name",
       minWidth: 120,
-      render: (name: string) => <span className="font-medium">{name}</span>,
+      render: (name: string, user: { _id: string; role: string }) =>
+        user.role === "user" ? (
+          <Link href={`/admin/customers/${user._id}`} className="font-medium">
+            {name}
+          </Link>
+        ) : (
+          <span className="font-medium">{name}</span>
+        ),
     },
     {
       title: <SortTitle column="email" label="Email" />,

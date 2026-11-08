@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import React from "react";
 import { Button, Select, Space, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -74,7 +76,13 @@ export function getBookingTableColumns(
       render: (_, booking) => (
         <div>
           <div className="font-medium text-[var(--ant-color-text)]">
-            {booking.userName}
+            {booking.userId ? (
+              <Link href={`/admin/customers/${booking.userId}`} onClick={(e) => e.stopPropagation()}>
+                {booking.userName}
+              </Link>
+            ) : (
+              booking.userName
+            )}
           </div>
           <Text
             type="secondary"
