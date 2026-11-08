@@ -2,7 +2,7 @@
 
 import { CheckOutlined } from "@ant-design/icons";
 import type { Court, CourtPricingPeriod } from "@/types";
-import { getPricePerHourForTime } from "@/lib/pricing-utils";
+import { getPricePerHourForTime, priceUnit } from "@/lib/pricing-utils";
 import { cn } from "@/lib/utils";
 
 export type AdminSelectedSlot = { courtId: string; slotTime: number };
@@ -131,7 +131,7 @@ export function AdminCourtSlotCards({
                     <span className="font-semibold text-[var(--ant-color-text-secondary)]">
                       {period.label === "peak" ? "Peak" : "Off-peak"}
                     </span>
-                    : PKR {period.pricePerHour.toLocaleString()}/hr
+                    : PKR {period.pricePerHour.toLocaleString()}{priceUnit(court.type).short}
                     {period.weekendPricePerHour != null && ` (Sat–Sun PKR ${period.weekendPricePerHour.toLocaleString()})`}{" "}
                     <span className="text-[var(--ant-color-text-secondary)]">
                       ({formatPeriodTime(period)})
@@ -141,8 +141,8 @@ export function AdminCourtSlotCards({
               </div>
             ) : (
               <p className="text-sm text-[var(--ant-color-primary)] font-semibold">
-                PKR {court.pricePerHour.toLocaleString()}/hr
-                {court.weekendPricePerHour != null && ` · Sat–Sun PKR ${court.weekendPricePerHour.toLocaleString()}/hr`}
+                PKR {court.pricePerHour.toLocaleString()}{priceUnit(court.type).short}
+                {court.weekendPricePerHour != null && ` · Sat–Sun PKR ${court.weekendPricePerHour.toLocaleString()}${priceUnit(court.type).short}`}
               </p>
             )}
           </div>

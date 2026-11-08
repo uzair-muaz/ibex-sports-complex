@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateOriginalPrice, getPricePerHourForTime, isWeekendSlot } from "@/lib/pricing-utils";
+import { calculateOriginalPrice, getPricePerHourForTime, isWeekendSlot, priceUnit } from "@/lib/pricing-utils";
 import { startingPricePerHour } from "@/lib/api/catalog";
 import { calculateDiscountedPrice, type DiscountInput } from "@/lib/discount-utils";
 
@@ -72,5 +72,12 @@ describe("weekend prices", () => {
     } as unknown as DiscountInput;
     const { finalPrice } = calculateDiscountedPrice(4500, [discount], { court: split, startTime: 10, duration: 1, date: SAT });
     expect(finalPrice).toBe(4050);
+  });
+});
+
+describe("price unit labels", () => {
+  it("Futsal prices are per 90 minutes, others per hour", () => {
+    expect(priceUnit("FUTSAL")).toEqual({ long: "Per 90 Min", short: "/90 min" });
+    expect(priceUnit("PADEL").short).toBe("/hr");
   });
 });

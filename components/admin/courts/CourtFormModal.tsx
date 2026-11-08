@@ -24,6 +24,7 @@ import {
   type CourtFormState,
 } from "./courtHelpers";
 import { COURT_FEATURE_LABELS } from "@/lib/court-features";
+import { priceUnit } from "@/lib/pricing-utils";
 
 const { Text } = Typography;
 
@@ -51,6 +52,9 @@ export function CourtFormModal({
   onClose,
   onSubmit,
 }: CourtFormModalProps) {
+  // Futsal prices are saved per 90 minutes, other sports per hour.
+  const unit = priceUnit(courtForm.type);
+
   const addPricingPeriod = (label: PricingLabel) => {
     setCourtForm((prev) => appendPricingPeriod(prev, label));
   };
@@ -119,7 +123,7 @@ export function CourtFormModal({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Form.Item
-            label="Base Price Per Hour (PKR)"
+            label={`Base Price ${unit.long} (PKR)`}
             required
             extra={
               <Text type="secondary" className="text-[11px]">
@@ -144,7 +148,7 @@ export function CourtFormModal({
             />
           </Form.Item>
           <Form.Item
-            label="Weekend Price Per Hour (Sat–Sun)"
+            label={`Weekend Price ${unit.long} (Sat–Sun)`}
             extra={
               <Text type="secondary" className="text-[11px]">
                 Leave empty to charge the base price on weekends too.
@@ -253,7 +257,7 @@ export function CourtFormModal({
                           />
                         </Form.Item>
 
-                        <Form.Item label="Price / Hour (PKR)" className="mb-0">
+                        <Form.Item label={`Price ${unit.long} (PKR)`} className="mb-0">
                           <InputNumber
                             className="w-full"
                             size="small"
@@ -268,7 +272,7 @@ export function CourtFormModal({
                           />
                         </Form.Item>
 
-                        <Form.Item label="Weekend Price / Hour (Sat–Sun)" className="mb-0">
+                        <Form.Item label={`Weekend Price ${unit.long} (Sat–Sun)`} className="mb-0">
                           <InputNumber
                             className="w-full"
                             size="small"

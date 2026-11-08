@@ -11,6 +11,14 @@ export interface CourtLike {
   type?: CourtType;
 }
 
+/**
+ * What a saved court price covers. Futsal is sold in 90-minute games, so its
+ * price is saved per 90 minutes; every other sport is saved per hour.
+ */
+export function priceUnit(type: CourtType | string | undefined): { long: string; short: string } {
+  return type === "FUTSAL" ? { long: "Per 90 Min", short: "/90 min" } : { long: "Per Hour", short: "/hr" };
+}
+
 function plainCourt(court: CourtLike | (CourtLike & { toObject?: (o?: object) => CourtLike })): CourtLike {
   if (court && typeof court === "object" && typeof (court as { toObject?: () => CourtLike }).toObject === "function") {
     return (court as { toObject: (o?: object) => CourtLike }).toObject({
