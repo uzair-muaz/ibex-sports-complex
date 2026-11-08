@@ -1,10 +1,13 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useVenue } from '@/lib/tanstack/hooks/queries';
+import { waHref } from '@/lib/venue-rules';
 
 export const WhatsAppFloat = () => {
-  const phoneNumber = '+923255429429';
-  const whatsappUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}`;
+  // WhatsApp number from Admin → App Settings.
+  const whatsappUrl = waHref(useVenue().whatsApp);
+  if (!whatsappUrl) return null;
 
   return (
     <motion.a

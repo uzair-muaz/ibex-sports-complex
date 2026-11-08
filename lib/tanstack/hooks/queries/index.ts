@@ -21,4 +21,5 @@ export {
   useMyMembershipQuery as useMyMembership,
   useMySupportTicketsQuery as useMySupportTickets,
 } from "./use-account.queries";
+export { useVenueQuery as useVenue } from "./use-venue.query";
 export { getQueryLoadingState } from "./use-query-loading-state";

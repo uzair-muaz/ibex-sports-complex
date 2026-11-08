@@ -6,6 +6,7 @@ import AppSettings, {
   type IVenueSetting,
   type SportKey,
 } from "@/models/AppSettings";
+import { DEFAULT_VENUE, isWebLink, type VenueInfo } from "@/lib/venue-rules";
 
 /** Settings after defaults are filled in. Every field is present. */
 export type SportRules = {
@@ -20,19 +21,7 @@ export type SportRules = {
   sortOrder: number;
 };
 
-export type VenueInfo = {
-  name: string;
-  branchName: string;
-  hoursLabel: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-  phone: string;
-  whatsApp: string;
-  email: string;
-  facilityNote: string | null;
-  weatherSummary: string | null;
-};
+export type { VenueInfo };
 
 export type LoyaltyRules = {
   earnBasis: "per_pkr" | "per_hour";
@@ -100,20 +89,8 @@ export function minDurationMinutesFor(_sport: SportKey): number {
 
 /** Today's values, taken from what the website already shows and allows. */
 export const DEFAULT_APP_SETTINGS: ResolvedAppSettings = {
-  venue: {
-    name: "IBEX Sports Complex",
-    branchName: "IBEX Islamabad",
-    hoursLabel: "Open 24 hours",
-    address:
-      "Ibex Sports Complex, Toot Stop Near Orchid Marquee, Wild Life Park Road, Main Islamabad Expy, Islamabad, 42700",
-    latitude: 33.5849499,
-    longitude: 73.1439709,
-    phone: "+923255429429",
-    whatsApp: "+923255429429",
-    email: "ibexsportscomplex@gmail.com",
-    facilityNote: null,
-    weatherSummary: null,
-  },
+  venue: { ...DEFAULT_VENUE },
+
   sports: [
     {
       sport: "PADEL",
@@ -214,6 +191,10 @@ export function resolveAppSettings(stored: StoredSettings | null | undefined): R
     phone: pick(v.phone, d.venue.phone),
     whatsApp: pick(v.whatsApp, d.venue.whatsApp),
     email: pick(v.email, d.venue.email),
+    // Links: an empty value means "hide it" (map link falls back to the pin).
+    mapUrl: v.mapUrl === undefined ? d.venue.mapUrl : v.mapUrl || null,
+    instagramUrl: v.instagramUrl === undefined ? d.venue.instagramUrl : v.instagramUrl || null,
+    facebookUrl: v.facebookUrl === undefined ? d.venue.facebookUrl : v.facebookUrl || null,
     // Optional notes: an empty value means "show nothing".
     facilityNote: v.facilityNote === undefined ? d.venue.facilityNote : v.facilityNote || null,
     weatherSummary:
@@ -326,6 +307,9 @@ export function validateSettingsPatch(input: unknown): CheckResult {
       ["phone", 30, true],
       ["whatsApp", 30, true],
       ["email", 120, true],
+      ["mapUrl", 300, false],
+      ["instagramUrl", 300, false],
+      ["facebookUrl", 300, false],
       ["facilityNote", 120, false],
       ["weatherSummary", 60, false],
     ];
@@ -343,6 +327,10 @@ export function validateSettingsPatch(input: unknown): CheckResult {
     }
     if (venue.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(venue.email)) {
       return { ok: false, error: "Venue email is not valid." };
+    }
+    for (const key of ["mapUrl", "instagramUrl", "facebookUrl"] as const) {
+      const link = venue[key];
+      if (link && !isWebLink(link)) return { ok: false, error: `${key} must be a web link starting with https://` };
     }
     for (const [key, min, max] of [["latitude", -90, 90], ["longitude", -180, 180]] as const) {
       if (v[key] === undefined) continue;

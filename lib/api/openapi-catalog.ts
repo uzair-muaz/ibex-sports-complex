@@ -25,6 +25,9 @@ const venueExample = {
   phone: "+923255429429",
   whatsApp: "+923255429429",
   email: "ibexsportscomplex@gmail.com",
+  mapUrl: "https://maps.app.goo.gl/4SJSmPKZHhHhF3tMA?g_st=ic",
+  instagramUrl: "https://www.instagram.com/ibexsportscomplex",
+  facebookUrl: null,
   facilityNote: "Night slots now open",
   weatherSummary: null,
 };

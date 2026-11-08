@@ -7,7 +7,18 @@
 
 import { Resend } from 'resend';
 import { SESClient, SendEmailCommand, SendRawEmailCommand } from '@aws-sdk/client-ses';
+import { getAppSettings } from './app-settings';
 import { generateBookingConfirmationEmail, BookingEmailData, AppliedDiscountEmail } from './email-templates/booking-confirmation';
+
+/** Phone and email for the email footer, from Admin → App Settings. */
+async function venueContact(): Promise<{ email: string; phone: string } | undefined> {
+  try {
+    const { venue } = await getAppSettings();
+    return { email: venue.email, phone: venue.phone };
+  } catch {
+    return undefined; // the template falls back to today's contacts
+  }
+}
 
 // QR Code generation
 let QRCode: any;
@@ -145,6 +156,7 @@ async function sendViaResend(
       totalPrice: data.totalPrice,
       bookingId: data.bookingId,
       advancePercent: (data as { advancePercent?: number }).advancePercent,
+      contact: await venueContact(),
       entryVerificationUrl,
       feedbackUrl,
       entryQRCode, // Data URL for inline display
@@ -237,6 +249,7 @@ async function sendViaSES(
       totalPrice: data.totalPrice,
       bookingId: data.bookingId,
       advancePercent: (data as { advancePercent?: number }).advancePercent,
+      contact: await venueContact(),
       entryVerificationUrl,
       feedbackUrl,
       entryQRCode: 'cid:entry-qr-code',

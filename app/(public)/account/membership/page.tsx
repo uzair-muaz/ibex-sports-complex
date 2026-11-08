@@ -1,14 +1,16 @@
 "use client";
 
-import { useMyMembership } from "@/lib/tanstack/hooks/queries";
+import { useMyMembership, useVenue } from "@/lib/tanstack/hooks/queries";
+import { waHref } from "@/lib/venue-rules";
 import { Button } from "@/components/ui/button";
 import { Loader2, MessageCircle } from "lucide-react";
 
-const WHATSAPP_URL = "https://wa.me/923255429429";
 const SPORT: Record<string, string> = { PADEL: "Padel", PICKLEBALL: "Pickleball", FUTSAL: "Futsal", CRICKET: "Cricket" };
 
 export default function MembershipPage() {
   const membershipQuery = useMyMembership();
+  // WhatsApp number from Admin → App Settings.
+  const WHATSAPP_URL = waHref(useVenue().whatsApp) ?? "";
   const membership = membershipQuery.data?.membership as {
     planId?: { name?: string };
     hoursRemaining?: number;

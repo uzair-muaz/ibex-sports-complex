@@ -29,6 +29,9 @@ export interface IVenueSetting {
   phone?: string;
   whatsApp?: string;
   email?: string;
+  mapUrl?: string | null;
+  instagramUrl?: string | null;
+  facebookUrl?: string | null;
   facilityNote?: string | null;
   weatherSummary?: string | null;
 }
@@ -97,6 +100,10 @@ const VenueSettingSchema = new Schema<IVenueSetting>(
     phone: { type: String, trim: true, maxlength: 30 },
     whatsApp: { type: String, trim: true, maxlength: 30 },
     email: { type: String, trim: true, maxlength: 120 },
+    // No default: missing means "use today's link", null means "hide".
+    mapUrl: { type: String, trim: true, maxlength: 300 },
+    instagramUrl: { type: String, trim: true, maxlength: 300 },
+    facebookUrl: { type: String, trim: true, maxlength: 300 },
     facilityNote: { type: String, trim: true, maxlength: 120, default: null },
     weatherSummary: { type: String, trim: true, maxlength: 60, default: null },
   },

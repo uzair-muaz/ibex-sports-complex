@@ -207,6 +207,25 @@ export default function AdminAppSettingsPage() {
                   onChange={(v) => typeof v === "number" && setVenue("longitude", v)}
                 />
               </Form.Item>
+              <Form.Item label="Google Maps link" extra={<Text type="secondary">Leave empty to use the pin above.</Text>}>
+                <Input
+                  placeholder="https://maps.app.goo.gl/…"
+                  value={draft.venue.mapUrl ?? ""}
+                  onChange={(e) => setVenue("mapUrl", e.target.value || null)}
+                />
+              </Form.Item>
+              <Form.Item label="Instagram link" extra={<Text type="secondary">Leave empty to hide the icon.</Text>}>
+                <Input
+                  value={draft.venue.instagramUrl ?? ""}
+                  onChange={(e) => setVenue("instagramUrl", e.target.value || null)}
+                />
+              </Form.Item>
+              <Form.Item label="Facebook link" extra={<Text type="secondary">Leave empty to hide the icon.</Text>}>
+                <Input
+                  value={draft.venue.facebookUrl ?? ""}
+                  onChange={(e) => setVenue("facebookUrl", e.target.value || null)}
+                />
+              </Form.Item>
             </div>
             <Form.Item label="Address">
               <Input.TextArea
