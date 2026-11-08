@@ -83,6 +83,7 @@ export async function POST(request: Request) {
         planId: body.planId,
         carryForwardHours: body.carryForwardHours,
         hoursBySport: Array.isArray(body.hoursBySport) ? body.hoursBySport : undefined,
+        payment: body.payment,
       },
       staffOpts,
     );

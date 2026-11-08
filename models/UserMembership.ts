@@ -2,6 +2,9 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export type UserMembershipStatus = "active" | "expired" | "cancelled";
 
+import { MEMBERSHIP_PAYMENT_METHODS, type MembershipPaymentMethod } from "@/lib/membership-payment";
+export { MEMBERSHIP_PAYMENT_METHODS, type MembershipPaymentMethod };
+
 export interface IUserMembership extends Document {
   userId: mongoose.Types.ObjectId;
   planId: mongoose.Types.ObjectId;
@@ -13,6 +16,12 @@ export interface IUserMembership extends Document {
   validFrom: Date;
   validUntil: Date;
   status: UserMembershipStatus;
+  /** What the customer paid for the plan (recorded by staff at activation). */
+  pricePaid?: number | null;
+  paymentMethod?: MembershipPaymentMethod | null;
+  paymentNote?: string;
+  activatedBy?: mongoose.Types.ObjectId | null;
+  cancelledAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +60,11 @@ const UserMembershipSchema = new Schema(
       default: "active",
       index: true,
     },
+    pricePaid: { type: Number, min: 0, default: null },
+    paymentMethod: { type: String, enum: MEMBERSHIP_PAYMENT_METHODS, default: null },
+    paymentNote: { type: String, trim: true, maxlength: 300, default: "" },
+    activatedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    cancelledAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

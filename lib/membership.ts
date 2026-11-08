@@ -5,7 +5,8 @@
  */
 import connectDB from "@/lib/mongodb";
 import MembershipPlan from "@/models/MembershipPlan";
-import UserMembership from "@/models/UserMembership";
+import UserMembership, { type MembershipPaymentMethod } from "@/models/UserMembership";
+import MembershipHoursChange from "@/models/MembershipHoursChange";
 import { cleanHoursBySport } from "@/lib/membership-plans";
 import { MEMBERSHIP_VALIDITY_DAYS } from "@/lib/membership-rules";
 import { getAppSettings } from "@/lib/app-settings";
@@ -36,6 +37,10 @@ export async function activateMembership(params: {
   carryForwardHours?: boolean;
   /** Staff can change the hours per sport for this customer (defaults to the plan's). */
   hoursBySport?: { sport: string; hours: number }[];
+  /** What the customer paid, recorded by staff (optional). */
+  payment?: { pricePaid: number; method: MembershipPaymentMethod; note?: string } | null;
+  /** Staff member who activated it. */
+  byUserId?: string | null;
 }) {
   await connectDB();
   const plan = await MembershipPlan.findById(params.planId);
@@ -54,6 +59,7 @@ export async function activateMembership(params: {
     throw new Error("This plan has no hours per sport yet. Set them in Plans first.");
   }
 
+  let replaced: typeof existing = null;
   // Unused hours of the same sport carry over (old one-pool hours don't).
   const carry = new Map<string, number>();
   if (existing) {
@@ -67,7 +73,9 @@ export async function activateMembership(params: {
       }
     }
     existing.status = "cancelled";
+    existing.cancelledAt = now;
     await existing.save();
+    replaced = existing;
   }
 
   const rows: { sport: string; total: number; remaining: number }[] = base.map((h) => {
@@ -89,7 +97,30 @@ export async function activateMembership(params: {
     validFrom: now,
     validUntil,
     status: "active",
+    pricePaid: params.payment?.pricePaid ?? null,
+    paymentMethod: params.payment?.method ?? null,
+    paymentNote: params.payment?.note ?? "",
+    activatedBy: params.byUserId ?? null,
   });
+
+  // History: the plan's hours, then any hours carried over. Never fails the activation.
+  const carried = new Map(rows.map((r) => [r.sport, r.total - (base.find((b) => b.sport === r.sport)?.hours ?? 0)]));
+  const history = [
+    ...(replaced ? [{ type: "cancelled" as const, sport: null, hours: 0, note: `Replaced by ${plan.name}`, membershipId: replaced._id }] : []),
+    ...base.map((b) => ({ type: "activated" as const, sport: b.sport, hours: b.hours, note: plan.name })),
+    ...[...carried].filter(([, h]) => h > 0).map(([sport, h]) => ({ type: "carried_over" as const, sport, hours: h, note: "Unused hours from the last plan" })),
+  ];
+  await MembershipHoursChange.insertMany(
+    history.map((h) => ({
+      membershipId: membership._id,
+      ...h,
+      userId: params.userId,
+      // After the plan's hours, then after the carried hours are added on top.
+      remainingAfter:
+        h.type === "cancelled" ? null : h.type === "activated" ? h.hours : (rows.find((r) => r.sport === h.sport)?.remaining ?? null),
+      byUserId: params.byUserId ?? null,
+    })),
+  ).catch((err) => console.error("Membership history write failed:", err));
 
   return membership;
 }

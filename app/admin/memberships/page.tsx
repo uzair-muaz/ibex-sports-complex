@@ -20,6 +20,8 @@ import type { ColumnsType } from "antd/es/table";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminTableSkeleton } from "@/components/admin/loaders";
 import { WalletModal } from "@/components/admin/WalletModal";
+import { HoursBankModal } from "@/components/admin/HoursBankModal";
+import { MEMBERSHIP_PAYMENT_METHODS, PAYMENT_METHOD_LABELS, type MembershipPaymentMethod } from "@/lib/membership-payment";
 import { MembershipPlansModal, SPORT_LABELS } from "@/components/admin/MembershipPlansModal";
 import { useSession } from "next-auth/react";
 import {
@@ -64,6 +66,10 @@ export default function AdminMembershipsPage() {
   const [planId, setPlanId] = useState<string>();
   const [hoursBySport, setHoursBySport] = useState<Record<string, number | null>>({});
   const [plansOpen, setPlansOpen] = useState(false);
+  const [hoursUser, setHoursUser] = useState<MembershipRosterRow | null>(null);
+  const [payMethod, setPayMethod] = useState<MembershipPaymentMethod>();
+  const [payAmount, setPayAmount] = useState<number | null>(null);
+  const [payNote, setPayNote] = useState("");
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [carry, setCarry] = useState(true);
@@ -140,6 +146,9 @@ export default function AdminMembershipsPage() {
           <Button size="small" onClick={() => setActivateUser(row)}>
             Activate
           </Button>
+          <Button size="small" onClick={() => setHoursUser(row)}>
+            Hours
+          </Button>
           <Button size="small" onClick={() => setLoyaltyUser(row)}>
             Adjust points
           </Button>
@@ -162,10 +171,16 @@ export default function AdminMembershipsPage() {
         hoursBySport: Object.entries(hoursBySport)
           .filter(([, h]) => (h ?? 0) > 0)
           .map(([sport, h]) => ({ sport, hours: h as number })),
+        payment: payMethod
+          ? { method: payMethod, pricePaid: payMethod === "free" ? 0 : (payAmount ?? 0), note: payNote.trim() || undefined }
+          : null,
       });
       message.success("Membership activated");
       setActivateUser(null);
       setPlanId(undefined);
+      setPayMethod(undefined);
+      setPayAmount(null);
+      setPayNote("");
       await queryClient.invalidateQueries({ queryKey: rosterKeys.all });
     } catch (e) {
       message.error(e instanceof Error ? e.message : "Failed");
@@ -258,6 +273,7 @@ export default function AdminMembershipsPage() {
         onOk={onActivate}
         confirmLoading={busy}
         okText="Activate"
+        okButtonProps={{ disabled: !planId || (!!payMethod && payMethod !== "free" && !payAmount) }}
       >
         <Form layout="vertical" className="mt-4">
           <Form.Item label="Plan" required>
@@ -294,6 +310,38 @@ export default function AdminMembershipsPage() {
           <Form.Item label="Carry forward unused hours">
             <Switch checked={carry} onChange={setCarry} />
           </Form.Item>
+          <Form.Item label="Payment received (optional, for reports)">
+            <Space wrap>
+              <Select
+                allowClear
+                placeholder="How they paid"
+                value={payMethod}
+                onChange={(v) => setPayMethod(v)}
+                style={{ width: 180 }}
+                options={MEMBERSHIP_PAYMENT_METHODS.map((m) => ({ value: m, label: PAYMENT_METHOD_LABELS[m] }))}
+              />
+              {payMethod && payMethod !== "free" && (
+                <InputNumber
+                  min={1}
+                  precision={0}
+                  prefix="PKR"
+                  placeholder="Amount"
+                  value={payAmount}
+                  onChange={(v) => setPayAmount(v)}
+                  style={{ width: 160 }}
+                />
+              )}
+            </Space>
+            {payMethod && (
+              <Input
+                className="mt-2"
+                maxLength={300}
+                placeholder="Note (optional), e.g. receipt number"
+                value={payNote}
+                onChange={(e) => setPayNote(e.target.value)}
+              />
+            )}
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -323,6 +371,12 @@ export default function AdminMembershipsPage() {
       </Modal>
 
       <WalletModal user={walletUser} onClose={() => setWalletUser(null)} />
+      <HoursBankModal
+        user={hoursUser}
+        canEdit={isSuperAdmin}
+        onClose={() => setHoursUser(null)}
+        onChanged={() => void queryClient.invalidateQueries({ queryKey: rosterKeys.all })}
+      />
       <MembershipPlansModal
         open={plansOpen}
         onClose={() => {

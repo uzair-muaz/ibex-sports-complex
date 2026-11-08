@@ -67,6 +67,7 @@ export async function activateAdminMembership(input: {
   planId: string;
   carryForwardHours?: boolean;
   hoursBySport?: { sport: string; hours: number }[];
+  payment?: { pricePaid: number; method: string; note?: string } | null;
 }) {
   return bffFetch("/api/v1/admin/ops", {
     method: "POST",

@@ -4,6 +4,7 @@ import { paymentPaths } from "@/lib/api/openapi-payments";
 import { walletPaths } from "@/lib/api/openapi-wallet";
 import { notificationPaths } from "@/lib/api/openapi-notifications";
 import { preferencesPaths } from "@/lib/api/openapi-preferences";
+import { membershipAdminPaths } from "@/lib/api/openapi-memberships-admin";
 
 /**
  * OpenAPI 3.0 document for the public HTTP API (`/api/v1`).
@@ -953,6 +954,7 @@ export function getOpenApiDocument(baseUrl?: string) {
       ...walletPaths,
       ...notificationPaths,
       ...preferencesPaths,
+      ...membershipAdminPaths,
     },
   } as const;
 }

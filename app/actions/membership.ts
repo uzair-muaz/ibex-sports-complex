@@ -9,6 +9,7 @@ import {
   getActiveMembershipForUser,
 } from "@/lib/membership";
 import { revalidatePath } from "next/cache";
+import { cleanMembershipPayment } from "@/lib/membership-payment";
 import { cleanHoursBySport } from "@/lib/membership-plans";
 import {
   resolveCustomerActor,
@@ -58,6 +59,8 @@ export async function adminActivateMembership(
     carryForwardHours?: boolean;
     /** Hours per sport for this customer; defaults to the plan's. */
     hoursBySport?: { sport: string; hours: number }[];
+    /** Optional: what the customer paid. */
+    payment?: unknown;
   },
   opts?: StaffActorOpts,
 ) {
@@ -65,9 +68,15 @@ export async function adminActivateMembership(
   if (!gate.ok) {
     return { success: false as const, error: gate.error };
   }
+  const payment = cleanMembershipPayment(input.payment);
+  if (payment === "invalid") {
+    return { success: false as const, error: "Amount paid must be a whole PKR amount, with how it was paid." };
+  }
 
   try {
       const membership = await activateMembership({
+      payment,
+      byUserId: gate.userId,
       userId: input.userId,
       planId: input.planId,
       carryForwardHours: input.carryForwardHours,
