@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   if (isAppBody(body)) {
     try {
       const result = await createAppBooking({
-        body,
+        body: body as AppBookingBody,
         user: apiUser,
         idempotencyKey: request.headers.get("idempotency-key"),
         clientIpHash: hashClientIp(request),
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   return bffOk(result, request);
 }
 
-function isAppBody(body: unknown): body is AppBookingBody {
+function isAppBody(body: unknown): boolean {
   return (
     typeof body === "object" &&
     body !== null &&

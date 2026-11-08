@@ -77,7 +77,7 @@ describe("booking view (what the app sees)", () => {
       ctx,
     );
     expect(v.status).toBe("confirmed");
-    expect(v.price).toEqual({ courtFee: 9000, hoursDiscount: 0, pointsUsed: 1000, pointsDiscount: 1000, total: 8000 });
+    expect(v.price).toEqual({ courtFee: 9000, promoCode: null, promoDiscount: 0, hoursDiscount: 0, pointsUsed: 1000, pointsDiscount: 1000, total: 8000 });
     expect(v.payment.status).toBe("verified");
   });
 

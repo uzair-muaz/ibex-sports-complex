@@ -222,12 +222,12 @@ export function getOpenApiDocument(baseUrl?: string) {
           tags: ["Bookings"],
           summary: "Create a booking (guest or signed-in customer) — app or website",
           description: [
-            "**App (body has courtId + start):** `{courtId, start, durationMinutes, useHours?, usePoints?, useWallet?}`; guests add `guest: {name, email, phone}`. Send an `Idempotency-Key` header (any unique string per tap of Book): sending it again returns the first booking (200) instead of a new one. Price is worked out exactly like POST /bookings/quote.",
+            "**App (body has courtId + start):** `{courtId, start, durationMinutes, useHours?, usePoints?, useWallet?, promoCode?}`; guests add `guest: {name, email, phone}`. Send an `Idempotency-Key` header (any unique string per tap of Book): sending it again returns the first booking (200) instead of a new one. Price is worked out exactly like POST /bookings/quote.",
             "Response 201: `{booking, guestAccessToken}`. guestAccessToken (`gt_…`) is only for guests: keep it on the phone to open the booking later. It is shown once and never stored in plain form.",
             "Status is `reserved` until the advance is verified (nothing is auto-cancelled). If hours, points or wallet cover the whole advance (toTransfer 0), the booking is `confirmed` straight away. The booking's `hoursUsed` and `price.hoursDiscount` show the hours used. No email is sent from the app path yet.",
-            "Errors: 400 VALIDATION_ERROR, INVALID_PHONE, PHONE_REQUIRED (signed-in customer with no phone in profile), DATE_IN_PAST, DATE_OUT_OF_WINDOW, INVALID_DURATION; 403 STAFF_ACCOUNT; 404 COURT_NOT_FOUND; 409 SLOT_UNAVAILABLE, POINTS_CHANGED, HOURS_CHANGED (membership hours dropped since the quote), WALLET_CHANGED (wallet balance dropped since the quote: quote again), REQUEST_IN_PROGRESS; 422 IDEMPOTENCY_KEY_REUSED (same key, different booking), or with useHours: NO_MEMBERSHIP, SPORT_NOT_INCLUDED, NO_HOURS_LEFT, WEEKDAYS_ONLY, TOO_SOON, EXPIRES_BEFORE_BOOKING (same as quote hours.reasonCode); 429 GUEST_LIMIT_REACHED (a guest email/phone already holds 3 upcoming bookings, or 5 guest bookings from the same device in 24 hours).",
+            "Errors: 400 VALIDATION_ERROR, INVALID_PHONE, PHONE_REQUIRED (signed-in customer with no phone in profile), DATE_IN_PAST, DATE_OUT_OF_WINDOW, INVALID_DURATION; 403 STAFF_ACCOUNT; 404 COURT_NOT_FOUND; 409 SLOT_UNAVAILABLE, POINTS_CHANGED, HOURS_CHANGED (membership hours dropped since the quote), WALLET_CHANGED (wallet balance dropped since the quote: quote again), REQUEST_IN_PROGRESS; 422 IDEMPOTENCY_KEY_REUSED (same key, different booking), PROMO_* (the promo code can't be used: same reason codes as the quote's promoError; the booking is not made), or with useHours: NO_MEMBERSHIP, SPORT_NOT_INCLUDED, NO_HOURS_LEFT, WEEKDAYS_ONLY, TOO_SOON, EXPIRES_BEFORE_BOOKING (same as quote hours.reasonCode); 429 GUEST_LIMIT_REACHED (a guest email/phone already holds 3 upcoming bookings, or 5 guest bookings from the same device in 24 hours).",
             "",
-            "**Website (unchanged):** body `CreateBookingInput` (courtType, date, startTime, duration …). Guests may book without auth. Membership hours / loyalty redeem require a customer account.",
+            "**Website:** body `CreateBookingInput` (courtType, date, startTime, duration …, optional promoCode). Guests may book without auth. Membership hours / loyalty redeem require a customer account.",
           ].join("\n"),
           security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
           parameters: [
@@ -267,7 +267,7 @@ export function getOpenApiDocument(baseUrl?: string) {
                       start: "2026-11-20T18:00:00+05:00",
                       durationMinutes: 90,
                       status: "reserved",
-                      price: { courtFee: 9000, pointsUsed: 0, pointsDiscount: 0, total: 9000 },
+                      price: { courtFee: 9000, promoCode: null, promoDiscount: 0, hoursDiscount: 0, pointsUsed: 0, pointsDiscount: 0, total: 9000 },
                       payment: {
                         status: "awaiting_proof",
                         advanceRequired: 4500,

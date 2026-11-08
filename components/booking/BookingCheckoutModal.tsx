@@ -44,6 +44,15 @@ type BookingCheckoutModalProps = {
   membershipHoursUsed: number;
   membershipDiscount: number;
   useMembershipHours: boolean;
+  promoInput: string;
+  /** A checked promo code and the PKR it takes off (null when none). */
+  appliedPromo: { code: string; discount: number; description: string } | null;
+  /** Why the typed code can't be used. */
+  promoMessage: string;
+  promoChecking: boolean;
+  onPromoInputChange: (value: string) => void;
+  onApplyPromo: () => void;
+  onRemovePromo: () => void;
   onUseLoyaltyChange: (value: boolean) => void;
   onLoyaltyPointsChange: (value: number) => void;
   onUseMembershipChange: (value: boolean) => void;
@@ -75,6 +84,13 @@ export function BookingCheckoutModal({
   membershipHoursUsed,
   membershipDiscount,
   useMembershipHours,
+  promoInput,
+  appliedPromo,
+  promoMessage,
+  promoChecking,
+  onPromoInputChange,
+  onApplyPromo,
+  onRemovePromo,
   onUseLoyaltyChange,
   onLoyaltyPointsChange,
   onUseMembershipChange,
@@ -86,6 +102,7 @@ export function BookingCheckoutModal({
   const displayTotal = Math.max(
     0,
     (selectedQuote?.totalPrice || 0) -
+      (appliedPromo?.discount ?? 0) -
       (useMembershipHours ? membershipDiscount : 0) -
       (useLoyalty ? Math.floor(loyaltyPointsToRedeem * pkrPerPoint) : 0),
   );
@@ -328,10 +345,70 @@ export function BookingCheckoutModal({
                     </div>
                   ) : null}
 
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                      Promo code
+                    </label>
+                    {appliedPromo ? (
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-[#2DD4BF]/40 bg-[#2DD4BF]/10 px-4 py-3 text-sm text-zinc-200">
+                        <span>
+                          <span className="font-semibold text-white">{appliedPromo.code}</span>
+                          {" "}takes PKR {appliedPromo.discount.toLocaleString("en-PK")} off
+                          {appliedPromo.description ? (
+                            <span className="block text-xs text-zinc-400">{appliedPromo.description}</span>
+                          ) : null}
+                        </span>
+                        <button type="button" onClick={onRemovePromo} className="text-xs text-zinc-400 hover:text-white">
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={promoInput}
+                          onChange={(e) => onPromoInputChange(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              onApplyPromo();
+                            }
+                          }}
+                          placeholder="Have a code?"
+                          maxLength={20}
+                          autoCapitalize="characters"
+                          className="min-w-0 flex-1 bg-zinc-900/70 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder:text-zinc-400 outline-none focus:border-[#2DD4BF]/70 focus:ring-2 focus:ring-[#2DD4BF]/20 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={onApplyPromo}
+                          disabled={!promoInput.trim() || promoChecking}
+                          className="shrink-0 rounded-xl border border-zinc-600 px-4 text-sm font-semibold text-zinc-100 hover:border-[#2DD4BF] disabled:opacity-40"
+                        >
+                          {promoChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
+                        </button>
+                      </div>
+                    )}
+                    {promoMessage ? <p className="text-xs text-red-400">{promoMessage}</p> : null}
+                  </div>
+
                   <PriceBreakdown
                     originalPrice={selectedQuote.originalPrice}
-                    discounts={selectedQuote.appliedDiscounts}
-                    discountAmount={selectedQuote.discountAmount}
+                    discounts={
+                      appliedPromo
+                        ? [
+                            ...(selectedQuote.appliedDiscounts ?? []),
+                            {
+                              discountId: `promo-${appliedPromo.code}`,
+                              name: `Promo ${appliedPromo.code}`,
+                              type: "fixed" as const,
+                              value: appliedPromo.discount,
+                              amountSaved: appliedPromo.discount,
+                            },
+                          ]
+                        : selectedQuote.appliedDiscounts
+                    }
+                    discountAmount={(selectedQuote.discountAmount ?? 0) + (appliedPromo?.discount ?? 0)}
                     totalPrice={displayTotal}
                     className="w-full"
                   />

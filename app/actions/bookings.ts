@@ -17,6 +17,7 @@ import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
 import { acquireSlotLocks, releaseSlotLocks } from '@/lib/booking-locks';
 import { staffCancelBooking, type StaffRefundChoice } from '@/lib/staff-cancel';
+import { checkPromo, releasePromoForBooking, undoPromoUse, usePromo } from '@/lib/promo';
 import { nextBookingSerial } from '@/lib/booking-serial';
 import {
   getApplicableDiscounts,
@@ -178,6 +179,8 @@ export interface CreateBookingInput {
   useMembershipHours?: boolean;
   /** No longer used (there are no guest passes). Ignored. */
   useGuestPass?: boolean;
+  /** Optional promo code; the booking is refused if it can't be used. */
+  promoCode?: string;
 }
 
 export async function createBooking(
@@ -188,6 +191,7 @@ export async function createBooking(
   let holdsLocks = false;
   let hoursTaken: { membershipId: string; sport: string; hours: number } | null = null;
   let bookingSaved = false;
+  let promoTaken = false;
   try {
     await connectDB();
 
@@ -322,10 +326,24 @@ export async function createBooking(
       amountSaved: d.amountSaved,
     }));
 
+    // Promo code: comes off the court fee after automatic discounts, before hours and points.
+    let promo: { promoId: string; code: string; discount: number } | null = null;
+    if (input.promoCode && input.promoCode.trim()) {
+      const check = await checkPromo({
+        code: input.promoCode,
+        sport: input.courtType,
+        courtFee: finalPrice,
+        customer: { userId: shouldLinkUser ? sessionUserId : null, email: input.userEmail },
+      });
+      if (!check.ok) throw new Error(check.message);
+      promo = { promoId: check.promoId!, code: check.code, discount: check.discount };
+    }
+    const feeAfterPromo = finalPrice - (promo?.discount ?? 0);
+
     // Next booking serial number (one atomic step, no duplicates)
     const nextSerialNumber = await nextBookingSerial();
 
-    let totalPrice = finalPrice;
+    let totalPrice = feeAfterPromo;
     let loyaltyPointsRedeemed = 0;
     let loyaltyDiscountPkr = 0;
     let usedMembershipHours = false;
@@ -352,7 +370,7 @@ export async function createBooking(
         canUse: true,
         useHours: true,
         durationHours: input.duration,
-        courtFee: finalPrice,
+        courtFee: feeAfterPromo,
       });
       const take = { membershipId: membership.id, sport: input.courtType, hours: cover.used };
       if (!(await takeSportHours(take))) {
@@ -364,7 +382,19 @@ export async function createBooking(
       membershipHoursUsed = cover.used;
       membershipSport = input.courtType;
       membershipDiscountPkr = cover.discount;
-      totalPrice = finalPrice - cover.discount;
+      totalPrice = feeAfterPromo - cover.discount;
+    }
+
+    if (promo) {
+      const used = await usePromo({
+        promoId: promo.promoId,
+        code: promo.code,
+        bookingId: newBookingId!,
+        customer: { userId: shouldLinkUser ? sessionUserId : null, email: input.userEmail },
+        discountPkr: promo.discount,
+      });
+      if (!used) throw new Error('This promo code has just been fully used.');
+      promoTaken = true;
     }
 
     // Create booking with discount information
@@ -382,6 +412,8 @@ export async function createBooking(
       originalPrice,
       discounts: discountsForDB,
       discountAmount,
+      promoCode: promo?.code,
+      promoDiscountPkr: promo?.discount ?? 0,
       totalPrice,
       loyaltyPointsRedeemed: 0,
       loyaltyDiscountPkr: 0,
@@ -408,11 +440,11 @@ export async function createBooking(
         userId: sessionUserId,
         points: input.loyaltyPointsToRedeem,
         bookingId: booking._id,
-        totalPriceAfterPromo: finalPrice - membershipDiscountPkr,
+        totalPriceAfterPromo: feeAfterPromo - membershipDiscountPkr,
       });
       loyaltyPointsRedeemed = redeemed.points;
       loyaltyDiscountPkr = redeemed.discountPkr;
-      totalPrice = Math.max(0, finalPrice - membershipDiscountPkr - loyaltyDiscountPkr);
+      totalPrice = Math.max(0, feeAfterPromo - membershipDiscountPkr - loyaltyDiscountPkr);
       booking.loyaltyPointsRedeemed = loyaltyPointsRedeemed;
       booking.loyaltyDiscountPkr = loyaltyDiscountPkr;
       booking.totalPrice = totalPrice;
@@ -459,6 +491,9 @@ export async function createBooking(
     console.error('Booking creation error:', error);
     if (hoursTaken && !bookingSaved) {
       await putBackSportHours(hoursTaken).catch(() => {});
+    }
+    if (promoTaken && !bookingSaved && newBookingId) {
+      await undoPromoUse(newBookingId).catch(() => {});
     }
     if (holdsLocks && newBookingId) {
       await releaseSlotLocks(newBookingId).catch(() => {});
@@ -1252,6 +1287,8 @@ export async function deleteBooking(bookingId: string, opts?: StaffActorOpts) {
     if (!booking) {
       throw new Error('Booking not found');
     }
+    // A deleted booking doesn't keep its promo code use.
+    if (booking.status !== 'cancelled') await releasePromoForBooking(bookingId).catch(() => {});
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');

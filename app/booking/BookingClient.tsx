@@ -158,6 +158,14 @@ export default function BookingClient() {
   const [useLoyalty, setUseLoyalty] = useState(false);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
   const [useMembershipHours, setUseMembershipHours] = useState(false);
+  // Promo code: kept with the slot it was checked for, so picking another slot drops it.
+  const [promoInput, setPromoInput] = useState("");
+  const [promoState, setPromoState] = useState<{
+    forKey: string;
+    applied: { code: string; discount: number; description: string } | null;
+    message: string;
+  } | null>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
   const canQuickCheck = userRole === "admin" || userRole === "super_admin";
 
   const courtsQuery = usePublicCourts();
@@ -299,14 +307,22 @@ export default function BookingClient() {
   const membershipHoursRemaining =
     membership?.hoursBySport?.find((h) => h.sport === selectedCourtType)?.remaining ?? 0;
   const hasMembership = membershipHoursRemaining > 0;
+  const promoKey = selectedQuote
+    ? `${selectedCourtType}|${dateString}|${selectedQuote.startTime}|${selectedDurationHours}|${selectedQuote.totalPrice}`
+    : "";
+  const promoNow = promoState && promoState.forKey === promoKey ? promoState : null;
+  const appliedPromo = promoNow?.applied ?? null;
+  const promoDiscount = appliedPromo ? Math.min(appliedPromo.discount, selectedQuote?.totalPrice ?? 0) : 0;
+  const feeAfterPromo = Math.max(0, (selectedQuote?.totalPrice ?? 0) - promoDiscount);
+
   const membershipCover = hoursCover({
     available: membershipHoursRemaining,
     canUse: hasMembership,
     useHours: useMembershipHours,
     durationHours: selectedDurationHours,
-    courtFee: selectedQuote?.totalPrice ?? 0,
+    courtFee: feeAfterPromo,
   });
-  const priceAfterHours = Math.max(0, (selectedQuote?.totalPrice ?? 0) - membershipCover.discount);
+  const priceAfterHours = Math.max(0, feeAfterPromo - membershipCover.discount);
 
   const maxLoyaltyRedeem = useMemo(() => {
     if (!selectedQuote) return 0;
@@ -547,6 +563,37 @@ export default function BookingClient() {
     [quickCheckDateKey, selectedCourtType, selectedDurationHours],
   );
 
+  const applyPromo = async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code || !selectedQuote || !selectedCourtType) return;
+    setPromoChecking(true);
+    try {
+      const res = await fetch("/api/v1/promo-codes/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          sport: selectedCourtType,
+          courtFee: selectedQuote.totalPrice,
+          email: formData.email.trim() || undefined,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      const d = json?.data ?? json;
+      if (!res.ok) {
+        setPromoState({ forKey: promoKey, applied: null, message: json?.error || "Could not check the code." });
+      } else if (d?.valid) {
+        setPromoState({ forKey: promoKey, applied: { code: d.code, discount: d.discount, description: d.description ?? "" }, message: "" });
+      } else {
+        setPromoState({ forKey: promoKey, applied: null, message: d?.message || "This code can't be used." });
+      }
+    } catch {
+      setPromoState({ forKey: promoKey, applied: null, message: "Could not check the code. Please try again." });
+    } finally {
+      setPromoChecking(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedCourtType || !selectedQuote) return;
     if (formStatus === "loading") return;
@@ -598,6 +645,7 @@ export default function BookingClient() {
           isCustomerLoggedIn && useLoyalty ? loyaltyPointsToRedeem : undefined,
         useMembershipHours:
           isCustomerLoggedIn && useMembershipHours && hasMembership ? true : undefined,
+        promoCode: appliedPromo?.code,
       });
 
       if (result.success) {
@@ -1056,6 +1104,16 @@ export default function BookingClient() {
         membershipHoursUsed={membershipCover.used}
         membershipDiscount={membershipCover.discount}
         useMembershipHours={useMembershipHours}
+        promoInput={promoInput}
+        appliedPromo={appliedPromo ? { ...appliedPromo, discount: promoDiscount } : null}
+        promoMessage={promoNow?.message ?? ""}
+        promoChecking={promoChecking}
+        onPromoInputChange={setPromoInput}
+        onApplyPromo={applyPromo}
+        onRemovePromo={() => {
+          setPromoState(null);
+          setPromoInput("");
+        }}
         onUseLoyaltyChange={setUseLoyalty}
         onLoyaltyPointsChange={setLoyaltyPointsToRedeem}
         onUseMembershipChange={setUseMembershipHours}

@@ -27,6 +27,8 @@ export type BookingSource = {
   walletCreditUsed?: number | null;
   refundAmount?: number | null;
   refundTo?: "wallet" | null;
+  promoCode?: string | null;
+  promoDiscountPkr?: number | null;
   createdAt?: Date | string;
 };
 
@@ -42,7 +44,16 @@ export type MobileBooking = {
   start: string;
   durationMinutes: number;
   status: MobileBookingStatus;
-  price: { courtFee: number; hoursDiscount: number; pointsUsed: number; pointsDiscount: number; total: number };
+  /** courtFee − promoDiscount − hoursDiscount − pointsDiscount = total. promoCode is null when none was used. */
+  price: {
+    courtFee: number;
+    promoCode: string | null;
+    promoDiscount: number;
+    hoursDiscount: number;
+    pointsUsed: number;
+    pointsDiscount: number;
+    total: number;
+  };
   payment: {
     status: MobilePaymentStatus;
     advanceRequired: number;
@@ -154,7 +165,15 @@ export function toMobileBooking(
       b.status === "confirmed" && now >= startMs + b.duration * 3_600_000
         ? "completed"
         : mobileStatus(b.status),
-    price: { courtFee, hoursDiscount, pointsUsed: b.loyaltyPointsRedeemed ?? 0, pointsDiscount, total },
+    price: {
+      courtFee,
+      promoCode: b.promoCode ?? null,
+      promoDiscount: Math.round(b.promoDiscountPkr ?? 0),
+      hoursDiscount,
+      pointsUsed: b.loyaltyPointsRedeemed ?? 0,
+      pointsDiscount,
+      total,
+    },
     payment: {
       status: paymentStatus,
       advanceRequired,

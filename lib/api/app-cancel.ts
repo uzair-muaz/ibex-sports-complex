@@ -6,6 +6,7 @@ import { refundLoyaltyForBooking } from "@/lib/loyalty";
 import { returnHoursForBooking } from "@/lib/membership-hours";
 import { notifyBookingCancelled } from "@/lib/notifications/events";
 import { creditWallet } from "@/lib/wallet";
+import { releasePromoForBooking } from "@/lib/promo";
 import { toPkIso } from "@/lib/api/time";
 import { bookingStartMs, type MobileBooking } from "@/lib/api/booking-view";
 import { getAppBookingWhere } from "@/lib/api/my-bookings";
@@ -175,6 +176,7 @@ export async function cancelAppBooking(params: {
   }
   await refundLoyaltyForBooking(params.bookingId);
   await returnHoursForBooking(params.bookingId);
+  await releasePromoForBooking(params.bookingId);
   await notifyBookingCancelled({ bookingId: params.bookingId, by: "customer", refundAmount: preview.refundAmount });
 
   void import("@/lib/analytics/daily-rollup")

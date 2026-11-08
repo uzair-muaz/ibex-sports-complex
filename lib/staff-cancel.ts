@@ -10,6 +10,7 @@ import { creditWallet } from "@/lib/wallet";
 import { refundLoyaltyForBooking } from "@/lib/loyalty";
 import { returnHoursForBooking } from "@/lib/membership-hours";
 import { notifyBookingCancelled } from "@/lib/notifications/events";
+import { releasePromoForBooking } from "@/lib/promo";
 
 import { STAFF_REFUND_CHOICES, defaultRefundChoice, staffRefundPlan, type StaffRefundChoice } from "@/lib/staff-refund-plan";
 
@@ -85,6 +86,8 @@ export async function staffCancelBooking(params: {
   if (plan.returnPointsAndHours) {
     await refundLoyaltyForBooking(params.bookingId);
     await returnHoursForBooking(params.bookingId);
+    // The promo code can be used again (not when staff keep the money).
+    await releasePromoForBooking(params.bookingId);
   }
   await notifyBookingCancelled({ bookingId: params.bookingId, by: "venue", refundAmount: plan.toWallet });
 

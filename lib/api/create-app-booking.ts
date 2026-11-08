@@ -10,6 +10,7 @@ import { resolveSlot } from "@/lib/api/slot";
 import { debitWallet, undoWalletDebit, walletBalance } from "@/lib/wallet";
 import { getAppSettings } from "@/lib/app-settings";
 import { computeQuote } from "@/lib/pricing/quote";
+import { checkPromo, undoPromoUse, usePromo } from "@/lib/promo";
 import { notifyBookingReceived } from "@/lib/notifications/events";
 import {
   checkHoursForSlot,
@@ -42,6 +43,8 @@ export type AppBookingBody = {
   useHours?: unknown;
   usePoints?: unknown;
   useWallet?: unknown;
+  /** Optional promo code; if it can't be used, the booking is refused (422). */
+  promoCode?: unknown;
   guest?: { name?: unknown; email?: unknown; phone?: unknown } | null;
 };
 
@@ -82,6 +85,8 @@ export function requestHash(body: AppBookingBody): string {
   const guest = body.guest ?? null;
   const stable = JSON.stringify([
     ...(body.useHours === true ? ["hours"] : []),
+    // Added only when sent, so older requests keep the same fingerprint.
+    ...(typeof body.promoCode === "string" && body.promoCode.trim() ? [`promo:${body.promoCode.trim().toUpperCase()}`] : []),
     body.courtId ?? null,
     body.start ?? null,
     Number(body.durationMinutes) || null,
@@ -196,6 +201,7 @@ export async function createAppBooking(params: {
   let locked = false;
   let pointsTaken = 0;
   let walletTaken = false;
+  let promoTaken = false;
   let hoursTaken: { membershipId: string; sport: string; hours: number } | null = null;
 
   const undo = async () => {
@@ -205,6 +211,7 @@ export async function createAppBooking(params: {
     }
     if (hoursTaken) await putBackSportHours(hoursTaken).catch(() => {});
     if (walletTaken) await undoWalletDebit(`booking:${bookingId}`).catch(() => {});
+    if (promoTaken) await undoPromoUse(bookingId).catch(() => {});
     if (locked) await releaseSlotLocks(bookingId).catch(() => {});
     if (scopeKey) await IdempotencyRecord.deleteOne({ scopeKey, status: "pending" }).catch(() => {});
   };
@@ -301,7 +308,23 @@ export async function createAppBooking(params: {
         membershipId = membership!.id;
       }
     }
+    // 7a. Promo code (checked with the server's own court fee).
+    let promo: { promoId: string; code: string; discount: number; description: string } | null = null;
+    if (typeof body.promoCode === "string" && body.promoCode.trim()) {
+      const check = await checkPromo({
+        code: body.promoCode,
+        sport: slot.court.type,
+        courtFee: slot.price,
+        customer: { userId: contact.userId, email: contact.email },
+      });
+      if (!check.ok) {
+        await undo();
+        return fail(422, check.reasonCode, check.message);
+      }
+      promo = { promoId: check.promoId!, code: check.code, discount: check.discount, description: check.description };
+    }
     const quote = computeQuote({
+      promo,
       originalCourtFee: slot.originalPrice,
       courtFee: slot.price,
       durationMinutes: slot.durationMinutes,
@@ -365,6 +388,22 @@ export async function createAppBooking(params: {
       walletTaken = true;
     }
 
+    // 8c. Claim the promo code use (the last use can only go to one booking).
+    if (promo && quote.promo) {
+      const used = await usePromo({
+        promoId: promo.promoId,
+        code: promo.code,
+        bookingId,
+        customer: { userId: contact.userId, email: contact.email },
+        discountPkr: quote.promo.discount,
+      });
+      if (!used) {
+        await undo();
+        return fail(422, "PROMO_USED_UP", "This promo code has just been fully used.");
+      }
+      promoTaken = true;
+    }
+
     // 9. Save the booking.
     const guestAccessToken = contact.userId ? null : newGuestAccessToken();
     const discounts = slot.discounts.map((d) => ({
@@ -389,6 +428,8 @@ export async function createAppBooking(params: {
       originalPrice: quote.originalCourtFee,
       discounts,
       discountAmount: quote.promotionDiscount,
+      promoCode: quote.promo?.code,
+      promoDiscountPkr: quote.promo?.discount ?? 0,
       usedMembershipHours: hoursUsed > 0,
       membershipId: hoursUsed > 0 ? membershipId : undefined,
       membershipHoursUsed: hoursUsed,

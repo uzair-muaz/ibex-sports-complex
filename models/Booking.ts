@@ -61,6 +61,9 @@ export interface IBooking extends Document {
   /** Money returned on cancel (whole PKR) and where it went. */
   refundAmount?: number | null;
   refundTo?: 'wallet' | null;
+  /** Promo code the customer typed, and PKR it took off the court fee. */
+  promoCode?: string | null;
+  promoDiscountPkr?: number | null;
   /** Staff cancel: what staff chose to give back. */
   refundChoice?: 'wallet' | 'paid_back' | 'none' | null;
   /** Staff cancel: PKR paid back outside the app (cash or bank). */
@@ -249,6 +252,8 @@ const BookingSchema: Schema = new Schema(
     cancelNote: { type: String, required: false, maxlength: 300 },
     refundAmount: { type: Number, required: false, min: 0 },
     refundTo: { type: String, enum: ['wallet'], required: false },
+    promoCode: { type: String, required: false },
+    promoDiscountPkr: { type: Number, required: false, min: 0 },
     refundChoice: { type: String, enum: ['wallet', 'paid_back', 'none'], required: false },
     refundPaidBackPkr: { type: Number, required: false, min: 0 },
     cancelledByUserId: { type: Schema.Types.ObjectId, ref: 'User', required: false },

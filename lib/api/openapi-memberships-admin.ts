@@ -2,6 +2,51 @@ const sec = [{ bearerAuth: [] }, { cookieAuth: [] }];
 
 /** Staff tools for a customer's membership hours bank. */
 export const membershipAdminPaths = {
+  "/api/v1/promo-codes/check": {
+    post: {
+      tags: ["Bookings"],
+      summary: "Does this promo code work? (public)",
+      description:
+        "Body `{code, sport, courtFee, email?}`. For the website's Apply button; the app can use POST /bookings/quote with promoCode instead. Answer `{valid: true, code, discount, description}` or `{valid: false, code, reasonCode, message}`. Only a check: the booking checks again with the server's own price. 20 tries per visitor per 10 minutes (429 RATE_LIMITED).",
+      requestBody: { required: true, content: { "application/json": { example: { code: "EID20", sport: "PADEL", courtFee: 4500 } } } },
+      responses: {
+        "200": { description: "OK", content: { "application/json": { example: { valid: true, code: "EID20", discount: 900, description: "Eid offer" } } } },
+        "400": { description: "VALIDATION_ERROR" },
+        "429": { description: "RATE_LIMITED" },
+      },
+    },
+  },
+  "/api/v1/admin/promo-codes": {
+    get: { tags: ["Admin"], summary: "Staff: all promo codes, with uses and PKR given", security: sec, responses: { "200": { description: "`{items: [...]}`" } } },
+    post: {
+      tags: ["Admin"],
+      summary: "Super admin: make a promo code",
+      description:
+        "Body: `{code, description?, type: percentage|fixed, value, maxDiscountPkr?, minFeePkr?, sports? ([] = all), validFrom?, validUntil?, maxUses?, maxUsesPerCustomer? (default 1, 0 = no limit), newCustomersOnly?, isActive?}`. The code comes off the court fee after automatic discounts. A use is given back when the booking is cancelled (not when staff keep the money).",
+      security: sec,
+      requestBody: { required: true, content: { "application/json": { example: { code: "EID20", description: "Eid offer", type: "percentage", value: 20, maxDiscountPkr: 2000, sports: [], maxUsesPerCustomer: 1 } } } },
+      responses: { "201": { description: "Created" }, "400": { description: "VALIDATION_ERROR" }, "403": { description: "Super admin only" }, "409": { description: "DUPLICATE" } },
+    },
+  },
+  "/api/v1/admin/promo-codes/{id}": {
+    get: { tags: ["Admin"], summary: "Staff: who used this code", security: sec, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "`{uses: [...]}`" } } },
+    patch: {
+      tags: ["Admin"],
+      summary: "Super admin: change a code (or switch it on/off with isActive)",
+      description: "Any field from POST. The code's name can't change once it was used (409 CODE_IN_USE).",
+      security: sec,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      responses: { "200": { description: "Saved" }, "409": { description: "CODE_IN_USE or DUPLICATE" } },
+    },
+    delete: {
+      tags: ["Admin"],
+      summary: "Super admin: delete a code nobody used",
+      description: "A used code can't be deleted (409 CODE_IN_USE): switch it off instead.",
+      security: sec,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      responses: { "200": { description: "Deleted" }, "409": { description: "CODE_IN_USE" } },
+    },
+  },
   "/api/v1/admin/customers/{id}": {
     get: {
       tags: ["Admin"],

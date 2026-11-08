@@ -15,6 +15,7 @@ import {
 } from "antd";
 import {
   BankOutlined,
+  BarcodeOutlined,
   BarChartOutlined,
   CalendarOutlined,
   TagOutlined,
@@ -89,6 +90,11 @@ export function AdminLayout({
         key: "/admin/discounts",
         icon: <TagOutlined />,
         label: "Discounts",
+      },
+      {
+        key: "/admin/promo-codes",
+        icon: <BarcodeOutlined />,
+        label: "Promo codes",
       },
       {
         key: "/admin/feedback",
