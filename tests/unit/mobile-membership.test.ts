@@ -98,8 +98,9 @@ describe("points on the part paid with hours", () => {
 
 describe("plans", () => {
   it("cleans hours per sport", () => {
-    expect(cleanHoursBySport([{ sport: "PADEL", hours: 10.2 }, { sport: "GOLF", hours: 3 }, { sport: "FUTSAL", hours: 0 }])).toEqual([
+    expect(cleanHoursBySport([{ sport: "PADEL", hours: 10.2 }, { sport: "golf!", hours: 3 }, { sport: "FUTSAL", hours: 0 }, { sport: "TABLE_TENNIS", hours: 4 }])).toEqual([
       { sport: "PADEL", hours: 10 },
+      { sport: "TABLE_TENNIS", hours: 4 }, // a sport added in App Settings
     ]);
   });
   it("public plan shape matches the app's", () => {

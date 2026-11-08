@@ -4,15 +4,13 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Checkbox, Input, InputNumber, Modal, Space, Table, Tag, Typography } from "antd";
 import { bffFetch } from "@/lib/bff/client";
+import { SPORT_NAMES } from "@/lib/promo-rules";
+import { useSportList } from "@/lib/tanstack/hooks/queries";
 
 const { Text } = Typography;
 
-export const SPORT_LABELS: Record<string, string> = {
-  PADEL: "Padel",
-  PICKLEBALL: "Pickleball",
-  FUTSAL: "Futsal",
-  CRICKET: "Cricket",
-};
+/** Sport names (a sport added later gets a name from its code). */
+export const SPORT_LABELS = SPORT_NAMES;
 
 type AdminPlan = {
   _id: string;
@@ -62,6 +60,8 @@ const hoursText = (rows: { sport: string; hours: number }[]) =>
 export function MembershipPlansModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  // Sports from Admin → App Settings.
+  const sportList = useSportList();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -185,12 +185,12 @@ export function MembershipPlansModal({ open, onClose }: { open: boolean; onClose
             </Space>
             <Text>Hours per sport</Text>
             <Space wrap>
-              {Object.keys(SPORT_LABELS).map((sport) => (
+              {sportList.map(({ sport, label }) => (
                 <InputNumber
                   key={sport}
                   min={0}
                   step={0.5}
-                  prefix={SPORT_LABELS[sport]}
+                  prefix={label}
                   value={draft.hours[sport] ?? null}
                   onChange={(v) => setDraft({ ...draft, hours: { ...draft.hours, [sport]: v } })}
                   style={{ width: 170 }}

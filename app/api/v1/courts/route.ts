@@ -8,9 +8,8 @@ import { closureSpansByCourt } from "@/lib/closures";
 import { pakistanNow, type BookingSpan } from "@/lib/booking-overlap";
 import { shiftDateKey } from "@/lib/date-time";
 import { publicBaseUrl } from "@/lib/api/base-url";
+import { isSportCode } from "@/lib/sport-rules";
 
-type Sport = "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
-const SPORTS: Sport[] = ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"];
 const ACTIVE_STATUSES = ["pending_payment", "confirmed", "completed"];
 
 /**
@@ -22,11 +21,11 @@ const ACTIVE_STATUSES = ["pending_payment", "confirmed", "completed"];
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const raw = (searchParams.get("sport") || searchParams.get("type") || "").toUpperCase();
-  if (raw && !SPORTS.includes(raw as Sport)) {
+  if (raw && !isSportCode(raw)) {
     return apiError("Unknown sport", 400, request, { code: "VALIDATION_ERROR" });
   }
 
-  const result = await getCourts((raw as Sport) || undefined);
+  const result = await getCourts(raw || undefined);
   if (!result.success) {
     return apiError(result.error || "Failed to load courts", 400, request);
   }

@@ -1,7 +1,9 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 import { COURT_FEATURE_KEYS, type CourtFeature } from "@/lib/court-features";
+import { SPORT_CODE_RE } from "@/lib/sport-rules";
 
-export type CourtType = "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
+/** A sport code, e.g. "PADEL". Sports are set in App Settings. */
+export type CourtType = string;
 
 export { COURT_FEATURE_KEYS, type CourtFeature, type CourtFeatureKey } from "@/lib/court-features";
 
@@ -13,6 +15,8 @@ export interface ICourt extends Document {
   pricePerHour: number; // 0 for free courts
   /** Saturday and Sunday price. Null = same as pricePerHour. */
   weekendPricePerHour?: number | null;
+  /** Minutes the price is for: 60 or 90. Empty = 90 for Futsal, else 60. */
+  priceUnitMinutes?: number | null;
   isActive: boolean;
   /** Enable time-based peak/off-peak pricing */
   timeBasedPricingEnabled?: boolean;
@@ -52,7 +56,7 @@ const CourtSchema: Schema = new Schema(
     },
     type: {
       type: String,
-      enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
+      match: [SPORT_CODE_RE, "Unknown sport"],
       required: [true, "Court type is required"],
     },
     image: {
@@ -72,6 +76,8 @@ const CourtSchema: Schema = new Schema(
     },
     // Saturday and Sunday price. Null = same as pricePerHour.
     weekendPricePerHour: { type: Number, min: 0, default: null },
+    // Minutes the price is for (60 or 90). Null = 90 for Futsal, else 60.
+    priceUnitMinutes: { type: Number, enum: [60, 90, null], default: null },
     isActive: {
       type: Boolean,
       default: true,

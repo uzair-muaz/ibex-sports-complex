@@ -88,7 +88,7 @@ describe("admin input", () => {
   it("refuses bad input", () => {
     expect(validatePromoInput({ code: "x", type: "percentage", value: 20 }).ok).toBe(false);
     expect(validatePromoInput({ code: "BIG", type: "percentage", value: 150 }).ok).toBe(false);
-    expect(validatePromoInput({ code: "OK1", type: "fixed", value: 500, sports: ["GOLF"] }).ok).toBe(false);
+    expect(validatePromoInput({ code: "OK1", type: "fixed", value: 500, sports: ["golf!"] }).ok).toBe(false); // not a sport code
     expect(validatePromoInput({ code: "OK1", type: "fixed", value: 500, validFrom: "2026-12-02", validUntil: "2026-12-01" }).ok).toBe(false);
   });
   it("partial edits only change what was sent", () => {

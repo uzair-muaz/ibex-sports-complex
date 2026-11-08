@@ -1,5 +1,6 @@
 "use client";
 
+import { useSportList } from "@/lib/tanstack/hooks/queries";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -24,7 +25,6 @@ import {
 import { useCreateBookingMutation } from "@/lib/tanstack/hooks/mutations";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 
-const COURT_TYPES: CourtType[] = ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"];
 
 type BookingFormValues = {
   courtType: CourtType;
@@ -44,6 +44,8 @@ function dateToDayjs(date: Date): Dayjs {
 
 export default function AdminNewBookingPage() {
   const { data: session } = useSession();
+  // Sports from Admin → App Settings.
+  const sportList = useSportList();
   const router = useRouter();
   const { message } = App.useApp();
   const [form] = Form.useForm<BookingFormValues>();
@@ -244,9 +246,9 @@ export default function AdminNewBookingPage() {
               rules={[{ required: true, message: "Please select a court type" }]}
             >
               <Select
-                options={COURT_TYPES.map((type) => ({
-                  value: type,
-                  label: type,
+                options={sportList.map(({ sport, label }) => ({
+                  value: sport,
+                  label,
                 }))}
               />
             </Form.Item>

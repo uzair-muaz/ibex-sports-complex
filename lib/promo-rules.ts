@@ -1,10 +1,12 @@
+import { BUILT_IN_SPORTS, isSportCode, labelFromSportCode } from "@/lib/sport-rules";
 /**
  * Promo codes customers type in. Pure rules, browser-safe (no database).
  * A code takes money off the court fee after automatic discounts, before
  * membership hours, points and wallet.
  */
-export const PROMO_SPORTS = ["PADEL", "PICKLEBALL", "FUTSAL", "CRICKET"] as const;
-export type PromoSport = (typeof PROMO_SPORTS)[number];
+/** The built-in sports (more can be added in App Settings; any sport code is accepted). */
+export const PROMO_SPORTS = BUILT_IN_SPORTS;
+export type PromoSport = string;
 
 export type PromoRules = {
   code: string;
@@ -53,7 +55,11 @@ export const PROMO_REASON_TEXT: Record<PromoReason, string> = {
   PROMO_NEW_CUSTOMERS_ONLY: "This promo code is only for your first booking.",
 };
 
-export const SPORT_NAMES: Record<string, string> = { PADEL: "Padel", PICKLEBALL: "Pickleball", FUTSAL: "Futsal", CRICKET: "Cricket" };
+/** Sport names; a sport added later gets a name made from its code ("TABLE_TENNIS" → "Table Tennis"). */
+export const SPORT_NAMES: Record<string, string> = new Proxy(
+  { PADEL: "Padel", PICKLEBALL: "Pickleball", FUTSAL: "Futsal", CRICKET: "Cricket" } as Record<string, string>,
+  { get: (t, k) => (typeof k === "string" ? (t[k] ?? (isSportCode(k) ? labelFromSportCode(k) : undefined)) : undefined) },
+);
 
 /** "  eid-20 " → "EID-20". */
 export function normaliseCode(v: unknown): string {
@@ -158,7 +164,7 @@ export function validatePromoInput(
   }
   if (need("sports")) {
     const s = has("sports") ? b.sports : [];
-    if (!Array.isArray(s) || s.some((x) => !PROMO_SPORTS.includes(x as PromoSport))) return { ok: false, error: "Unknown sport." };
+    if (!Array.isArray(s) || s.some((x) => !isSportCode(x))) return { ok: false, error: "Unknown sport." };
     out.sports = [...new Set(s as string[])];
   }
   for (const k of ["validFrom", "validUntil"] as const) {

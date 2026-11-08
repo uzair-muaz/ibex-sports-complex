@@ -1,3 +1,4 @@
+import { SPORT_CODE_RE } from "@/lib/sport-rules";
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IFeedback extends Document {
@@ -48,7 +49,7 @@ const FeedbackSchema: Schema = new Schema(
     },
     courtType: {
       type: String,
-      enum: ['PADEL', 'CRICKET', 'PICKLEBALL', 'FUTSAL'],
+      match: SPORT_CODE_RE,
       trim: true,
     },
   },

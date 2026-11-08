@@ -2,7 +2,7 @@ import { apiOk, apiError, apiOptions } from "@/lib/api/response";
 import { optionalApiUser } from "@/lib/api/guard";
 import { isCustomerRole } from "@/lib/authz";
 import { checkPromo } from "@/lib/promo";
-import { PROMO_SPORTS, type PromoSport } from "@/lib/promo-rules";
+import { isSportCode } from "@/lib/sport-rules";
 import { hashClientIp } from "@/lib/api/create-app-booking";
 
 // 20 checks per visitor per 10 minutes, so codes can't be guessed by trying many.
@@ -27,8 +27,8 @@ function tooMany(key: string, now = Date.now()): boolean {
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return apiError("Invalid JSON body", 400, request, { code: "VALIDATION_ERROR" });
-  if (!PROMO_SPORTS.includes(body.sport as PromoSport)) {
-    return apiError("sport must be PADEL, PICKLEBALL, FUTSAL or CRICKET", 400, request, { code: "VALIDATION_ERROR" });
+  if (!isSportCode(body.sport)) {
+    return apiError("sport must be a sport code, e.g. PADEL", 400, request, { code: "VALIDATION_ERROR" });
   }
   const courtFee = body.courtFee;
   if (typeof courtFee !== "number" || !Number.isFinite(courtFee) || courtFee < 0 || courtFee > 1_000_000) {

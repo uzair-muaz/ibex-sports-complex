@@ -1,5 +1,6 @@
 "use client";
 
+import { useSportList } from "@/lib/tanstack/hooks/queries";
 import Link from "next/link";
 
 import { useMemo, useState } from "react";
@@ -47,6 +48,8 @@ const rosterKeys = {
 export default function AdminMembershipsPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  // Sports from Admin → App Settings.
+  const sportList = useSportList();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [membershipFilter, setMembershipFilter] = useState<
@@ -299,12 +302,12 @@ export default function AdminMembershipsPage() {
           {planId && (
             <Form.Item label="Hours per sport (change for this customer if needed)">
               <Space wrap>
-                {Object.keys(SPORT_LABELS).map((sport) => (
+                {sportList.map(({ sport, label }) => (
                   <InputNumber
                     key={sport}
                     min={0}
                     step={0.5}
-                    prefix={SPORT_LABELS[sport]}
+                    prefix={label}
                     value={hoursBySport[sport] ?? null}
                     onChange={(v) => setHoursBySport((prev) => ({ ...prev, [sport]: v }))}
                     style={{ width: 170 }}

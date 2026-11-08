@@ -1,3 +1,4 @@
+import { SPORT_CODE_RE } from "@/lib/sport-rules";
 import mongoose, { Schema, Document, Model } from "mongoose";
 import type { CourtType } from "@/types";
 
@@ -38,7 +39,7 @@ const MembershipPlanSchema = new Schema(
       type: [
         {
           _id: false,
-          sport: { type: String, enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"], required: true },
+          sport: { type: String, match: SPORT_CODE_RE, required: true },
           hours: { type: Number, required: true, min: 0 },
         },
       ],
@@ -52,7 +53,7 @@ const MembershipPlanSchema = new Schema(
     priorityBadge: { type: Boolean, default: false },
     courtTypes: {
       type: [String],
-      enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
+      validate: { validator: (v: string[]) => v.every((x) => SPORT_CODE_RE.test(x)), message: "Unknown sport" },
       default: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
     },
     isActive: { type: Boolean, default: true },

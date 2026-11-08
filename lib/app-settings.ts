@@ -1,4 +1,5 @@
 import connectDB from "@/lib/mongodb";
+import Court from "@/models/Court";
 import AppSettings, {
   type ILoyaltySetting,
   type IPaymentSetting,
@@ -7,6 +8,7 @@ import AppSettings, {
   type SportKey,
 } from "@/models/AppSettings";
 import { DEFAULT_VENUE, isWebLink, type VenueInfo } from "@/lib/venue-rules";
+import { BUILT_IN_SPORTS, isSportCode, labelFromSportCode } from "@/lib/sport-rules";
 
 /** Settings after defaults are filled in. Every field is present. */
 export type SportRules = {
@@ -76,7 +78,23 @@ export type ResolvedAppSettings = {
 
 export type Faq = { question: string; answer: string };
 
-export const SPORT_KEYS: SportKey[] = ["PADEL", "PICKLEBALL", "FUTSAL", "CRICKET"];
+/** The built-in sports. More can be added in App Settings (lib/sport-rules.ts). */
+export const SPORT_KEYS: SportKey[] = [...BUILT_IN_SPORTS];
+
+/** Starting rules for a sport the super admin adds. Hidden from the app until they turn it on. */
+export function newSportDefaults(sport: string, label: string, sortOrder: number): SportRules {
+  return {
+    sport,
+    label,
+    showInApp: false,
+    imageUrl: "",
+    badge: null,
+    durationsMinutes: [60, 90, 120],
+    defaultDurationMinutes: 60,
+    bookingWindowDays: 14,
+    sortOrder,
+  };
+}
 
 /**
  * Shortest length the super admin may allow for a sport. Same for every sport
@@ -223,6 +241,30 @@ export function resolveAppSettings(stored: StoredSettings | null | undefined): R
         sortOrder: pick(s.sortOrder, def.sortOrder),
       };
     })
+    .concat(
+      // Sports the super admin added (not built in).
+      (stored?.sports || [])
+        .filter((s) => isSportCode(s.sport) && !d.sports.some((def) => def.sport === s.sport))
+        .map((s): SportRules => {
+          const base = newSportDefaults(s.sport, labelFromSportCode(s.sport), 100);
+          const durations =
+            Array.isArray(s.durationsMinutes) && s.durationsMinutes.length > 0
+              ? [...s.durationsMinutes].sort((a, b) => a - b)
+              : base.durationsMinutes;
+          const wantedDefault = pick(s.defaultDurationMinutes, base.defaultDurationMinutes);
+          return {
+            sport: s.sport,
+            label: pick(s.label, base.label),
+            showInApp: pick(s.showInApp, base.showInApp),
+            imageUrl: pick(s.imageUrl, base.imageUrl),
+            badge: s.badge || null,
+            durationsMinutes: durations,
+            defaultDurationMinutes: durations.includes(wantedDefault) ? wantedDefault : durations[0],
+            bookingWindowDays: pick(s.bookingWindowDays, base.bookingWindowDays),
+            sortOrder: pick(s.sortOrder, base.sortOrder),
+          };
+        }),
+    )
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const l = stored?.loyalty || {};
@@ -269,6 +311,8 @@ export function resolveAppSettings(stored: StoredSettings | null | undefined): R
 export type SettingsPatch = {
   venue?: Partial<VenueInfo>;
   sports?: Array<Partial<SportRules> & { sport: SportKey }>;
+  /** Added sports to take out of the list (built-in ones can only be hidden). */
+  removeSports?: SportKey[];
   cancellationNoticeMinutes?: number;
   loyalty?: Partial<LoyaltyRules>;
   payments?: Partial<PaymentRules>;
@@ -468,6 +512,15 @@ export function validateSettingsPatch(input: unknown): CheckResult {
     }
   }
 
+  if (body.removeSports !== undefined) {
+    const list = body.removeSports;
+    if (!Array.isArray(list) || !list.every(isSportCode)) return { ok: false, error: "removeSports must be a list of sport codes." };
+    if (list.some((s) => (BUILT_IN_SPORTS as readonly string[]).includes(s))) {
+      return { ok: false, error: "Built-in sports can't be removed. Turn off \"Show in app\" instead." };
+    }
+    out.removeSports = [...new Set(list)];
+  }
+
   if (body.sports !== undefined) {
     if (!Array.isArray(body.sports)) return { ok: false, error: "sports must be a list." };
     const seen = new Set<string>();
@@ -476,7 +529,7 @@ export function validateSettingsPatch(input: unknown): CheckResult {
       if (!raw || typeof raw !== "object") return { ok: false, error: "Each sport must be an object." };
       const s = raw as Record<string, unknown>;
       const sport = s.sport as SportKey;
-      if (!SPORT_KEYS.includes(sport)) return { ok: false, error: `Unknown sport: ${String(s.sport)}` };
+      if (!isSportCode(sport)) return { ok: false, error: `Unknown sport: ${String(s.sport)}` };
       if (seen.has(sport)) return { ok: false, error: `${sport} is listed twice.` };
       seen.add(sport);
       const item: Partial<SportRules> & { sport: SportKey } = { sport };
@@ -492,7 +545,7 @@ export function validateSettingsPatch(input: unknown): CheckResult {
         item.showInApp = s.showInApp;
       }
       if (s.imageUrl !== undefined) {
-        if (typeof s.imageUrl !== "string" || !/^(https:\/\/|\/)/.test(s.imageUrl.trim())) {
+        if (typeof s.imageUrl !== "string" || (s.imageUrl.trim() !== "" && !/^(https:\/\/|\/)/.test(s.imageUrl.trim()))) {
           return { ok: false, error: `${sport}: image must be an https:// link or a /images/… path.` };
         }
         item.imageUrl = s.imageUrl.trim();
@@ -562,6 +615,26 @@ export async function updateAppSettings(
     const change = patch.sports?.find((p) => p.sport === s.sport);
     return change ? { ...s, ...change } : s;
   });
+  // Taking out added sports: only when no court uses them.
+  if (patch.removeSports?.length) {
+    const used = await Court.distinct("type", { type: { $in: patch.removeSports } });
+    if (used.length) {
+      const names = used.map((code: string) => sports.find((s) => s.sport === code)?.label ?? code);
+      return { ok: false, error: `Move or delete the courts for ${names.join(", ")} first (Admin → Courts).` };
+    }
+    for (const code of patch.removeSports) {
+      const i = sports.findIndex((s) => s.sport === code);
+      if (i >= 0) sports.splice(i, 1);
+    }
+  }
+  // A sport that isn't saved yet is being added: it needs a name.
+  for (const change of patch.sports ?? []) {
+    if (patch.removeSports?.includes(change.sport)) continue;
+    if (sports.some((s) => s.sport === change.sport)) continue;
+    if (!change.label) return { ok: false, error: `Give the new sport ${change.sport} a name.` };
+    const order = Math.max(0, ...sports.map((s) => s.sortOrder)) + 1;
+    sports.push({ ...newSportDefaults(change.sport, change.label, order), ...change });
+  }
   for (const s of sports) {
     if (!s.durationsMinutes.includes(s.defaultDurationMinutes)) {
       return {

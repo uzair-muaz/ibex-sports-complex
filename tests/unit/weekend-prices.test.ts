@@ -77,7 +77,9 @@ describe("weekend prices", () => {
 
 describe("price unit labels", () => {
   it("Futsal prices are per 90 minutes, others per hour", () => {
-    expect(priceUnit("FUTSAL")).toEqual({ long: "Per 90 Min", short: "/90 min" });
-    expect(priceUnit("PADEL").short).toBe("/hr");
+    expect(priceUnit({ type: "FUTSAL" })).toEqual({ long: "Per 90 Min", short: "/90 min" });
+    expect(priceUnit({ type: "PADEL" }).short).toBe("/hr");
+    expect(priceUnit({ type: "TABLE_TENNIS", priceUnitMinutes: 90 }).short).toBe("/90 min");
+    expect(priceUnit({ type: "FUTSAL", priceUnitMinutes: 60 }).short).toBe("/hr");
   });
 });

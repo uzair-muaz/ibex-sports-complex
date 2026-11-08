@@ -67,7 +67,7 @@ describe("app settings", () => {
     expect(validateSettingsPatch({ cancellationNoticeMinutes: -1 }).ok).toBe(false);
     expect(validateSettingsPatch({ sports: [{ sport: "FUTSAL", durationsMinutes: [30] }] }).ok).toBe(false); // under 1 hour
     expect(validateSettingsPatch({ sports: [{ sport: "PADEL", durationsMinutes: [75] }] }).ok).toBe(false);
-    expect(validateSettingsPatch({ sports: [{ sport: "TENNIS" }] }).ok).toBe(false);
+    expect(validateSettingsPatch({ sports: [{ sport: "tennis!" }] }).ok).toBe(false); // not a sport code
     expect(validateSettingsPatch({ venue: { email: "nope" } }).ok).toBe(false);
     expect(validateSettingsPatch({ venue: { latitude: 200 } }).ok).toBe(false);
     expect(validateSettingsPatch({ venue: { name: "  " } }).ok).toBe(false);

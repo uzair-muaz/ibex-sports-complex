@@ -1,5 +1,6 @@
 "use client";
 
+import { useSportList } from "@/lib/tanstack/hooks/queries";
 import React from "react";
 import {
   Button,
@@ -15,7 +16,6 @@ import {
 import { DeleteOutlined } from "@ant-design/icons";
 import type { Court, PricingLabel } from "@/types";
 import {
-  COURT_TYPE_OPTIONS,
   PRICING_LABEL_OPTIONS,
   TIME_OPTIONS,
   appendPricingPeriod,
@@ -25,6 +25,7 @@ import {
 } from "./courtHelpers";
 import { COURT_FEATURE_LABELS } from "@/lib/court-features";
 import { priceUnit } from "@/lib/pricing-utils";
+import { priceUnitMinutesFor } from "@/lib/sport-rules";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 
 const { Text } = Typography;
@@ -53,8 +54,10 @@ export function CourtFormModal({
   onClose,
   onSubmit,
 }: CourtFormModalProps) {
+  // Sports from Admin → App Settings.
+  const sportList = useSportList();
   // Futsal prices are saved per 90 minutes, other sports per hour.
-  const unit = priceUnit(courtForm.type);
+  const unit = priceUnit(courtForm);
 
   const addPricingPeriod = (label: PricingLabel) => {
     setCourtForm((prev) => appendPricingPeriod(prev, label));
@@ -106,7 +109,24 @@ export function CourtFormModal({
                   type: v as Court["type"],
                 })
               }
-              options={COURT_TYPE_OPTIONS}
+              options={sportList.map(({ sport, label }) => ({ value: sport, label }))}
+            />
+          </Form.Item>
+          <Form.Item
+            label="Price is for"
+            extra={
+              <Text type="secondary" className="text-[11px]">
+                Choose 90 minutes for sports sold as 90-minute games, like Futsal.
+              </Text>
+            }
+          >
+            <Select
+              value={priceUnitMinutesFor(courtForm)}
+              onChange={(v) => setCourtForm((prev) => ({ ...prev, priceUnitMinutes: v }))}
+              options={[
+                { value: 60, label: "1 hour" },
+                { value: 90, label: "90 minutes" },
+              ]}
             />
           </Form.Item>
         </div>

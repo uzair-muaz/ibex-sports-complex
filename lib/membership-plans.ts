@@ -1,3 +1,4 @@
+import { BUILT_IN_SPORTS, isSportCode } from "@/lib/sport-rules";
 import connectDB from "@/lib/mongodb";
 import MembershipPlan from "@/models/MembershipPlan";
 import UserMembership from "@/models/UserMembership";
@@ -7,8 +8,9 @@ import { toPkIso } from "@/lib/api/time";
 
 /** Membership plans and "my membership" for the app (Phase 12). Not a "use server" file. */
 
-export const PLAN_SPORTS = ["PADEL", "PICKLEBALL", "FUTSAL", "CRICKET"] as const;
-type PlanSport = (typeof PLAN_SPORTS)[number];
+/** The built-in sports, in their usual order. Sports added in App Settings are accepted too. */
+export const PLAN_SPORTS = BUILT_IN_SPORTS;
+type PlanSport = string;
 
 /** Keep only real sports with hours > 0, in half hours, one row per sport. */
 export function cleanHoursBySport(rows: unknown): { sport: PlanSport; hours: number }[] {
@@ -17,11 +19,13 @@ export function cleanHoursBySport(rows: unknown): { sport: PlanSport; hours: num
   for (const r of rows) {
     const sport = (r as { sport?: unknown })?.sport;
     const hours = Number((r as { hours?: unknown })?.hours);
-    if (!PLAN_SPORTS.includes(sport as PlanSport)) continue;
+    if (!isSportCode(sport)) continue;
     if (!Number.isFinite(hours) || hours <= 0 || hours > 1000) continue;
     out.set(sport as PlanSport, Math.round(hours * 2) / 2);
   }
-  return PLAN_SPORTS.filter((s) => out.has(s)).map((sport) => ({ sport, hours: out.get(sport)! }));
+  // Built-in sports first in their usual order, then added sports.
+  const rank = (s: string) => { const i = (PLAN_SPORTS as readonly string[]).indexOf(s); return i < 0 ? 99 : i; };
+  return [...out.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b)).map((sport) => ({ sport, hours: out.get(sport)! }));
 }
 
 /** "+92 325 5429429" → "https://wa.me/923255429429" */

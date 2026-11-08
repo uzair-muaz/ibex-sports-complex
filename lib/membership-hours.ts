@@ -1,3 +1,4 @@
+import { BUILT_IN_SPORTS } from "@/lib/sport-rules";
 import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import Booking from "@/models/Booking";
@@ -13,8 +14,8 @@ import { DEFAULT_APP_SETTINGS, getAppSettings, type MembershipRules } from "@/li
  * so nothing here can be called straight from a browser.
  */
 
-export const MEMBERSHIP_SPORTS = ["PADEL", "PICKLEBALL", "FUTSAL", "CRICKET"] as const;
-export type MembershipSport = (typeof MEMBERSHIP_SPORTS)[number];
+export const MEMBERSHIP_SPORTS = BUILT_IN_SPORTS;
+export type MembershipSport = string;
 
 export type SportHours = { sport: string; total: number; remaining: number };
 

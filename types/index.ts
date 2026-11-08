@@ -1,4 +1,5 @@
-export type CourtType = "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
+/** A sport code, e.g. "PADEL". Sports are set in App Settings (lib/sport-rules.ts). */
+export type CourtType = string;
 
 export type PricingLabel = "off_peak" | "peak";
 
@@ -33,6 +34,8 @@ export interface Court {
   pricePerHour: number;
   /** Saturday and Sunday price. Empty = same as pricePerHour. */
   weekendPricePerHour?: number | null;
+  /** Minutes the price is for: 60 (default) or 90 (Futsal games). */
+  priceUnitMinutes?: number | null;
   isActive: boolean;
   /** Enable time-based peak/off-peak pricing */
   timeBasedPricingEnabled?: boolean;

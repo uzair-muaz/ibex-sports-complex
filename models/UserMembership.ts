@@ -1,3 +1,4 @@
+import { SPORT_CODE_RE } from "@/lib/sport-rules";
 import mongoose, { Schema, Document, Model } from "mongoose";
 
 export type UserMembershipStatus = "active" | "expired" | "cancelled";
@@ -44,7 +45,7 @@ const UserMembershipSchema = new Schema(
       type: [
         {
           _id: false,
-          sport: { type: String, enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"], required: true },
+          sport: { type: String, match: SPORT_CODE_RE, required: true },
           total: { type: Number, required: true, min: 0 },
           remaining: { type: Number, required: true, min: 0 },
         },

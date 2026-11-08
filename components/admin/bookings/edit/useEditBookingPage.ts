@@ -52,7 +52,7 @@ export function useEditBookingPage() {
   } | null>(null);
 
   const [courtType, setCourtType] = useState<
-    "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL"
+    string
   >("PADEL");
   const [durationHours, setDurationHours] = useState(1);
 
@@ -209,7 +209,7 @@ export function useEditBookingPage() {
         : "PADEL";
 
     setCourtType(
-      resolvedCourtType as "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL",
+      resolvedCourtType as string,
     );
 
     const hasNewPaymentFields =

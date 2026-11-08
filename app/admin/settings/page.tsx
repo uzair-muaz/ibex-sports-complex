@@ -13,9 +13,11 @@ import {
   Input,
   InputNumber,
   Select,
+  Space,
   Switch,
   Typography,
 } from "antd";
+import { BUILT_IN_SPORTS, sportCodeFromName } from "@/lib/sport-rules";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminTableSkeleton } from "@/components/admin/loaders";
 import { FaqsCard } from "@/components/admin/FaqsCard";
@@ -46,6 +48,8 @@ export default function AdminAppSettingsPage() {
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [draft, setDraft] = useState<ResolvedAppSettings | null>(null);
   const [saving, setSaving] = useState(false);
+  const [newSportName, setNewSportName] = useState("");
+  const [removedSports, setRemovedSports] = useState<string[]>([]);
   const [builtInFaqs, setBuiltInFaqs] = useState<Faq[]>([]);
 
   const query = useQuery({
@@ -113,6 +117,42 @@ export default function AdminAppSettingsPage() {
         : d,
     );
 
+  // Take out an added sport (saved on "Save changes"; refused while a court uses it).
+  const removeSport = (code: string) => {
+    if (!draft) return;
+    setDraft({ ...draft, sports: draft.sports.filter((s) => s.sport !== code) });
+    setRemovedSports((prev) => [...new Set([...prev, code])]);
+  };
+
+  // A new sport: a code made from its name (e.g. TABLE_TENNIS), hidden until turned on.
+  const addSport = () => {
+    if (!draft) return;
+    const label = newSportName.trim();
+    const code = sportCodeFromName(label);
+    if (!label || !code) return void message.error("Type a sport name using letters.");
+    if (draft.sports.some((s) => s.sport === code)) return void message.error(`${label} is already in the list.`);
+    setDraft({
+      ...draft,
+      sports: [
+        ...draft.sports,
+        {
+          sport: code,
+          label,
+          showInApp: false,
+          imageUrl: "",
+          badge: null,
+          durationsMinutes: [60, 90, 120],
+          defaultDurationMinutes: 60,
+          bookingWindowDays: 14,
+          sortOrder: Math.max(0, ...draft.sports.map((s) => s.sortOrder)) + 1,
+        },
+      ],
+    });
+    setNewSportName("");
+    setRemovedSports((prev) => prev.filter((c) => c !== code));
+    message.success(`${label} added. Press Save changes to keep it.`);
+  };
+
   const save = async () => {
     if (!draft) return;
     setSaving(true);
@@ -124,6 +164,7 @@ export default function AdminAppSettingsPage() {
         loyalty: draft.loyalty,
         payments: draft.payments,
         membership: draft.membership,
+        removeSports: removedSports.length ? removedSports : undefined,
         sports: draft.sports.map((s) => ({
           sport: s.sport,
           label: s.label,
@@ -137,6 +178,7 @@ export default function AdminAppSettingsPage() {
         })),
       });
       setDraft(settings);
+      setRemovedSports([]);
       setBuiltInFaqs(builtIn);
       message.success("Settings saved");
     } catch (err) {
@@ -438,6 +480,11 @@ export default function AdminAppSettingsPage() {
               title={s.label}
               extra={
                 <span className="flex items-center gap-2">
+                  {!(BUILT_IN_SPORTS as readonly string[]).includes(s.sport) && (
+                    <Button size="small" type="text" danger onClick={() => removeSport(s.sport)}>
+                      Remove
+                    </Button>
+                  )}
                   <Text type="secondary">Show in app</Text>
                   <Switch
                     checked={s.showInApp}
@@ -506,6 +553,23 @@ export default function AdminAppSettingsPage() {
               </Form.Item>
             </Card>
           ))}
+
+          <Card title="Add a sport">
+            <Text type="secondary">
+              Type the sport&apos;s name and press Add. It starts hidden from the app: set its photo,
+              lengths and &quot;Show in app&quot;, press Save changes, then add its courts in Admin → Courts.
+            </Text>
+            <Space.Compact className="mt-3" style={{ width: "100%", maxWidth: 420 }}>
+              <Input
+                placeholder="e.g. Table Tennis"
+                maxLength={40}
+                value={newSportName}
+                onChange={(e) => setNewSportName(e.target.value)}
+                onPressEnter={addSport}
+              />
+              <Button onClick={addSport}>Add</Button>
+            </Space.Compact>
+          </Card>
 
           <FaqsCard
             faqs={draft.faqs}

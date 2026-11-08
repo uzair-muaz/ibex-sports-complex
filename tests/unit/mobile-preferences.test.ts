@@ -46,7 +46,7 @@ describe("preferences", () => {
     [{ skillLevel: "expert" }, "skillLevel"],
     [{ hand: "both" }, "hand"],
     [{ courtSide: "middle" }, "courtSide"],
-    [{ primarySport: "TENNIS" }, "primarySport"],
+    [{ primarySport: "tennis!" }, "primarySport"],
     [{ notifications: { matchReminders: "yes" } }, "notifications.matchReminders"],
     [{ notifications: "off" }, "notifications"],
   ])("refuses %j", (body, field) => {

@@ -22,4 +22,5 @@ export {
   useMySupportTicketsQuery as useMySupportTickets,
 } from "./use-account.queries";
 export { useVenueQuery as useVenue } from "./use-venue.query";
+export { useSportListQuery as useSportList, type SportOption } from "./use-sports.query";
 export { getQueryLoadingState } from "./use-query-loading-state";

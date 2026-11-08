@@ -1,3 +1,4 @@
+import { SPORT_CODE_RE } from "@/lib/sport-rules";
 import mongoose, { Schema, Document, Model } from "mongoose";
 
 /**
@@ -5,7 +6,8 @@ import mongoose, { Schema, Document, Model } from "mongoose";
  * per-sport booking rules for the app, and the cancellation notice.
  * Anything missing falls back to the defaults in lib/app-settings.ts.
  */
-export type SportKey = "PADEL" | "PICKLEBALL" | "FUTSAL" | "CRICKET";
+/** A sport code, e.g. "PADEL" (lib/sport-rules.ts). */
+export type SportKey = string;
 
 export interface ISportSetting {
   sport: SportKey;
@@ -76,7 +78,7 @@ export interface IAppSettings extends Document {
 
 const SportSettingSchema = new Schema<ISportSetting>(
   {
-    sport: { type: String, enum: ["PADEL", "PICKLEBALL", "FUTSAL", "CRICKET"], required: true },
+    sport: { type: String, match: SPORT_CODE_RE, required: true },
     label: { type: String, trim: true, maxlength: 40 },
     showInApp: { type: Boolean },
     imageUrl: { type: String, trim: true, maxlength: 1000 },

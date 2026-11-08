@@ -50,7 +50,7 @@ export function DeleteCourtModal({
             </div>
             <div className="flex items-center justify-between">
               <Text type="secondary">Price:</Text>
-              <Text>PKR {court.pricePerHour.toLocaleString()}{priceUnit(court.type).short}</Text>
+              <Text>PKR {court.pricePerHour.toLocaleString()}{priceUnit(court).short}</Text>
             </div>
             <div className="flex items-center justify-between">
               <Text type="secondary">Status:</Text>

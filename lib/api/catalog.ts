@@ -76,7 +76,7 @@ export function sportFeaturesText(courts: Array<{ isIndoor?: boolean; features?:
 export type CourtSource = CourtLike & {
   _id: { toString(): string };
   name: string;
-  type: "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
+  type: string;
   image?: string;
   description?: string;
   surfaceLabel?: string;

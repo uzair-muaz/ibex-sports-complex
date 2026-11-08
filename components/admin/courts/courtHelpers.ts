@@ -7,6 +7,8 @@ export type CourtFormState = {
   pricePerHour: number;
   /** Saturday and Sunday price. null = same as weekday. */
   weekendPricePerHour: number | null;
+  /** Minutes the price is for: 60, 90, or null (90 for Futsal, else 60). */
+  priceUnitMinutes: number | null;
   isActive: boolean;
   timeBasedPricingEnabled: boolean;
   pricingPeriods: CourtPricingPeriod[];
@@ -18,13 +20,6 @@ export type CourtFormState = {
   featureKeys: string[];
   highlightKey: string | null;
 };
-
-export const COURT_TYPE_OPTIONS = [
-  { value: "PADEL" as const, label: "Padel" },
-  { value: "CRICKET" as const, label: "Cricket" },
-  { value: "PICKLEBALL" as const, label: "Pickleball" },
-  { value: "FUTSAL" as const, label: "Futsal" },
-];
 
 export const PRICING_LABEL_OPTIONS = [
   { value: "off_peak" as const, label: "Off-peak" },
@@ -38,6 +33,7 @@ export function createEmptyCourtForm(): CourtFormState {
     description: "",
     pricePerHour: 0,
     weekendPricePerHour: null,
+    priceUnitMinutes: null,
     isActive: true,
     timeBasedPricingEnabled: false,
     pricingPeriods: [],
@@ -57,6 +53,7 @@ export function courtToFormState(court: Court): CourtFormState {
     description: court.description,
     pricePerHour: court.pricePerHour,
     weekendPricePerHour: court.weekendPricePerHour ?? null,
+    priceUnitMinutes: court.priceUnitMinutes ?? null,
     isActive: court.isActive,
     timeBasedPricingEnabled: court.timeBasedPricingEnabled ?? false,
     pricingPeriods: court.pricingPeriods ?? [],

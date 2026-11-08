@@ -1,5 +1,6 @@
 "use client";
 
+import { useSportList } from "@/lib/tanstack/hooks/queries";
 import { useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -27,7 +28,7 @@ import dayjs, { type Dayjs } from "dayjs";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminTableSkeleton } from "@/components/admin/loaders";
 import { bffFetch } from "@/lib/bff/client";
-import { PROMO_SPORTS, SPORT_NAMES } from "@/lib/promo-rules";
+import { SPORT_NAMES } from "@/lib/promo-rules";
 import type { AdminPromo } from "@/lib/promo-admin";
 
 const { Text } = Typography;
@@ -101,6 +102,8 @@ function statusOf(p: AdminPromo): { label: string; color: string } {
 
 export default function PromoCodesPage() {
   const { data: session } = useSession();
+  // Sports from Admin → App Settings.
+  const sportList = useSportList();
   const isSuperAdmin = session?.user?.role === "super_admin";
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -362,7 +365,7 @@ export default function PromoCodesPage() {
             <Checkbox.Group
               value={draft.sports}
               onChange={(v) => set({ sports: v as string[] })}
-              options={PROMO_SPORTS.map((s) => ({ value: s, label: SPORT_NAMES[s] }))}
+              options={sportList.map(({ sport, label }) => ({ value: sport, label }))}
             />
           </Form.Item>
           <Space size="large" wrap>

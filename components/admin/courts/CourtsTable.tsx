@@ -76,7 +76,7 @@ export function CourtsTable({
           <Space size="small" wrap>
             <span className="font-semibold text-[#2DD4BF]">
               PKR {price.toLocaleString()}
-              <span className="font-normal text-[var(--ant-color-text-secondary)]">{priceUnit(court.type).short}</span>
+              <span className="font-normal text-[var(--ant-color-text-secondary)]">{priceUnit(court).short}</span>
             </span>
             {price === 0 && <Tag>Free</Tag>}
             {weekend && <Tag color="purple">Weekend price</Tag>}

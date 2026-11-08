@@ -184,7 +184,7 @@ function bookingOverlapsCandidate(
 }
 
 export interface CreateBookingInput {
-  courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
+  courtType: string;
   date: string;
   startTime: number;
   duration: number;
@@ -533,7 +533,7 @@ export async function createBooking(
 }
 
 export interface GetAvailableStartTimesInput {
-  courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
+  courtType: string;
   date: string; // YYYY-MM-DD (calendar day semantics)
   duration: number; // hours in 0.5 increments
   /** When editing a booking, omit it from conflict checks so its time stays bookable */

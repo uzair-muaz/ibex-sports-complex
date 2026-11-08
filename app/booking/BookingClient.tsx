@@ -32,6 +32,7 @@ import {
 } from "../actions/bookings";
 import { maxUsablePoints } from "@/lib/loyalty-rules";
 import { isWeekendDateKey } from "@/lib/membership-rules";
+import { labelFromSportCode, priceUnitMinutesFor } from "@/lib/sport-rules";
 import { hoursCover } from "@/lib/membership-hours-rules";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
@@ -55,6 +56,7 @@ type CourtRecord = {
   type?: CourtType;
   pricePerHour?: number;
   weekendPricePerHour?: number | null;
+  priceUnitMinutes?: number | null;
   pricingPeriods?: Array<{
     label?: string;
     startHour?: number;
@@ -79,6 +81,7 @@ type CreatedBooking = {
 /** Booking lengths for each sport come from Admin → App Settings (via GET /api/v1/sports). */
 type SportBookingRules = {
   sport: CourtType;
+  label?: string;
   booking: { durationsMinutes: number[]; defaultDurationMinutes: number };
 };
 
@@ -87,7 +90,7 @@ function durationLabel(minutes: number): string {
   return `${minutes / 60} hours`;
 }
 
-const sportHeadingMap: Record<CourtType, { title: string; subtitle: string }> =
+const sportHeadingMap: Record<string, { title: string; subtitle: string }> =
   {
     PADEL: {
       title: "PADEL COURT",
@@ -107,6 +110,11 @@ const sportHeadingMap: Record<CourtType, { title: string; subtitle: string }> =
     },
   };
 
+/** A sport added in App Settings: "TABLE_TENNIS" → "Table Tennis" COURT, with a plain subtitle. */
+function sportHeading(type: CourtType, label: string): { title: string; subtitle: string } {
+  return sportHeadingMap[type] ?? { title: `${label.toUpperCase()} COURT`, subtitle: "Book online in a few taps" };
+}
+
 function courtTypeLabel(type: CourtType): string {
   switch (type) {
     case "PADEL":
@@ -118,7 +126,7 @@ function courtTypeLabel(type: CourtType): string {
     case "FUTSAL":
       return "Futsal";
     default:
-      return type;
+      return labelFromSportCode(type);
   }
 }
 
@@ -203,6 +211,11 @@ export default function BookingClient() {
     },
     staleTime: 5 * 60_000,
   });
+  // Sport names from App Settings (a sport added later has no built-in name).
+  const sportName = useCallback(
+    (type: CourtType) => sportRulesQuery.data?.find((s) => s.sport === type)?.label ?? courtTypeLabel(type),
+    [sportRulesQuery.data],
+  );
   // Advance % from Admin → App Settings.
   const paymentRulesQuery = useQuery({
     queryKey: ["public", "payment-instructions"],
@@ -367,8 +380,8 @@ export default function BookingClient() {
     [selectedTypeCourts],
   );
 
-  // Court prices are saved per hour, except Futsal, saved per 90 minutes (see lib/pricing-utils.ts).
-  const priceUnit = selectedCourtType === "FUTSAL" ? "90 MIN" : "HR";
+  // Court prices are saved per hour, or per 90 minutes for courts sold in 90-minute games (Futsal).
+  const priceUnit = activeCourt && priceUnitMinutesFor(activeCourt) === 90 ? "90 MIN" : "HR";
   // Saturday and Sunday use the weekend prices set in Admin → Courts (when set).
   const isWeekendDay = Boolean(dateString) && isWeekendDateKey(dateString);
   const courtPricing = useMemo(() => {
@@ -761,7 +774,7 @@ export default function BookingClient() {
             className="mb-6"
             items={(isLoadingTypes ? [] : activeCourtTypes).map((type) => ({
               key: type,
-              label: courtTypeLabel(type).toUpperCase(),
+              label: sportName(type).toUpperCase(),
             }))}
             activeKey={selectedCourtType}
             onSelect={(type) => {
@@ -805,12 +818,12 @@ export default function BookingClient() {
               <div className="mb-6">
                 <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight gradient-text mb-2">
                   {selectedCourtType
-                    ? sportHeadingMap[selectedCourtType].title
+                    ? sportHeading(selectedCourtType, sportName(selectedCourtType)).title
                     : "COURT"}
                 </h2>
                 <p className="text-zinc-500 text-xs sm:text-sm font-medium tracking-wide">
                   {selectedCourtType
-                    ? sportHeadingMap[selectedCourtType].subtitle
+                    ? sportHeading(selectedCourtType, sportName(selectedCourtType)).subtitle
                     : "Premium Surface"}
                   {courtPricing.weekendRates && " · Weekend prices"}
                 </p>
@@ -1137,7 +1150,7 @@ export default function BookingClient() {
         selectedQuote={selectedQuote}
         selectedCourtLabel={
           selectedCourtType
-            ? courtTypeLabel(selectedCourtType).toUpperCase()
+            ? sportName(selectedCourtType).toUpperCase()
             : "SPORT"
         }
         selectedDateLabel={selectedDate

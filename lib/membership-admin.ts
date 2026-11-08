@@ -8,7 +8,7 @@ import connectDB from "@/lib/mongodb";
 import UserMembership from "@/models/UserMembership";
 import MembershipHoursChange, { type MembershipHoursChangeType } from "@/models/MembershipHoursChange";
 import Booking from "@/models/Booking";
-import { PLAN_SPORTS } from "@/lib/membership-plans";
+import { isSportCode } from "@/lib/sport-rules";
 import { toPkIso } from "@/lib/api/time";
 import { bookingReference } from "@/lib/api/booking-view";
 
@@ -52,8 +52,8 @@ export async function adjustMembershipHours(params: {
   requestId: unknown;
   staffId: string;
 }): Promise<{ ok: true; remaining: number } | Fail> {
-  const sport = params.sport as (typeof PLAN_SPORTS)[number];
-  if (!PLAN_SPORTS.includes(sport)) return bad("Choose a sport.");
+  const sport = params.sport;
+  if (!isSportCode(sport)) return bad("Choose a sport.");
   const hours = cleanHoursDelta(params.hours);
   if (hours === null) return bad(`Hours must be whole or half hours, from −${MAX_HOURS} to ${MAX_HOURS}, not 0.`);
   const note = cleanNote(params.note);

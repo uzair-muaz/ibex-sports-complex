@@ -1,5 +1,6 @@
 import type { CourtPricingPeriod, PricingLabel, CourtType } from "@/types";
 import { isWeekendDateKey } from "@/lib/membership-rules";
+import { priceUnitMinutesFor } from "@/lib/sport-rules";
 
 // Minimal shape we need from a court-like object for pricing
 export interface CourtLike {
@@ -9,14 +10,16 @@ export interface CourtLike {
   timeBasedPricingEnabled?: boolean;
   pricingPeriods?: CourtPricingPeriod[];
   type?: CourtType;
+  /** Minutes the saved price is for (60 or 90). Empty = 90 for Futsal, else 60. */
+  priceUnitMinutes?: number | null;
 }
 
 /**
- * What a saved court price covers. Futsal is sold in 90-minute games, so its
- * price is saved per 90 minutes; every other sport is saved per hour.
+ * What a saved court price covers: 60 minutes, or 90 for courts sold in
+ * 90-minute games (Futsal by default; set per court in Admin → Courts).
  */
-export function priceUnit(type: CourtType | string | undefined): { long: string; short: string } {
-  return type === "FUTSAL" ? { long: "Per 90 Min", short: "/90 min" } : { long: "Per Hour", short: "/hr" };
+export function priceUnit(court: { type?: CourtType; priceUnitMinutes?: number | null }): { long: string; short: string } {
+  return priceUnitMinutesFor(court) === 90 ? { long: "Per 90 Min", short: "/90 min" } : { long: "Per Hour", short: "/hr" };
 }
 
 function plainCourt(court: CourtLike | (CourtLike & { toObject?: (o?: object) => CourtLike })): CourtLike {
@@ -129,8 +132,8 @@ export function getPricePerHourForTime(
   const basePrice = (weekend ? weekendRate(c.weekendPricePerHour) : null) ?? Number(c.pricePerHour);
   const basePriceN = Number.isFinite(basePrice) ? basePrice : 0;
 
-  const isFutsal = c.type === "FUTSAL";
-  const futsalMultiplier = isFutsal ? 60 / 90 : 1;
+  // Prices saved per 90 minutes (e.g. Futsal) are turned into a per-hour rate.
+  const futsalMultiplier = 60 / priceUnitMinutesFor(c);
 
   if (!c.timeBasedPricingEnabled || !hasPeriods) {
     return { pricePerHour: basePriceN * futsalMultiplier };

@@ -1,3 +1,4 @@
+import { BUILT_IN_SPORTS, isSportCode } from "@/lib/sport-rules";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import type { NotificationType } from "@/models/Notification";
@@ -7,7 +8,8 @@ import type { NotificationType } from "@/models/Notification";
 export const SKILL_LEVELS = ["beginner", "intermediate", "advanced", "pro"] as const;
 export const HANDS = ["right", "left", "ambidextrous"] as const;
 export const COURT_SIDES = ["left", "right", "either"] as const;
-export const PREF_SPORTS = ["PADEL", "PICKLEBALL", "FUTSAL", "CRICKET"] as const;
+/** Built-in sports; any sport added in App Settings is accepted too. */
+export const PREF_SPORTS = BUILT_IN_SPORTS;
 
 export type NotificationSwitches = {
   matchReminders: boolean;
@@ -17,7 +19,7 @@ export type NotificationSwitches = {
 };
 
 export type Preferences = {
-  primarySport: (typeof PREF_SPORTS)[number] | null;
+  primarySport: string | null;
   skillLevel: (typeof SKILL_LEVELS)[number] | null;
   hand: (typeof HANDS)[number] | null;
   courtSide: (typeof COURT_SIDES)[number] | null;
@@ -63,7 +65,7 @@ export function validatePreferencesPatch(input: unknown): { ok: true; value: Sto
       (out as Record<string, unknown>)[key] = null;
       return null;
     }
-    if (!list.includes(b[key] as string)) return `${key} must be one of: ${list.join(", ")}.`;
+    if (key === "primarySport" ? !isSportCode(b[key]) : !list.includes(b[key] as string)) return `${key} must be one of: ${list.join(", ")}.`;
     (out as Record<string, unknown>)[key] = b[key];
     return null;
   };

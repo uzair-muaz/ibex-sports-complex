@@ -1,5 +1,6 @@
 "use client";
 
+import { useSportList } from "@/lib/tanstack/hooks/queries";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -79,6 +80,8 @@ export function HoursBankModal({
 }) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  // Sports from Admin → App Settings.
+  const sportList = useSportList();
   const [tab, setTab] = useState<Tab>("hours");
   const [sport, setSport] = useState<string>();
   const [direction, setDirection] = useState<"add" | "remove">("add");
@@ -231,7 +234,7 @@ export function HoursBankModal({
                         value={sport}
                         onChange={setSport}
                         style={{ width: 150 }}
-                        options={Object.entries(SPORT_LABELS).map(([value, label]) => ({ value, label }))}
+                        options={sportList.map(({ sport, label }) => ({ value: sport, label }))}
                       />
                       <InputNumber
                         min={0.5}
