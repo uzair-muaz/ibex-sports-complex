@@ -14,6 +14,7 @@ export async function GET(request: Request) {
         maxFileSizeMb: 5,
         transferNote: settings.payments.transferNote,
         verificationNote: settings.payments.verificationNote,
+        balanceNote: settings.payments.balanceNote,
       },
       request,
     );

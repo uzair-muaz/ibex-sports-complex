@@ -91,4 +91,16 @@ describe("bank account settings", () => {
     expect(validateSettingsPatch({ payments: { bankAccounts: [{ bankName: "Meezan" }] } }).ok).toBe(false);
     expect(validateSettingsPatch({ payments: { transferNote: "" } }).ok).toBe(false);
   });
+
+  it("the balance note has a default and is edited like the other notes", () => {
+    expect(resolveAppSettings(null).payments.balanceNote).toBe("Pay the remaining balance at the venue.");
+    expect(resolveAppSettings({ payments: { balanceNote: "Pay the rest at reception." } }).payments.balanceNote).toBe(
+      "Pay the rest at reception.",
+    );
+    expect(validateSettingsPatch({ payments: { balanceNote: " Pay at reception. " } })).toEqual({
+      ok: true,
+      value: { payments: { balanceNote: "Pay at reception." } },
+    });
+    expect(validateSettingsPatch({ payments: { balanceNote: " " } }).ok).toBe(false);
+  });
 });

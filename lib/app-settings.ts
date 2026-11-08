@@ -70,6 +70,8 @@ export type PaymentRules = {
   bankAccounts: BankAccount[];
   transferNote: string;
   verificationNote: string;
+  /** How the rest of the price is paid after the advance. */
+  balanceNote: string;
 };
 
 export type ResolvedAppSettings = {
@@ -176,6 +178,7 @@ export const DEFAULT_APP_SETTINGS: ResolvedAppSettings = {
     bankAccounts: [],
     transferNote: "Write your booking reference in the transfer description.",
     verificationNote: "Our team checks payments by hand. You will get a notification.",
+    balanceNote: "Pay the remaining balance at the venue.",
   },
   membership: { weekdayAdvanceHours: 2, weekendAdvanceHours: 24, carryOverGraceDays: 7 },
   faqs: null,
@@ -268,6 +271,7 @@ export function resolveAppSettings(stored: StoredSettings | null | undefined): R
       })),
       transferNote: pick(stored?.payments?.transferNote, d.payments.transferNote),
       verificationNote: pick(stored?.payments?.verificationNote, d.payments.verificationNote),
+      balanceNote: pick(stored?.payments?.balanceNote, d.payments.balanceNote),
     },
     membership: {
       weekdayAdvanceHours: pick(stored?.membership?.weekdayAdvanceHours, d.membership.weekdayAdvanceHours),
@@ -429,7 +433,7 @@ export function validateSettingsPatch(input: unknown): CheckResult {
       }
       pay.bankAccounts = accounts;
     }
-    for (const key of ["transferNote", "verificationNote"] as const) {
+    for (const key of ["transferNote", "verificationNote", "balanceNote"] as const) {
       if (p[key] !== undefined) {
         const v = typeof p[key] === "string" ? (p[key] as string).trim() : "";
         if (!v || v.length > 300) return { ok: false, error: "Payment notes must be 1–300 characters." };

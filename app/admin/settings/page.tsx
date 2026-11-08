@@ -302,6 +302,13 @@ export default function AdminAppSettingsPage() {
                 onChange={(e) => setPayments({ verificationNote: e.target.value })}
               />
             </Form.Item>
+            <Form.Item label="How the rest of the price is paid">
+              <Input
+                maxLength={300}
+                value={draft.payments.balanceNote}
+                onChange={(e) => setPayments({ balanceNote: e.target.value })}
+              />
+            </Form.Item>
           </Card>
 
           <Card title="Membership rules">

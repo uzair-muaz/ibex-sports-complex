@@ -52,6 +52,7 @@ export interface IPaymentSetting {
   bankAccounts?: { bankName: string; accountTitle: string; accountNumber: string; iban?: string | null }[];
   transferNote?: string;
   verificationNote?: string;
+  balanceNote?: string;
 }
 
 export interface IAppSettings extends Document {
@@ -133,6 +134,7 @@ const PaymentSettingSchema = new Schema<IPaymentSetting>(
     },
     transferNote: { type: String },
     verificationNote: { type: String },
+    balanceNote: { type: String },
   },
   { _id: false },
 );

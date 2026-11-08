@@ -121,6 +121,7 @@ export const paymentPaths = {
           maxFileSizeMb: 5,
           transferNote: "Write your booking reference in the transfer description.",
           verificationNote: "Our team checks payments by hand. You will get a notification.",
+          balanceNote: "Pay the remaining balance at the venue.",
         }),
       },
     },
