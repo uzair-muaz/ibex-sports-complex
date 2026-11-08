@@ -2,6 +2,20 @@ const sec = [{ bearerAuth: [] }, { cookieAuth: [] }];
 
 /** Staff tools for a customer's membership hours bank. */
 export const membershipAdminPaths = {
+  "/api/v1/admin/customers/{id}": {
+    get: {
+      tags: ["Admin"],
+      summary: "Staff: one customer on one page",
+      description:
+        "Answer: `{customer, stats, bookings, wallet, points, membership, tickets}`. stats: total, upcoming, completed, cancelled, paidTotal (kept for bookings not cancelled), dueTotal (still owed). bookings include guest bookings made with the same email before sign-up (`guest: true`). Staff accounts give 404.",
+      security: sec,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      responses: {
+        "200": { description: "OK" },
+        "404": { description: "No such customer (USER_NOT_FOUND)" },
+      },
+    },
+  },
   "/api/v1/admin/memberships": {
     get: {
       tags: ["Admin"],
