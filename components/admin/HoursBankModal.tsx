@@ -164,13 +164,13 @@ export function HoursBankModal({
       destroyOnHidden
     >
       {error ? (
-        <Alert type="error" showIcon message={(error as Error).message} />
+        <Alert type="error" showIcon title={(error as Error).message} />
       ) : isPending ? (
         <Text type="secondary">Loading…</Text>
       ) : !current ? (
         <Empty description="No membership yet. Use Activate to give this customer a plan." />
       ) : (
-        <Space direction="vertical" size="large" className="w-full">
+        <Space orientation="vertical" size="large" className="w-full">
           <Descriptions size="small" column={{ xs: 1, sm: 2 }} bordered>
             <Descriptions.Item label="Plan">
               {current.planName} <Tag color={STATUS_COLORS[current.status]}>{current.status}</Tag>
@@ -240,7 +240,7 @@ export function HoursBankModal({
                         placeholder="Hours"
                         value={hours}
                         onChange={(v) => setHours(v)}
-                        addonAfter="hours"
+                        suffix="hours"
                         style={{ width: 160 }}
                       />
                       {direction === "remove" && sport && (
@@ -248,7 +248,7 @@ export function HoursBankModal({
                       )}
                     </Space>
                   ) : (
-                    <Alert type="info" showIcon message="This plan has ended. Change the end date first, or activate a new plan." />
+                    <Alert type="info" showIcon title="This plan has ended. Change the end date first, or activate a new plan." />
                   ))}
                 {tab === "date" && (
                   <Space wrap>
@@ -265,7 +265,7 @@ export function HoursBankModal({
                   <Alert
                     type="warning"
                     showIcon
-                    message="Cancelling stops the plan now. Hours left can't be used. Bookings already made stay."
+                    title="Cancelling stops the plan now. Hours left can't be used. Bookings already made stay."
                   />
                 )}
                 {(tab !== "hours" || isActive) && (
