@@ -10,6 +10,8 @@ import {
 } from "@/app/actions/bookings";
 import { getAppSettings } from "@/lib/app-settings";
 import { getActiveDiscountInputs } from "@/lib/active-discounts";
+import { closureSpansForCourt } from "@/lib/closures";
+import { closedTimesView } from "@/lib/api/closure-view";
 import { buildCourtSlots, checkAvailabilityRequest } from "@/lib/api/availability";
 import { pakistanNow } from "@/lib/booking-overlap";
 import { shiftDateKey } from "@/lib/date-time";
@@ -52,18 +54,19 @@ async function courtAvailability(request: Request, params: URLSearchParams) {
       .lean(),
     getActiveDiscountInputs(date),
   ]);
+  const closed = await closureSpansForCourt(court._id.toString(), date);
 
   const slots = buildCourtSlots({
     court: court as typeof court & { type: CourtType },
     dateKey: date,
     durationMinutes,
-    bookings: bookings.map((b) => ({ date: b.date, startTime: b.startTime, duration: b.duration })),
+    bookings: [...bookings.map((b) => ({ date: b.date, startTime: b.startTime, duration: b.duration })), ...closed],
     discounts,
     fromHour: date === now.dateKey ? now.nextStartHour : 0,
   });
 
   return apiOk(
-    { courtId: court._id.toString(), date, durationMinutes, slots },
+    { courtId: court._id.toString(), date, durationMinutes, slots, closures: closedTimesView(closed) },
     request,
     { headers: { "Cache-Control": "no-store" } },
   );

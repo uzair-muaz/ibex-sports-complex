@@ -4,6 +4,7 @@ import { apiOk, apiError, apiOptions } from "@/lib/api/response";
 import { getCourts } from "@/app/actions/courts";
 import { getAppSettings } from "@/lib/app-settings";
 import { mobileCourtFields, type CourtSource } from "@/lib/api/catalog";
+import { closureSpansByCourt } from "@/lib/closures";
 import { pakistanNow, type BookingSpan } from "@/lib/booking-overlap";
 import { shiftDateKey } from "@/lib/date-time";
 import { publicBaseUrl } from "@/lib/api/base-url";
@@ -50,6 +51,12 @@ export async function GET(request: Request) {
           .lean()
       : [];
     const byCourt = new Map<string, BookingSpan[]>();
+    // Closed times count as taken for "next free time".
+    if (courts.length) {
+      for (const [id, spans] of await closureSpansByCourt(courts.map((c) => c._id.toString()), now.dateKey)) {
+        byCourt.set(id, [...spans]);
+      }
+    }
     for (const b of bookings) {
       const key = String(b.courtId);
       const list = byCourt.get(key) ?? [];

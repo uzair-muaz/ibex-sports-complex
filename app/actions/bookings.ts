@@ -1,5 +1,6 @@
 'use server';
 
+import { closureSpansByCourt } from "@/lib/closures";
 import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 import Booking from '@/models/Booking';
@@ -79,13 +80,27 @@ async function findConflictBookings(params: {
 }) {
   const dateMinus = shiftDateUTC(params.date, -1);
   const datePlus = shiftDateUTC(params.date, 1);
-  return Booking.find({
-    courtId: { $in: params.courtIds },
-    date: { $in: [dateMinus, params.date, datePlus] },
-    status: { $in: [...ACTIVE_BOOKING_STATUSES] },
-  })
-    .select("courtId date startTime duration")
-    .lean();
+  const [bookings, closed] = await Promise.all([
+    Booking.find({
+      courtId: { $in: params.courtIds },
+      date: { $in: [dateMinus, params.date, datePlus] },
+      status: { $in: [...ACTIVE_BOOKING_STATUSES] },
+    })
+      .select("courtId date startTime duration")
+      .lean(),
+    closureSpansByCourt(params.courtIds, params.date),
+  ]);
+  // Closed times (Admin → Closures) count as taken.
+  const closures = [...closed].flatMap(([courtId, spans]) =>
+    spans.map((s) => ({
+      _id: `closure:${s.closureId}`,
+      courtId: new mongoose.Types.ObjectId(courtId),
+      date: s.date,
+      startTime: s.startTime,
+      duration: s.duration,
+    })),
+  );
+  return [...bookings, ...closures];
 }
 
 function toDiscountInput(d: any): DiscountInput {

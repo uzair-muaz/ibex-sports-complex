@@ -47,6 +47,35 @@ export const membershipAdminPaths = {
       responses: { "200": { description: "Deleted" }, "409": { description: "CODE_IN_USE" } },
     },
   },
+  "/api/v1/admin/closures": {
+    get: { tags: ["Admin"], summary: "Staff: closures still to come (?past=1 adds old ones)", description: "Each has `affectedBookings`: active bookings already inside it.", security: sec, responses: { "200": { description: "`{items: [...]}`" } } },
+    post: {
+      tags: ["Admin"],
+      summary: "Super admin: close courts for a time",
+      description:
+        "Body `{courtIds ([] = every court), startsAt, endsAt (on the hour or half hour, at most 90 days), reason (staff only), publicNote? (shown to customers)}`. The time can't be booked on the app or the website from now on. Bookings already inside it stay: the reply's `affectedBookings` says how many; GET /admin/closures/{id} lists them.",
+      security: sec,
+      requestBody: { required: true, content: { "application/json": { example: { courtIds: ["69607301a5bc0098eadcfa85"], startsAt: "2026-11-13T09:00:00+05:00", endsAt: "2026-11-13T14:00:00+05:00", reason: "Glass repair", publicNote: "Closed for maintenance." } } } },
+      responses: { "201": { description: "Created" }, "400": { description: "VALIDATION_ERROR" }, "403": { description: "Super admin only" }, "404": { description: "COURT_NOT_FOUND" } },
+    },
+  },
+  "/api/v1/admin/closures/{id}": {
+    get: { tags: ["Admin"], summary: "Staff: a closure and the bookings inside it", description: "`{closure, bookings: [{id, reference, date, startTime, duration, status, court, customer: {userId, name, email, phone}, total, paid}]}` — to call, move or cancel them.", security: sec, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "OK" }, "404": { description: "NOT_FOUND" } } },
+    patch: { tags: ["Admin"], summary: "Super admin: change a closure", description: "Any field from POST.", security: sec, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Saved" }, "400": { description: "VALIDATION_ERROR" } } },
+    delete: { tags: ["Admin"], summary: "Super admin: remove a closure (the time can be booked again)", security: sec, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Deleted" } } },
+  },
+  "/api/v1/admin/broadcasts": {
+    get: { tags: ["Admin"], summary: "Staff: messages sent to customers", security: sec, responses: { "200": { description: "`{items: [...]}`" } } },
+    post: {
+      tags: ["Admin"],
+      summary: "Super admin: send a message to customers",
+      description:
+        "Body `{title (3–80), body (3–500), kind: venue_news|offer, audience: all|closure|one, closureId? (audience closure), email? (audience one)}`. First send with `dryRun: true` to get `{customers, withApp, guestBookings}`; then send with `confirm: true`. It goes to each customer's in-app list (type venue_news or offer) and as a push (data `{type, broadcastId}`). venue_news always pushes; offer only pushes to customers with the newsletter switch on. Push only really goes out when the server has NOTIFY_SEND_PUSH=true.",
+      security: sec,
+      requestBody: { required: true, content: { "application/json": { example: { title: "Padel closed Friday morning", body: "Padel courts are closed on Friday 9 AM–2 PM for repairs.", kind: "venue_news", audience: "all", confirm: true } } } },
+      responses: { "200": { description: "Dry run counts" }, "201": { description: "Sent: `{broadcast: {id, inAppCount, pushSent, pushLogged, guestBookings}}`" }, "400": { description: "VALIDATION_ERROR, CONFIRM_NEEDED or NO_RECIPIENTS" }, "403": { description: "Super admin only" } },
+    },
+  },
   "/api/v1/admin/customers/{id}": {
     get: {
       tags: ["Admin"],

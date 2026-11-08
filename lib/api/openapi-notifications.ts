@@ -16,7 +16,7 @@ export const notificationPaths = {
       tags: ["Account"],
       summary: "My notifications (bell) and unreadCount",
       description:
-        "Newest first. type: booking_reminder (2 h before), proof_submitted, payment_verified, proof_rejected (body has the reason), booking_cancelled, wallet_credited, points_earned. bookingId opens the booking; amount is set for payment and wallet messages. The same messages go out as push (data: {type, bookingId}); booking received, payment verified/rejected, cancelled and the reminder are also emailed. Messages never contain bank details.",
+        "Newest first. type: booking_reminder (2 h before), proof_submitted, payment_verified, proof_rejected (body has the reason), booking_cancelled, wallet_credited, points_earned, venue_news and offer (messages from the venue; no bookingId). bookingId opens the booking; amount is set for payment and wallet messages. The same messages go out as push (data: {type, bookingId}); booking received, payment verified/rejected, cancelled and the reminder are also emailed. Messages never contain bank details.",
       security: auth,
       parameters: [
         { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } },

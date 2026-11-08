@@ -5,6 +5,7 @@ import Court from "@/models/Court";
 import { getAppSettings, type ResolvedAppSettings, type SportRules } from "@/lib/app-settings";
 import { getActiveDiscountInputs } from "@/lib/active-discounts";
 import { checkAvailabilityRequest, parseSlotStart, priceForSlot, type RateType } from "@/lib/api/availability";
+import { closureSpansForCourt } from "@/lib/closures";
 import { overlapsBooking, pakistanNow } from "@/lib/booking-overlap";
 import { shiftDateKey } from "@/lib/date-time";
 import type { AppliedDiscount, CourtType } from "@/types";
@@ -91,6 +92,12 @@ export async function resolveSlot(input: {
   );
   if (taken) {
     return { ok: false, status: 409, code: "SLOT_UNAVAILABLE", error: "This time is already booked. Please pick another." };
+  }
+  const closed = (await closureSpansForCourt(court._id.toString(), parsed.dateKey)).find((c) =>
+    overlapsBooking(parsed.dateKey, parsed.hour, durationMinutes / 60, c),
+  );
+  if (closed) {
+    return { ok: false, status: 409, code: "COURT_CLOSED", error: `${closed.note} Please pick another time.` };
   }
 
   const typedCourt = court as typeof court & { type: CourtType };

@@ -138,6 +138,28 @@ export const catalogPaths = {
       responses: { "200": ok("Venue", venueExample) },
     },
   },
+  "/api/v1/venue/closures": {
+    get: {
+      tags: ["Venue"],
+      summary: "Closures in the next 30 days",
+      description:
+        "Times courts can't be booked (set in Admin → Closures). `allCourts: true` = the whole venue; otherwise `courts` lists them with their sport. `note` is the text to show customers. Free-time lists already treat these as taken, and booking or pricing a closed time gives 409 COURT_CLOSED.",
+      responses: {
+        "200": ok("Closures", {
+          items: [
+            {
+              id: "6750a1b2c3d4e5f601234567",
+              allCourts: false,
+              courts: [{ id: "69607301a5bc0098eadcfa85", name: "Padel Court 1", sport: "PADEL" }],
+              start: "2026-11-13T09:00:00+05:00",
+              end: "2026-11-13T14:00:00+05:00",
+              note: "Closed for maintenance.",
+            },
+          ],
+        }),
+      },
+    },
+  },
   "/api/v1/sports": {
     get: {
       tags: ["Venue"],
@@ -188,7 +210,7 @@ export const catalogPaths = {
         "- advanceRequired = advancePercent of total, rounded UP. advancePercent comes from Admin → App Settings (50 today).",
         "- toTransfer = advanceRequired − wallet used (never below 0). 0 means the booking can be confirmed straight away.",
         "- Guests: points and wallet are null. Points rules come from App Settings (today: 10 per hour played, use from 100, up to 50% of the fee, 1 point = PKR 1).",
-        "Errors: 400 VALIDATION_ERROR (bad start), DATE_IN_PAST, DATE_OUT_OF_WINDOW, INVALID_DURATION; 404 COURT_NOT_FOUND; 409 SLOT_UNAVAILABLE.",
+        "Errors: 400 VALIDATION_ERROR (bad start), DATE_IN_PAST, DATE_OUT_OF_WINDOW, INVALID_DURATION; 404 COURT_NOT_FOUND; 409 SLOT_UNAVAILABLE, COURT_CLOSED (the venue closed this time; the message says why).",
       ].join("\n"),
       security: [{ bearerAuth: [] }, {}],
       requestBody: {

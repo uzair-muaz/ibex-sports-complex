@@ -29,6 +29,8 @@ import {
   LogoutOutlined,
   CustomerServiceOutlined,
   GiftOutlined,
+  StopOutlined,
+  NotificationOutlined,
   BulbOutlined,
   BulbFilled,
 } from "@ant-design/icons";
@@ -110,6 +112,16 @@ export function AdminLayout({
         key: "/admin/memberships",
         icon: <GiftOutlined />,
         label: "Memberships",
+      },
+      {
+        key: "/admin/closures",
+        icon: <StopOutlined />,
+        label: "Closures",
+      },
+      {
+        key: "/admin/messages",
+        icon: <NotificationOutlined />,
+        label: "Messages",
       },
     );
     if (isSuperAdmin) {

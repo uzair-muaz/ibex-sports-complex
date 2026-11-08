@@ -8,6 +8,8 @@ export const NOTIFICATION_TYPES = [
   "booking_cancelled",
   "wallet_credited",
   "points_earned",
+  "venue_news",
+  "offer",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

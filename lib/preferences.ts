@@ -120,6 +120,9 @@ export const SWITCH_FOR_TYPE: Record<NotificationType, keyof NotificationSwitche
   wallet_credited: "paymentUpdates",
   points_earned: "paymentUpdates",
   booking_cancelled: null,
+  // Messages from Admin → Messages. Venue news (closures, changes) always goes; offers follow "newsletter".
+  venue_news: null,
+  offer: "newsletter",
 };
 
 export function allowedBySwitches(p: Preferences, type: NotificationType | null): boolean {
