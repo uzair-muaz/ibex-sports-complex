@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkPhoto, detectPhotoType, mediaUrl, MAX_PHOTO_BYTES } from "@/lib/media-rules";
+import { checkPhoto, detectPhotoType, mediaIdFromUrl, mediaUrl, MAX_PHOTO_BYTES } from "@/lib/media-rules";
 import { sanitizeCourtAppFields } from "@/lib/court-app-fields";
 import { absoluteUrl } from "@/lib/api/catalog";
 
@@ -25,5 +25,15 @@ describe("uploaded photos", () => {
     const url = mediaUrl("6aef4e5a47e461d86cd61c01");
     expect(sanitizeCourtAppFields({ image: url })).toEqual({ ok: true, value: { image: url } });
     expect(absoluteUrl(url, "https://ibex.pk")).toBe("https://ibex.pk/api/v1/media/6aef4e5a47e461d86cd61c01");
+  });
+});
+
+describe("finding our own photo links", () => {
+  it("reads the id only from our /api/v1/media links", () => {
+    expect(mediaIdFromUrl("/api/v1/media/6aef4e5a47e461d86cd61c01")).toBe("6aef4e5a47e461d86cd61c01");
+    expect(mediaIdFromUrl("https://ibex.pk/api/v1/media/6aef4e5a47e461d86cd61c01")).toBe("6aef4e5a47e461d86cd61c01");
+    expect(mediaIdFromUrl("/images/paddle.jpg")).toBeNull();
+    expect(mediaIdFromUrl("https://evil.example/x?u=/api/v1/media/6aef4e5a47e461d86cd61c01x")).toBeNull();
+    expect(mediaIdFromUrl(null)).toBeNull();
   });
 });

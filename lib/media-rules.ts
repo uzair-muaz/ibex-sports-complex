@@ -31,6 +31,12 @@ export function mediaUrl(id: string): string {
   return `/api/v1/media/${id}`;
 }
 
+/** "/api/v1/media/abc…" or "https://host/api/v1/media/abc…" → the photo's id; null for other links. */
+export function mediaIdFromUrl(url: string | null | undefined): string | null {
+  const m = /\/api\/v1\/media\/([0-9a-f]{24})$/.exec(String(url ?? "").trim());
+  return m ? m[1] : null;
+}
+
 export function checkPhoto(size: number): string | null {
   if (size <= 0) return "The file is empty.";
   if (size > MAX_PHOTO_BYTES) return "The photo is too big. The limit is 3 MB.";

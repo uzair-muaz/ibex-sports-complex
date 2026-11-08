@@ -1,3 +1,4 @@
+import { deleteUnusedPhotos } from "@/lib/media";
 import connectDB from "@/lib/mongodb";
 import Court from "@/models/Court";
 import AppSettings, {
@@ -660,5 +661,7 @@ export async function updateAppSettings(
     { $set: next, $setOnInsert: { key: "main" } },
     { upsert: true, new: true, runValidators: true },
   );
+  // Sport photos that were replaced or removed: delete them if nothing uses them now.
+  await deleteUnusedPhotos(current.sports.map((s) => s.imageUrl).filter((u) => !next.sports.some((n) => n.imageUrl === u)));
   return { ok: true, settings: resolveAppSettings(next) };
 }

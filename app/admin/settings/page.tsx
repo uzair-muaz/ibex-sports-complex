@@ -469,8 +469,7 @@ export default function AdminAppSettingsPage() {
               </Form.Item>
             </div>
             <Text type="secondary">
-              The app uses these rules now. The website will switch to them when the points work
-              (Phase 10) is done.
+              The website and the app both use these rules.
             </Text>
           </Card>
 

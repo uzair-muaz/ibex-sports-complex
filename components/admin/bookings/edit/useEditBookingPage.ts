@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { App, Form } from "antd";
 import dayjs from "dayjs";
@@ -143,22 +144,25 @@ export function useEditBookingPage() {
 
   const updateBookingMutation = useUpdateBookingMutation();
 
+  // Lengths per sport from Admin → App Settings (same list customers and the new-booking page use).
+  const sportRulesQuery = useQuery({
+    queryKey: ["public", "sport-booking-rules"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/sports?includeHidden=true");
+      if (!res.ok) throw new Error("Could not load booking lengths");
+      return ((await res.json()) as {
+        sports: { sport: string; booking: { durationsMinutes: number[] } }[];
+      }).sports;
+    },
+    staleTime: 5 * 60_000,
+  });
+
   const durationPresets = useMemo((): DurationPreset[] => {
-    let presets: DurationPreset[];
-    if (courtType === "FUTSAL") {
-      presets = [
-        { hours: 1.5, label: "1h 30m" },
-        { hours: 2, label: "2h" },
-        { hours: 2.5, label: "2h 30m" },
-        { hours: 3, label: "3h" },
-      ];
-    } else {
-      presets = [
-        { hours: 1, label: "1 hour" },
-        { hours: 1.5, label: "1h 30m" },
-        { hours: 2, label: "2 hours" },
-      ];
-    }
+    const minutes = sportRulesQuery.data?.find((s) => s.sport === courtType)?.booking.durationsMinutes ?? [];
+    let presets: DurationPreset[] = minutes.map((m) => ({
+      hours: m / 60,
+      label: m % 60 === 0 ? `${m / 60} hour${m === 60 ? "" : "s"}` : `${Math.floor(m / 60)}h ${m % 60}m`,
+    }));
     if (loadedBooking) {
       const ld = Number(loadedBooking.duration);
       if (!Number.isNaN(ld) && !presets.some((p) => p.hours === ld)) {
@@ -168,7 +172,7 @@ export function useEditBookingPage() {
       }
     }
     return presets;
-  }, [courtType, loadedBooking]);
+  }, [courtType, loadedBooking, sportRulesQuery.data]);
 
   useEffect(() => {
     if (session && !isAdmin) {

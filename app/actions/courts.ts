@@ -1,5 +1,6 @@
 'use server';
 
+import { deleteUnusedPhotos } from "@/lib/media";
 import { getAppSettings } from "@/lib/app-settings";
 import { audit, snapshot } from '@/lib/audit';
 import connectDB from '@/lib/mongodb';
@@ -283,6 +284,7 @@ export async function updateCourt(input: UpdateCourtInput, opts?: StaffActorOpts
     if (!court) {
       throw new Error('Court not found');
     }
+    if (before?.image && before.image !== court.image) await deleteUnusedPhotos([before.image]);
     await audit({
       actor: gate,
       area: "courts",
@@ -321,6 +323,7 @@ export async function deleteCourt(courtId: string, opts?: StaffActorOpts) {
     if (!court) {
       throw new Error('Court not found');
     }
+    await deleteUnusedPhotos([court.image]);
     await audit({ actor: gate, area: "courts", action: "delete", targetId: court._id, targetLabel: court.name, summary: `Deleted court ${court.name}`, before: snapshot(court) });
 
     safeRevalidatePath('/admin');
