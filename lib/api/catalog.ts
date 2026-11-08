@@ -15,12 +15,17 @@ export function absoluteUrl(pathOrUrl: string | null | undefined, baseUrl: strin
   return `${baseUrl.replace(/\/$/, "")}/${pathOrUrl.replace(/^\//, "")}`;
 }
 
-/** Cheapest hourly price over the day (Futsal is stored per 90 min; this is per hour). */
+const SAMPLE_WEEKDAY = "2026-01-05"; // Monday
+const SAMPLE_SATURDAY = "2026-01-03";
+
+/** Cheapest hourly price over the week (Futsal is stored per 90 min; this is per hour). */
 export function startingPricePerHour(court: CourtLike): number {
   let min = Infinity;
-  for (let i = 0; i < 48; i++) {
-    const { pricePerHour } = getPricePerHourForTime(court, i * 0.5);
-    if (Number.isFinite(pricePerHour) && pricePerHour < min) min = pricePerHour;
+  for (const weekend of [false, true]) {
+    for (let i = 0; i < 48; i++) {
+      const { pricePerHour } = getPricePerHourForTime(court, i * 0.5, { weekend });
+      if (Number.isFinite(pricePerHour) && pricePerHour < min) min = pricePerHour;
+    }
   }
   return Number.isFinite(min) ? roundPkr(min) : 0;
 }
@@ -32,9 +37,12 @@ export function startingPricePerHour(court: CourtLike): number {
  */
 export function startingPriceFor(court: CourtLike, minutes: number): number {
   let min = Infinity;
-  for (let i = 0; i < 48; i++) {
-    const { originalPrice } = calculateOriginalPrice(court, i * 0.5, minutes / 60);
-    if (Number.isFinite(originalPrice) && originalPrice > 0 && originalPrice < min) min = originalPrice;
+  // A Monday and a Saturday, so weekday and weekend prices are both looked at.
+  for (const sampleDate of [SAMPLE_WEEKDAY, SAMPLE_SATURDAY]) {
+    for (let i = 0; i < 48; i++) {
+      const { originalPrice } = calculateOriginalPrice(court, i * 0.5, minutes / 60, sampleDate);
+      if (Number.isFinite(originalPrice) && originalPrice > 0 && originalPrice < min) min = originalPrice;
+    }
   }
   return Number.isFinite(min) ? roundPkr(min) : 0;
 }

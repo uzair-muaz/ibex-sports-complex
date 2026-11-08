@@ -11,6 +11,8 @@ export interface ICourt extends Document {
   image: string;
   description: string;
   pricePerHour: number; // 0 for free courts
+  /** Saturday and Sunday price. Null = same as pricePerHour. */
+  weekendPricePerHour?: number | null;
   isActive: boolean;
   /** Enable time-based peak/off-peak pricing */
   timeBasedPricingEnabled?: boolean;
@@ -20,6 +22,7 @@ export interface ICourt extends Document {
     startHour: number;
     endHour: number;
     pricePerHour: number;
+    weekendPricePerHour?: number | null;
     allDay?: boolean;
   }[];
   /** Mobile app card details (all optional; the website ignores them). */
@@ -67,6 +70,8 @@ const CourtSchema: Schema = new Schema(
       min: 0,
       default: 0,
     },
+    // Saturday and Sunday price. Null = same as pricePerHour.
+    weekendPricePerHour: { type: Number, min: 0, default: null },
     isActive: {
       type: Boolean,
       default: true,
@@ -104,6 +109,7 @@ const CourtSchema: Schema = new Schema(
           min: 0,
           required: true,
         },
+        weekendPricePerHour: { type: Number, min: 0, default: null },
         allDay: {
           type: Boolean,
           default: false,

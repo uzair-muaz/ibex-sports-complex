@@ -86,7 +86,7 @@ export function priceForSlot(
   discounts: DiscountInput[],
 ): { rateType: RateType; price: number; originalPrice: number; discounts: AppliedDiscount[] } {
   const duration = durationMinutes / 60;
-  const { originalPrice } = calculateOriginalPrice(court, startHour, duration);
+  const { originalPrice } = calculateOriginalPrice(court, startHour, duration, dateKey);
   const applicable = getApplicableDiscounts(discounts, {
     courtType: court.type,
     court,

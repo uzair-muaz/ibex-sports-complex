@@ -67,14 +67,20 @@ export function CourtsTable({
       key: "pricePerHour",
       sorter: (a, b) => a.pricePerHour - b.pricePerHour,
       sortOrder: sortOrderFor("pricePerHour"),
-      render: (price: number) => (
-        <Space size="small">
-          <span className="font-semibold text-[#2DD4BF]">
-            PKR {price.toLocaleString()}
-          </span>
-          {price === 0 && <Tag>Free</Tag>}
-        </Space>
-      ),
+      render: (price: number, court) => {
+        const weekend = court.timeBasedPricingEnabled
+          ? court.pricingPeriods?.some((p) => p.weekendPricePerHour != null)
+          : court.weekendPricePerHour != null;
+        return (
+          <Space size="small" wrap>
+            <span className="font-semibold text-[#2DD4BF]">
+              PKR {price.toLocaleString()}
+            </span>
+            {price === 0 && <Tag>Free</Tag>}
+            {weekend && <Tag color="purple">Weekend price</Tag>}
+          </Space>
+        );
+      },
     },
     {
       title: "Status",

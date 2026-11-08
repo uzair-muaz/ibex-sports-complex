@@ -13,6 +13,7 @@ import {
   getBookingStartPricingLabel,
   getPricePerHourForTime,
   calculatePeakOffPeakNeutralSplit,
+  isWeekendSlot,
   type CourtLike,
 } from '@/lib/pricing-utils';
 
@@ -140,6 +141,7 @@ export function tierSplitAmountSavedWithSlices(
     ctx.court,
     ctx.startTime,
     ctx.duration,
+    ctx.date,
   );
   if (breakdown.total <= 0 || runningPrice <= 0) return 0;
 
@@ -153,7 +155,9 @@ export function tierSplitAmountSavedWithSlices(
   for (let i = 0; i < slots; i++) {
     const rawSlotStart = ctx.startTime + i * 0.5;
     const slotStart = ((rawSlotStart % 24) + 24) % 24;
-    const { pricePerHour, label } = getPricePerHourForTime(ctx.court, slotStart);
+    const { pricePerHour, label } = getPricePerHourForTime(ctx.court, slotStart, {
+      weekend: isWeekendSlot(ctx.date, rawSlotStart),
+    });
     const slotBase = pricePerHour * 0.5;
     const slotRunning = slotBase * priceScale;
 

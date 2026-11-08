@@ -32,6 +32,25 @@ function addPeriodSlots(
   }
 }
 
+/** Weekend prices: empty means "same as weekday". Cleans them in place; returns an error or null. */
+function cleanWeekendPrices(input: { weekendPricePerHour?: number | null; pricingPeriods?: CourtPricingPeriod[] }): string | null {
+  const clean = (v: unknown): number | null | undefined | "bad" => {
+    if (v === undefined) return undefined;
+    if (v === null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 1_000_000 ? n : "bad";
+  };
+  const base = clean(input.weekendPricePerHour);
+  if (base === "bad") return "Weekend price must be a number of 0 or more.";
+  if (base !== undefined) input.weekendPricePerHour = base;
+  for (const p of input.pricingPeriods ?? []) {
+    const w = clean(p.weekendPricePerHour);
+    if (w === "bad") return "Weekend price for a peak/off-peak period must be a number of 0 or more.";
+    p.weekendPricePerHour = w ?? null;
+  }
+  return null;
+}
+
 function validateTimeBasedPricing(periods: CourtPricingPeriod[]): string | null {
   if (!periods.length) {
     return 'Please add at least one peak/off-peak period when dynamic pricing is enabled.';
@@ -124,6 +143,8 @@ export interface CreateCourtInput {
   image?: string; // Images are hardcoded, optional
   description: string;
   pricePerHour: number;
+  /** Saturday and Sunday price. Empty = same as pricePerHour. */
+  weekendPricePerHour?: number | null;
   timeBasedPricingEnabled?: boolean;
   pricingPeriods?: CourtPricingPeriod[];
   surfaceLabel?: string;
@@ -139,6 +160,9 @@ export async function createCourt(input: CreateCourtInput, opts?: StaffActorOpts
     const gate = await requireStaffActor(opts, { superAdmin: true });
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
+
+    const weekendError = cleanWeekendPrices(input);
+    if (weekendError) return { success: false, error: weekendError };
 
     if (input.timeBasedPricingEnabled) {
       const error = validateTimeBasedPricing(input.pricingPeriods || []);
@@ -160,6 +184,7 @@ export async function createCourt(input: CreateCourtInput, opts?: StaffActorOpts
       description: input.description,
       ...app.value,
       pricePerHour: input.pricePerHour,
+      weekendPricePerHour: input.weekendPricePerHour ?? null,
       isActive: true,
       timeBasedPricingEnabled: input.timeBasedPricingEnabled ?? false,
       pricingPeriods: input.pricingPeriods ?? [],
@@ -190,6 +215,8 @@ export interface UpdateCourtInput {
   image?: string;
   description?: string;
   pricePerHour?: number;
+  /** Saturday and Sunday price. Empty = same as pricePerHour. */
+  weekendPricePerHour?: number | null;
   isActive?: boolean;
   timeBasedPricingEnabled?: boolean;
   pricingPeriods?: CourtPricingPeriod[];
@@ -212,6 +239,9 @@ export async function updateCourt(input: UpdateCourtInput, opts?: StaffActorOpts
     const app = sanitizeCourtAppFields(updateData as unknown as Record<string, unknown>);
     if (!app.ok) return { success: false, error: app.error };
     Object.assign(updateData, app.value);
+
+    const weekendError = cleanWeekendPrices(updateData);
+    if (weekendError) return { success: false, error: weekendError };
 
     if (updateData.timeBasedPricingEnabled) {
       const error = validateTimeBasedPricing(updateData.pricingPeriods || []);

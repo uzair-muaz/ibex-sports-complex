@@ -5,6 +5,8 @@ export type CourtFormState = {
   type: Court["type"];
   description: string;
   pricePerHour: number;
+  /** Saturday and Sunday price. null = same as weekday. */
+  weekendPricePerHour: number | null;
   isActive: boolean;
   timeBasedPricingEnabled: boolean;
   pricingPeriods: CourtPricingPeriod[];
@@ -35,6 +37,7 @@ export function createEmptyCourtForm(): CourtFormState {
     type: "PADEL",
     description: "",
     pricePerHour: 0,
+    weekendPricePerHour: null,
     isActive: true,
     timeBasedPricingEnabled: false,
     pricingPeriods: [],
@@ -53,6 +56,7 @@ export function courtToFormState(court: Court): CourtFormState {
     type: court.type,
     description: court.description,
     pricePerHour: court.pricePerHour,
+    weekendPricePerHour: court.weekendPricePerHour ?? null,
     isActive: court.isActive,
     timeBasedPricingEnabled: court.timeBasedPricingEnabled ?? false,
     pricingPeriods: court.pricingPeriods ?? [],
@@ -118,6 +122,7 @@ export function appendPricingPeriod(
         startHour: defaultStart,
         endHour: defaultEnd,
         pricePerHour: prev.pricePerHour || 0,
+        weekendPricePerHour: null,
         allDay: false,
       },
     ],

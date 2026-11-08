@@ -18,6 +18,8 @@ export interface CourtPricingPeriod {
   endHour: number;
   /** Price per hour during this period */
   pricePerHour: number;
+  /** Saturday and Sunday price for this period. Empty = same as pricePerHour. */
+  weekendPricePerHour?: number | null;
   /** If true, applies all day regardless of hours */
   allDay?: boolean;
 }
@@ -29,6 +31,8 @@ export interface Court {
   image: string;
   description: string;
   pricePerHour: number;
+  /** Saturday and Sunday price. Empty = same as pricePerHour. */
+  weekendPricePerHour?: number | null;
   isActive: boolean;
   /** Enable time-based peak/off-peak pricing */
   timeBasedPricingEnabled?: boolean;

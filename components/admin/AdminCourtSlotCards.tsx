@@ -131,7 +131,8 @@ export function AdminCourtSlotCards({
                     <span className="font-semibold text-[var(--ant-color-text-secondary)]">
                       {period.label === "peak" ? "Peak" : "Off-peak"}
                     </span>
-                    : PKR {period.pricePerHour.toLocaleString()}/hr{" "}
+                    : PKR {period.pricePerHour.toLocaleString()}/hr
+                    {period.weekendPricePerHour != null && ` (Sat–Sun PKR ${period.weekendPricePerHour.toLocaleString()})`}{" "}
                     <span className="text-[var(--ant-color-text-secondary)]">
                       ({formatPeriodTime(period)})
                     </span>
@@ -141,6 +142,7 @@ export function AdminCourtSlotCards({
             ) : (
               <p className="text-sm text-[var(--ant-color-primary)] font-semibold">
                 PKR {court.pricePerHour.toLocaleString()}/hr
+                {court.weekendPricePerHour != null && ` · Sat–Sun PKR ${court.weekendPricePerHour.toLocaleString()}/hr`}
               </p>
             )}
           </div>

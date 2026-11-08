@@ -31,6 +31,7 @@ import {
   type AvailableStartTimeQuote,
 } from "../actions/bookings";
 import { maxUsablePoints } from "@/lib/loyalty-rules";
+import { isWeekendDateKey } from "@/lib/membership-rules";
 import { hoursCover } from "@/lib/membership-hours-rules";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
@@ -53,12 +54,14 @@ type CheckoutFormErrors = {
 type CourtRecord = {
   type?: CourtType;
   pricePerHour?: number;
+  weekendPricePerHour?: number | null;
   pricingPeriods?: Array<{
     label?: string;
     startHour?: number;
     endHour?: number;
     allDay?: boolean;
     pricePerHour?: number;
+    weekendPricePerHour?: number | null;
   }>;
 };
 
@@ -366,8 +369,12 @@ export default function BookingClient() {
 
   // Court prices are saved per hour, except Futsal, saved per 90 minutes (see lib/pricing-utils.ts).
   const priceUnit = selectedCourtType === "FUTSAL" ? "90 MIN" : "HR";
+  // Saturday and Sunday use the weekend prices set in Admin → Courts (when set).
+  const isWeekendDay = Boolean(dateString) && isWeekendDateKey(dateString);
   const courtPricing = useMemo(() => {
-    const fallback = activeCourt?.pricePerHour || 0;
+    const rate = (p?: { pricePerHour?: number; weekendPricePerHour?: number | null }) =>
+      p ? (isWeekendDay && p.weekendPricePerHour != null ? p.weekendPricePerHour : p.pricePerHour) : undefined;
+    const fallback = rate(activeCourt) || 0;
     const periods = Array.isArray(activeCourt?.pricingPeriods)
       ? activeCourt.pricingPeriods
       : [];
@@ -390,15 +397,18 @@ export default function BookingClient() {
       return `${formatTime12(period.startHour)} - ${formatTime12(period.endHour)}`;
     };
     return {
-      offPeak: offPeak?.pricePerHour ?? fallback,
-      peak: peak?.pricePerHour ?? fallback,
+      offPeak: rate(offPeak) ?? fallback,
+      peak: rate(peak) ?? fallback,
       offPeakHours: formatRange(offPeak),
       peakHours: formatRange(peak),
       peakPeriod: peak,
       hasSplitPricing,
       basePrice: fallback,
+      weekendRates:
+        isWeekendDay &&
+        (activeCourt?.weekendPricePerHour != null || periods.some((p) => p.weekendPricePerHour != null)),
     };
-  }, [activeCourt]);
+  }, [activeCourt, isWeekendDay]);
 
   const getIsPeakTime = useCallback(
     (hour: number) => {
@@ -802,6 +812,7 @@ export default function BookingClient() {
                   {selectedCourtType
                     ? sportHeadingMap[selectedCourtType].subtitle
                     : "Premium Surface"}
+                  {courtPricing.weekendRates && " · Weekend prices"}
                 </p>
               </div>
               {selectedTypeCourts.length > 0 ? (

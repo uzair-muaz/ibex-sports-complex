@@ -143,6 +143,29 @@ export function CourtFormModal({
               disabled={courtForm.timeBasedPricingEnabled}
             />
           </Form.Item>
+          <Form.Item
+            label="Weekend Price Per Hour (Sat–Sun)"
+            extra={
+              <Text type="secondary" className="text-[11px]">
+                Leave empty to charge the base price on weekends too.
+              </Text>
+            }
+          >
+            <InputNumber
+              className="w-full"
+              min={0}
+              step={0.01}
+              value={courtForm.weekendPricePerHour}
+              onChange={(v) =>
+                setCourtForm({
+                  ...courtForm,
+                  weekendPricePerHour: typeof v === "number" ? v : null,
+                })
+              }
+              placeholder="Same as base price"
+              disabled={courtForm.timeBasedPricingEnabled}
+            />
+          </Form.Item>
           <Form.Item label="Settings">
             <Space direction="vertical">
               <Checkbox
@@ -244,6 +267,23 @@ export function CourtFormModal({
                             }
                           />
                         </Form.Item>
+
+                        <Form.Item label="Weekend Price / Hour (Sat–Sun)" className="mb-0">
+                          <InputNumber
+                            className="w-full"
+                            size="small"
+                            min={0}
+                            step={0.01}
+                            placeholder="Same as weekday"
+                            value={period.weekendPricePerHour ?? null}
+                            onChange={(v) =>
+                              updatePricingPeriod(index, {
+                                weekendPricePerHour: typeof v === "number" ? v : null,
+                              })
+                            }
+                          />
+                        </Form.Item>
+                        <div className="hidden md:block" />
 
                         <Form.Item label="Start Time" className="mb-0">
                           <Select

@@ -316,6 +316,7 @@ export async function createBooking(
       assignedCourt,
       input.startTime,
       input.duration,
+      input.date,
     );
 
     // Fetch active discounts using business timezone date boundary
@@ -636,6 +637,7 @@ export async function getAvailableStartTimes(
         assignedCourt,
         startTime,
         input.duration,
+        input.date,
       );
       const applicable = getApplicableDiscounts(discountsData, {
         courtType: input.courtType,
@@ -1139,6 +1141,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
         courtForSlot,
         finalStartTime,
         finalDuration,
+        finalDate,
       );
 
       // Fetch active discounts using business timezone date boundary
