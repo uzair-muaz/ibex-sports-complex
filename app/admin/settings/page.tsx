@@ -1,5 +1,6 @@
 "use client";
 
+import { PhotoUpload } from "@/components/admin/PhotoUpload";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -496,10 +497,11 @@ export default function AdminAppSettingsPage() {
                   />
                 </Form.Item>
               </div>
-              <Form.Item label="Photo link" extra={<Text type="secondary">https://… or /images/…</Text>}>
-                <Input
+              <Form.Item label="Photo" extra={<Text type="secondary">Upload a photo, or paste https://… or /images/…</Text>}>
+                <PhotoUpload
+                  kind="sport_photo"
                   value={s.imageUrl}
-                  onChange={(e) => setSport(s.sport, { imageUrl: e.target.value })}
+                  onChange={(imageUrl) => setSport(s.sport, { imageUrl })}
                 />
               </Form.Item>
             </Card>

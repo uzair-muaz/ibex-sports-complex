@@ -25,6 +25,7 @@ import {
 } from "./courtHelpers";
 import { COURT_FEATURE_LABELS } from "@/lib/court-features";
 import { priceUnit } from "@/lib/pricing-utils";
+import { PhotoUpload } from "@/components/admin/PhotoUpload";
 
 const { Text } = Typography;
 
@@ -352,16 +353,15 @@ export function CourtFormModal({
             label="Photo link"
             extra={
               <Text type="secondary" className="text-[11px]">
-                An https:// link (or /images/… on this site). Leave empty to use
-                the sport&apos;s photo.
+                Upload a photo, or paste an https:// link (or /images/… on this
+                site). Leave empty to use the sport&apos;s photo.
               </Text>
             }
           >
-            <Input
+            <PhotoUpload
+              kind="court_photo"
               value={courtForm.image}
-              onChange={(e) =>
-                setCourtForm({ ...courtForm, image: e.target.value })
-              }
+              onChange={(image) => setCourtForm((prev) => ({ ...prev, image }))}
               placeholder="https://…/court1.jpg"
             />
           </Form.Item>

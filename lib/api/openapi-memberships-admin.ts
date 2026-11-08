@@ -114,6 +114,25 @@ export const membershipAdminPaths = {
       responses: { "200": { description: "`{items, total, nextCursor}`" }, "403": { description: "Super admin only" } },
     },
   },
+  "/api/v1/admin/media": {
+    post: {
+      tags: ["Admin"],
+      summary: "Super admin: upload a court or sport photo",
+      description:
+        "multipart/form-data: `file` (JPG, PNG or WebP, up to 3 MB; checked by its content, not its name) and `kind` (`court_photo` or `sport_photo`). Answer `{id, url}`: put `url` in the court's `image` or the sport's `imageUrl` and save. Photos are kept in the database and never change (a new photo gets a new link).",
+      security: sec,
+      responses: { "201": { description: "`{id, url}`" }, "400": { description: "INVALID_FILE or VALIDATION_ERROR" }, "403": { description: "Super admin only" } },
+    },
+  },
+  "/api/v1/media/{id}": {
+    get: {
+      tags: ["Catalog"],
+      summary: "Public: an uploaded photo",
+      description: "The photo itself (image/jpeg, image/png or image/webp), cached for a year. Court and sport `imageUrl`s in the app API already point here as full links.",
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      responses: { "200": { description: "The photo" }, "404": { description: "Not found" } },
+    },
+  },
   "/api/v1/admin/customers/{id}/block": {
     post: {
       tags: ["Admin"],
