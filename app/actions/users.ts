@@ -1,5 +1,7 @@
 'use server';
 
+import { audit } from '@/lib/audit';
+import { diffChanges } from '@/lib/audit-rules';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import bcrypt from 'bcryptjs';
@@ -37,6 +39,7 @@ export async function createUser(input: CreateUserInput, opts?: StaffActorOpts) 
       name: input.name,
       role: input.role,
     });
+    await audit({ actor: gate, area: "users", action: "create", targetId: user._id, targetLabel: user.email, summary: `Made account ${user.email} (${user.role})` });
 
     revalidatePath('/admin');
 
@@ -87,6 +90,7 @@ export async function updateUser(input: UpdateUserInput, opts?: StaffActorOpts) 
       updatePayload.email = updatePayload.email.toLowerCase();
     }
 
+    const before = await User.findById(userId).select("name email role").lean();
     const user = await User.findByIdAndUpdate(
       userId,
       updatePayload,
@@ -96,6 +100,19 @@ export async function updateUser(input: UpdateUserInput, opts?: StaffActorOpts) 
     if (!user) {
       throw new Error('User not found');
     }
+    const pick = (u: { name?: string; email?: string; role?: string } | null) => (u ? { name: u.name, email: u.email, role: u.role } : null);
+    const changes = diffChanges(pick(before), pick(user));
+    if (password) changes.push({ path: "password", from: "—", to: "changed" });
+    await audit({
+      actor: gate,
+      area: "users",
+      action: "update",
+      targetId: user._id,
+      targetLabel: user.email,
+      customerId: user.role === "user" ? user._id : null,
+      summary: `Changed account ${user.email}`,
+      changes,
+    });
 
     revalidatePath('/admin');
 
@@ -123,6 +140,7 @@ export async function deleteUser(userId: string, opts?: StaffActorOpts) {
     if (!user) {
       throw new Error('User not found');
     }
+    await audit({ actor: gate, area: "users", action: "delete", targetId: user._id, targetLabel: user.email, summary: `Deleted account ${user.email} (${user.role})` });
 
     revalidatePath('/admin');
 

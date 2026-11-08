@@ -1,4 +1,5 @@
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
+import { audit } from "@/lib/audit";
 import { requireApiAdmin } from "@/lib/api/guard";
 import { isSuperAdminRole } from "@/lib/authz";
 import { listBroadcasts, previewBroadcast, sendBroadcast } from "@/lib/broadcast";
@@ -29,6 +30,14 @@ export async function POST(request: Request) {
   }
   const r = await sendBroadcast(body, gate.user.id);
   if (!r.ok) return apiError(r.error, r.status, request, { code: r.code });
+  await audit({
+    actor: gate.user,
+    area: "messages",
+    action: "send",
+    targetId: r.broadcast.id,
+    targetLabel: String(body.title ?? ""),
+    summary: `Sent "${String(body.title ?? "").slice(0, 80)}" to ${r.broadcast.inAppCount} customer(s) (${String(body.audience)})`,
+  });
   return apiOk({ broadcast: r.broadcast }, request, { status: 201 });
 }
 

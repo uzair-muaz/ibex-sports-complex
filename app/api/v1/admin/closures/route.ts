@@ -1,4 +1,5 @@
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
+import { audit } from "@/lib/audit";
 import { requireApiAdmin } from "@/lib/api/guard";
 import { isSuperAdminRole } from "@/lib/authz";
 import { createClosure, listClosures } from "@/lib/closure-admin";
@@ -19,6 +20,15 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const r = await createClosure(body, gate.user.id);
   if (!r.ok) return apiError(r.error, r.status, request, { code: r.code });
+  const c = r.closure;
+  await audit({
+    actor: gate.user,
+    area: "closures",
+    action: "create",
+    targetId: c.id,
+    targetLabel: c.courts.join(", "),
+    summary: `Closed ${c.courts.join(", ")} from ${c.startsAt.slice(0, 16).replace("T", " ")} to ${c.endsAt.slice(0, 16).replace("T", " ")} — ${c.reason}`,
+  });
   return apiOk({ closure: r.closure }, request, { status: 201 });
 }
 

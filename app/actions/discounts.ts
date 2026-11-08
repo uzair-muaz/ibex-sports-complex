@@ -1,5 +1,6 @@
 'use server';
 
+import { audit, snapshot } from '@/lib/audit';
 import connectDB from '@/lib/mongodb';
 import Discount from '@/models/Discount';
 import type {
@@ -432,6 +433,7 @@ export async function createDiscount(input: CreateDiscountInput, opts?: StaffAct
     applyDayRulesToDoc(doc, input.dayRules);
 
     const discount = await Discount.create(doc);
+    await audit({ actor: gate, area: "discounts", action: "create", targetId: discount._id, targetLabel: discount.name, summary: `Made discount ${discount.name}`, after: snapshot(discount) });
 
     safeRevalidatePath('/admin/discounts');
     safeRevalidatePath('/');
@@ -634,11 +636,24 @@ export async function updateDiscount(input: UpdateDiscountInput, opts?: StaffAct
     if (Object.keys($set).length > 0) updatePayload.$set = $set;
     if (Object.keys($unset).length > 0) updatePayload.$unset = $unset;
 
+    const before = await Discount.findById(discountId);
     const discount = await Discount.findByIdAndUpdate(
       discountId,
       updatePayload,
       { new: true, runValidators: true },
     );
+    if (discount) {
+      await audit({
+        actor: gate,
+        area: "discounts",
+        action: "update",
+        targetId: discount._id,
+        targetLabel: discount.name,
+        summary: `Changed discount ${discount.name}`,
+        before: snapshot(before),
+        after: snapshot(discount),
+      });
+    }
 
     safeRevalidatePath('/admin/discounts');
     safeRevalidatePath('/');
@@ -668,6 +683,7 @@ export async function deleteDiscount(discountId: string, opts?: StaffActorOpts) 
     if (!discount) {
       throw new Error('Discount not found');
     }
+    await audit({ actor: gate, area: "discounts", action: "delete", targetId: discount._id, targetLabel: discount.name, summary: `Deleted discount ${discount.name}`, before: snapshot(discount) });
 
     safeRevalidatePath('/admin/discounts');
     safeRevalidatePath('/');
@@ -699,6 +715,14 @@ export async function toggleDiscountActive(discountId: string, opts?: StaffActor
 
     discount.isActive = !discount.isActive;
     await discount.save();
+    await audit({
+      actor: gate,
+      area: "discounts",
+      action: discount.isActive ? "switch_on" : "switch_off",
+      targetId: discount._id,
+      targetLabel: discount.name,
+      summary: `Switched discount ${discount.name} ${discount.isActive ? "on" : "off"}`,
+    });
 
     safeRevalidatePath('/admin/discounts');
     safeRevalidatePath('/');

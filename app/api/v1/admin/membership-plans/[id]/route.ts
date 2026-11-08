@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import { audit, snapshot } from "@/lib/audit";
+import MembershipPlan from "@/models/MembershipPlan";
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
 import { requireApiAdmin } from "@/lib/api/guard";
 import { isSuperAdminRole } from "@/lib/authz";
@@ -19,8 +21,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!mongoose.isValidObjectId(id)) return apiError("Plan not found", 404, request, { code: "PLAN_NOT_FOUND" });
   const check = validatePlanInput(await request.json().catch(() => null), true);
   if (!check.ok) return apiError(check.error, 400, request, { code: "VALIDATION_ERROR" });
+  const before = await MembershipPlan.findById(id).lean();
   const plan = await updatePlan(id, check.value);
   if (!plan) return apiError("Plan not found", 404, request, { code: "PLAN_NOT_FOUND" });
+  await audit({
+    actor: gate.user,
+    area: "membership_plans",
+    action: "update",
+    targetId: id,
+    targetLabel: before?.name ?? null,
+    summary: `Changed membership plan ${before?.name ?? ""}`.trim(),
+    before: snapshot(before),
+    after: check.value,
+    onlyAfterKeys: true,
+  });
   return apiOk({ plan }, request);
 }
 

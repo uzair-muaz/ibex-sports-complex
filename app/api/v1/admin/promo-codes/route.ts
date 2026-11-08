@@ -1,4 +1,5 @@
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
+import { audit } from "@/lib/audit";
 import { requireApiAdmin } from "@/lib/api/guard";
 import { isSuperAdminRole } from "@/lib/authz";
 import { createPromo, listPromos } from "@/lib/promo-admin";
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const r = await createPromo(body, gate.user.id);
   if (!r.ok) return apiError(r.error, r.status, request, { code: r.code });
+  await audit({ actor: gate.user, area: "promo_codes", action: "create", targetId: r.promo.id, targetLabel: r.promo.code, summary: `Made promo code ${r.promo.code}`, after: r.promo });
   return apiOk({ promo: r.promo }, request, { status: 201 });
 }
 

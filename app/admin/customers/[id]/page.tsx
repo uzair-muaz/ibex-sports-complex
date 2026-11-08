@@ -26,6 +26,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminPageLoader } from "@/components/admin/loaders";
 import { WalletModal } from "@/components/admin/WalletModal";
 import { HoursBankModal } from "@/components/admin/HoursBankModal";
+import { AuditTable } from "@/components/admin/AuditTable";
 import { SPORT_LABELS } from "@/components/admin/MembershipPlansModal";
 import { bffFetch } from "@/lib/bff/client";
 import { adjustAdminLoyalty } from "@/lib/tanstack/requests/admin-ops.requests";
@@ -259,6 +260,15 @@ export default function CustomerPageView() {
                     <Empty description="No support tickets." />
                   ),
                 },
+                ...(isSuperAdmin
+                  ? [
+                      {
+                        key: "audit",
+                        label: "Staff changes",
+                        children: <AuditTable compact filters={{ customerId: data.customer.id }} />,
+                      },
+                    ]
+                  : []),
               ]}
             />
           </Card>

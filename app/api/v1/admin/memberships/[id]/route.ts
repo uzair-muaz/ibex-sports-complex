@@ -1,4 +1,6 @@
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
+import { audit } from "@/lib/audit";
+import UserMembership from "@/models/UserMembership";
 import { requireApiAdmin } from "@/lib/api/guard";
 import { isSuperAdminRole } from "@/lib/authz";
 import { adjustMembershipHours, cancelMembership, changeMembershipEndDate } from "@/lib/membership-admin";
@@ -34,6 +36,24 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       return apiError("action must be adjust-hours, change-end-date or cancel", 400, request, { code: "VALIDATION_ERROR" });
     }
     if (!result.ok) return apiError(result.error, result.status, request, { code: result.code });
+    const m = await UserMembership.findById(id).select("userId").populate("planId", "name").lean();
+    const plan = (m?.planId as unknown as { name?: string } | null)?.name ?? "membership";
+    const hours = Number(body.hours);
+    const note = typeof body.note === "string" ? ` — ${body.note.slice(0, 200)}` : "";
+    await audit({
+      actor: gate.user,
+      area: "memberships",
+      action: String(body.action),
+      targetId: id,
+      targetLabel: plan,
+      customerId: m?.userId ? String(m.userId) : null,
+      summary:
+        body.action === "adjust-hours"
+          ? `${hours > 0 ? "Added" : "Removed"} ${Math.abs(hours)} ${String(body.sport)} hour(s) on ${plan}${note}`
+          : body.action === "change-end-date"
+            ? `Changed ${plan} end date to ${String(body.validUntil).slice(0, 10)}${note}`
+            : `Cancelled ${plan}${note}`,
+    });
     const data: Record<string, unknown> = { ...result };
     delete data.ok;
     return apiOk(data, request);

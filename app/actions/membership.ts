@@ -1,5 +1,7 @@
 "use server";
 
+import { audit } from "@/lib/audit";
+import { pkrText } from "@/lib/audit-rules";
 import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import MembershipPlan from "@/models/MembershipPlan";
@@ -81,6 +83,16 @@ export async function adminActivateMembership(
       planId: input.planId,
       carryForwardHours: input.carryForwardHours,
       hoursBySport: input.hoursBySport ? cleanHoursBySport(input.hoursBySport) : undefined,
+    });
+    const plan = await MembershipPlan.findById(input.planId).select("name").lean();
+    await audit({
+      actor: gate,
+      area: "memberships",
+      action: "activate",
+      targetId: membership._id,
+      targetLabel: plan?.name ?? null,
+      customerId: input.userId,
+      summary: `Activated ${plan?.name ?? "a plan"}${payment ? ` — paid ${payment.method === "free" ? "nothing (free)" : `${pkrText(payment.pricePaid)} by ${payment.method.replace("_", " ")}`}` : ""}${input.carryForwardHours ? ", hours carried over" : ""}`,
     });
     revalidatePath("/admin/users");
     revalidatePath("/account/membership");

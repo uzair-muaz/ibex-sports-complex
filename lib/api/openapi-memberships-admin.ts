@@ -104,6 +104,16 @@ export const membershipAdminPaths = {
       responses: { "200": { description: "text/csv file" }, "400": { description: "VALIDATION_ERROR" }, "403": { description: "Super admin only" } },
     },
   },
+  "/api/v1/admin/audit": {
+    get: {
+      tags: ["Admin"],
+      summary: "Super admin: audit log (who changed what)",
+      description:
+        "Newest first, 50 per page. Filters: `area` (settings, courts, discounts, promo_codes, membership_plans, memberships, wallet, points, bookings, payments, closures, messages, users), `actorId` (staff), `customerId`, `targetId`, `q` (search the summary and name), `from`/`to` (YYYY-MM-DD), `cursor`. Each item: `{id, at, by: {id, name}, role, area, action, targetId, targetLabel, customerId, summary, changes: [{path, from, to}]}`. Passwords and secrets are never stored.",
+      security: sec,
+      responses: { "200": { description: "`{items, total, nextCursor}`" }, "403": { description: "Super admin only" } },
+    },
+  },
   "/api/v1/admin/customers/{id}": {
     get: {
       tags: ["Admin"],

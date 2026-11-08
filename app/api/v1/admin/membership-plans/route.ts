@@ -1,4 +1,5 @@
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
+import { audit } from "@/lib/audit";
 import { requireApiAdmin } from "@/lib/api/guard";
 import { isSuperAdminRole } from "@/lib/authz";
 import { createPlan, listAdminPlans, validatePlanInput } from "@/lib/membership-plans";
@@ -20,6 +21,14 @@ export async function POST(request: Request) {
   const check = validatePlanInput(await request.json().catch(() => null), false);
   if (!check.ok) return apiError(check.error, 400, request, { code: "VALIDATION_ERROR" });
   const plan = await createPlan(check.value);
+  await audit({
+    actor: gate.user,
+    area: "membership_plans",
+    action: "create",
+    targetLabel: check.value.name ?? null,
+    summary: `Made membership plan ${check.value.name ?? ""}`.trim(),
+    after: check.value,
+  });
   return apiOk({ plan }, request, { status: 201 });
 }
 

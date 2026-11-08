@@ -1,5 +1,6 @@
 'use server';
 
+import { audit, snapshot } from '@/lib/audit';
 import connectDB from '@/lib/mongodb';
 import Court from '@/models/Court';
 import type { CourtFeature } from '@/models/Court';
@@ -164,6 +165,8 @@ export async function createCourt(input: CreateCourtInput, opts?: StaffActorOpts
       pricingPeriods: input.pricingPeriods ?? [],
     });
 
+    await audit({ actor: gate, area: "courts", action: "create", targetId: court._id, targetLabel: court.name, summary: `Added court ${court.name}`, after: snapshot(court) });
+
     safeRevalidatePath('/admin');
     safeRevalidatePath('/');
 
@@ -220,6 +223,7 @@ export async function updateCourt(input: UpdateCourtInput, opts?: StaffActorOpts
       }
     }
 
+    const before = await Court.findById(courtId);
     const court = await Court.findByIdAndUpdate(
       courtId,
       updateData,
@@ -229,6 +233,16 @@ export async function updateCourt(input: UpdateCourtInput, opts?: StaffActorOpts
     if (!court) {
       throw new Error('Court not found');
     }
+    await audit({
+      actor: gate,
+      area: "courts",
+      action: "update",
+      targetId: court._id,
+      targetLabel: court.name,
+      summary: `Changed court ${court.name}`,
+      before: snapshot(before),
+      after: snapshot(court),
+    });
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/');
@@ -257,6 +271,7 @@ export async function deleteCourt(courtId: string, opts?: StaffActorOpts) {
     if (!court) {
       throw new Error('Court not found');
     }
+    await audit({ actor: gate, area: "courts", action: "delete", targetId: court._id, targetLabel: court.name, summary: `Deleted court ${court.name}`, before: snapshot(court) });
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/');

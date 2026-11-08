@@ -1,5 +1,6 @@
 "use server";
 
+import { audit } from "@/lib/audit";
 import connectDB from "@/lib/mongodb";
 import LoyaltyTransaction from "@/models/LoyaltyTransaction";
 import {
@@ -65,6 +66,14 @@ export async function adminAdjustLoyalty(
 
   try {
     const balance = await adjustLoyaltyPoints(input);
+    await audit({
+      actor: gate,
+      area: "points",
+      action: "adjust",
+      targetId: input.userId,
+      customerId: input.userId,
+      summary: `${input.delta > 0 ? "Added" : "Took away"} ${Math.abs(input.delta).toLocaleString()} points${input.note ? ` — ${input.note.slice(0, 200)}` : ""}. Balance now ${balance.toLocaleString()}.`,
+    });
     revalidatePath("/admin/users");
     return { success: true as const, balance };
   } catch (error: unknown) {

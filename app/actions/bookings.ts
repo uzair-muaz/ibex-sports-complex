@@ -1,6 +1,7 @@
 'use server';
 
 import { closureSpansByCourt } from "@/lib/closures";
+import { auditBooking, bookingSnap } from "@/lib/audit-booking";
 import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 import Booking from '@/models/Booking';
@@ -978,8 +979,11 @@ export async function cancelBooking(
   try {
     const gate = await requireStaffActor(opts);
     if (!gate.ok) return { success: false, error: gate.error };
+    await connectDB();
+    const auditBefore = await bookingSnap(bookingId);
     const result = await staffCancelBooking({ bookingId, staffId: gate.userId, refund: refund?.choice, note: refund?.note });
     if (!result.ok) return { success: false, error: result.error };
+    await auditBooking(gate, bookingId, "cancel", auditBefore);
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');
@@ -1025,6 +1029,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
     await connectDB();
 
     const { bookingId, cancelRefund, cancelNote, ...updateData } = input;
+    const auditBefore = await bookingSnap(bookingId);
 
     // Cancelling goes through the shared staff cancel, so money, points and hours come back the same way.
     if (updateData.status === 'cancelled') {
@@ -1033,6 +1038,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
       delete updateData.status;
       const others = Object.values(updateData).some((v) => v !== undefined);
       if (!others) {
+        await auditBooking(gate, bookingId, "cancel", auditBefore);
         safeRevalidatePath('/admin');
         safeRevalidatePath('/booking');
         safeRevalidatePath('/account/bookings');
@@ -1181,6 +1187,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
       updatedBooking.date,
       previousDate,
     ]);
+    await auditBooking(gate, bookingId, auditBefore?.status !== "cancelled" && updatedBooking.status === "cancelled" ? "cancel" : "update", auditBefore);
 
     return {
       success: true,
@@ -1297,6 +1304,7 @@ export async function deleteBooking(bookingId: string, opts?: StaffActorOpts) {
 
     await connectDB();
 
+    const auditBefore = await bookingSnap(bookingId);
     const booking = await Booking.findByIdAndDelete(bookingId);
 
     if (!booking) {
@@ -1304,6 +1312,7 @@ export async function deleteBooking(bookingId: string, opts?: StaffActorOpts) {
     }
     // A deleted booking doesn't keep its promo code use.
     if (booking.status !== 'cancelled') await releasePromoForBooking(bookingId).catch(() => {});
+    await auditBooking(gate, bookingId, "delete", auditBefore, ` — was ${booking.status}, PKR ${Math.round(booking.amountPaid ?? 0)} paid`);
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');

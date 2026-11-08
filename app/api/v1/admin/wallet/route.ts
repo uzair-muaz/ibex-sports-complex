@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import { audit } from "@/lib/audit";
+import { pkrText } from "@/lib/audit-rules";
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
 import { requireApiAdmin } from "@/lib/api/guard";
 import { buildWallet } from "@/lib/api/wallet-view";
@@ -35,6 +37,15 @@ export async function POST(request: Request) {
     staffId: gate.user.id,
   });
   if (!result.ok) return apiError(result.error, result.status, request, { code: result.code });
+  const what = body.action === "credit" ? "Added" : body.action === "bank_payout" ? "Paid out to bank" : "Took away";
+  await audit({
+    actor: gate.user,
+    area: "wallet",
+    action: String(body.action),
+    customerId: String(body.userId),
+    targetId: String(body.userId),
+    summary: `${what} ${pkrText(Number(body.amount))}${body.note ? ` — ${String(body.note).slice(0, 200)}` : ""}. Balance now ${pkrText(result.balance)}.`,
+  });
   return apiOk({ balance: result.balance }, request);
 }
 

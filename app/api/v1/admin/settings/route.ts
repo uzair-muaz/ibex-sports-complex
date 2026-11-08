@@ -1,4 +1,5 @@
 import { requireApiAdmin } from "@/lib/api/guard";
+import { audit } from "@/lib/audit";
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
 import { isSuperAdminRole } from "@/lib/authz";
 import { getAppSettings, updateAppSettings, validateSettingsPatch } from "@/lib/app-settings";
@@ -28,8 +29,10 @@ export async function PATCH(request: Request) {
   if (!check.ok) return apiError(check.error, 400, request, { code: "VALIDATION_ERROR" });
 
   try {
+    const before = await getAppSettings();
     const result = await updateAppSettings(check.value, gate.user.id);
     if (!result.ok) return apiError(result.error, 400, request, { code: "VALIDATION_ERROR" });
+    await audit({ actor: gate.user, area: "settings", action: "update", summary: "Changed app settings", before, after: result.settings });
     return apiOk({ settings: result.settings, builtInFaqs: defaultFaqs(result.settings) }, request);
   } catch (err) {
     console.error("PATCH /api/v1/admin/settings:", err);

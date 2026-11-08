@@ -18,6 +18,7 @@ import {
   BarcodeOutlined,
   BarChartOutlined,
   FileTextOutlined,
+  HistoryOutlined,
   CalendarOutlined,
   TagOutlined,
   MessageOutlined,
@@ -148,6 +149,11 @@ export function AdminLayout({
           key: "/admin/settings",
           icon: <SettingOutlined />,
           label: "App Settings",
+        },
+        {
+          key: "/admin/audit",
+          icon: <HistoryOutlined />,
+          label: "Audit log",
         },
       );
     }
