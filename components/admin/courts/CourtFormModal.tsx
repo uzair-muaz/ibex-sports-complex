@@ -133,7 +133,7 @@ export function CourtFormModal({
             }
           >
             <InputNumber
-              className="w-full"
+              style={{ width: "100%" }}
               min={0}
               step={0.01}
               value={courtForm.pricePerHour}
@@ -156,7 +156,7 @@ export function CourtFormModal({
             }
           >
             <InputNumber
-              className="w-full"
+              style={{ width: "100%" }}
               min={0}
               step={0.01}
               value={courtForm.weekendPricePerHour}
@@ -259,7 +259,7 @@ export function CourtFormModal({
 
                         <Form.Item label={`Price ${unit.long} (PKR)`} className="mb-0">
                           <InputNumber
-                            className="w-full"
+                            style={{ width: "100%" }}
                             size="small"
                             min={0}
                             step={0.01}
@@ -274,7 +274,7 @@ export function CourtFormModal({
 
                         <Form.Item label={`Weekend Price ${unit.long} (Sat–Sun)`} className="mb-0">
                           <InputNumber
-                            className="w-full"
+                            style={{ width: "100%" }}
                             size="small"
                             min={0}
                             step={0.01}
