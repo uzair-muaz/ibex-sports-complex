@@ -21,7 +21,9 @@ async function userFromSession(): Promise<ApiUser | null> {
   if (!isStaffRole(session.user.role)) {
     try {
       await connectDB();
-      blocked = !!(await User.exists({ _id: session.user.id, blockedAt: { $type: "date" } }));
+      const row = await User.findById(session.user.id).select("blockedAt deletedAt").lean();
+      if (row?.deletedAt) return null;
+      blocked = !!row?.blockedAt;
     } catch {
       /* keep going */
     }
@@ -47,9 +49,10 @@ async function userFromBearer(request: Request): Promise<ApiUser | null> {
   try {
     await connectDB();
     const dbUser = await User.findById(claims.sub).select(
-      "email name role phone image blockedAt",
+      "email name role phone image blockedAt deletedAt",
     );
-    if (!dbUser) return null;
+    // Deleted accounts: old tokens stop working.
+    if (!dbUser || dbUser.deletedAt) return null;
     return {
       id: dbUser._id.toString(),
       email: dbUser.email,

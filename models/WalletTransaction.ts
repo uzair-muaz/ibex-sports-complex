@@ -7,7 +7,9 @@ export type WalletTxnReason =
   | "booking_payment"
   | "admin_adjustment"
   /** Staff paid the customer's credit back to their bank (at the desk). */
-  | "bank_payout";
+  | "bank_payout"
+  /** The customer deleted their account and chose to lose this credit. */
+  | "account_deleted";
 
 /** One change to a wallet. `refKey` makes each refund happen only once. */
 export interface IWalletTransaction extends Document {
@@ -34,7 +36,7 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
     balanceAfter: { type: Number, default: null },
     reason: {
       type: String,
-      enum: ["booking_refund", "late_payment_refund", "booking_payment", "admin_adjustment", "bank_payout"],
+      enum: ["booking_refund", "late_payment_refund", "booking_payment", "admin_adjustment", "bank_payout", "account_deleted"],
       required: true,
     },
     refKey: { type: String, required: true, unique: true },

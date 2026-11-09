@@ -24,6 +24,7 @@ const TYPE: Record<WalletTxnReason, WalletItemType> = {
   booking_payment: "spent",
   admin_adjustment: "adjustment",
   bank_payout: "adjustment",
+  account_deleted: "adjustment",
 };
 
 export function mapWalletTxn(
@@ -52,6 +53,9 @@ export function mapWalletTxn(
       break;
     case "bank_payout":
       title = "Paid out to your bank";
+      break;
+    case "account_deleted":
+      title = "Account deleted";
       break;
     default:
       title = t.note ? `Adjustment · ${t.note}` : amount >= 0 ? "Credit from IBEX" : "Adjustment";

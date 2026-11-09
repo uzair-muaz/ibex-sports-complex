@@ -22,6 +22,7 @@ const WALLET_REASONS: Record<string, string> = {
   booking_payment: "Spent on bookings",
   admin_adjustment: "Changed by staff",
   bank_payout: "Paid out to bank",
+  account_deleted: "Lost when the account was deleted",
 };
 const POINT_TYPES: Record<string, string> = {
   earn: "Earned from bookings",

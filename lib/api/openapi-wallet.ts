@@ -22,6 +22,52 @@ const walletExample = {
 };
 
 export const walletPaths = {
+  "/api/v1/account/deletion-check": {
+    get: {
+      tags: ["Account"],
+      summary: "Can I delete my account?",
+      description:
+        "blockingBookings = every booking that isn't completed or cancelled (a confirmed booking that has ended counts as completed). walletBalance and points are what the customer loses on delete.",
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      responses: {
+        "200": json("Check", {
+          canDelete: false,
+          blockingBookings: [
+            { id: "6650c0ffee0000000000b201", reference: "IBX-2131", courtName: "Padel Court 1", start: "2026-11-12T10:00:00+05:00", status: "reserved" },
+          ],
+          walletBalance: 1850,
+          points: 420,
+        }),
+        "401": err("Not signed in", "UNAUTHORIZED", "Unauthorized"),
+      },
+    },
+  },
+  "/api/v1/account/delete": {
+    post: {
+      tags: ["Account"],
+      summary: "Delete my account",
+      description:
+        "Body `{forfeitWallet: boolean}`. On success: all sign-ins end (old tokens get 401), push devices are removed, wallet credit and points are lost, and the name, email, phone, photo and Google/Apple links are erased so the email can sign up again. Bookings and payments stay for the venue under \"Deleted customer\". No email or push is sent. 409 bodies include `message`, ready to show.",
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      requestBody: { content: { "application/json": { example: { forfeitWallet: true } } } },
+      responses: {
+        "200": json("Deleted", { deleted: true }),
+        "401": err("Not signed in", "UNAUTHORIZED", "Unauthorized"),
+        "409": {
+          description: "ACTIVE_BOOKINGS (a booking isn't completed or cancelled) or WALLET_NOT_EMPTY (credit left and forfeitWallet isn't true)",
+          content: {
+            "application/json": {
+              example: {
+                error: "You have upcoming bookings. Please play or cancel them first, then you can delete your account.",
+                code: "ACTIVE_BOOKINGS",
+                message: "You have upcoming bookings. Please play or cancel them first, then you can delete your account.",
+              },
+            },
+          },
+        },
+      },
+    },
+  },
   "/api/v1/account/wallet": {
     get: {
       tags: ["Account"],

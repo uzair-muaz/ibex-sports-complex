@@ -28,6 +28,8 @@ export interface IUser extends Document {
   blockedAt?: Date | null;
   blockedReason?: string | null;
   blockedBy?: mongoose.Types.ObjectId | null;
+  /** Deleted by the customer (lib/account-deletion.ts): details are anonymized, sign-in refused. */
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -121,6 +123,7 @@ const UserSchema: Schema = new Schema(
     blockedAt: { type: Date, default: null },
     blockedReason: { type: String, default: null, maxlength: 300 },
     blockedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    deletedAt: { type: Date, default: null },
   },
   {
     timestamps: true,
