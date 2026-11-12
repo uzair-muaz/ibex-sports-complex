@@ -21,7 +21,7 @@ import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
 import { acquireSlotLocks, releaseSlotLocks } from '@/lib/booking-locks';
 import { staffCancelBooking, type StaffRefundChoice } from '@/lib/staff-cancel';
-import { checkPromo, releasePromoForBooking, undoPromoUse, usePromo } from '@/lib/promo';
+import { checkPromo, releasePromoForBooking, undoPromoUse, redeemPromo } from '@/lib/promo';
 import { nextBookingSerial } from '@/lib/booking-serial';
 import {
   getApplicableDiscounts,
@@ -413,7 +413,7 @@ export async function createBooking(
     }
 
     if (promo) {
-      const used = await usePromo({
+      const used = await redeemPromo({
         promoId: promo.promoId,
         code: promo.code,
         bookingId: newBookingId!,

@@ -12,7 +12,7 @@ import { resolveSlot } from "@/lib/api/slot";
 import { debitWallet, undoWalletDebit, walletBalance } from "@/lib/wallet";
 import { getAppSettings } from "@/lib/app-settings";
 import { computeQuote } from "@/lib/pricing/quote";
-import { checkPromo, undoPromoUse, usePromo } from "@/lib/promo";
+import { checkPromo, undoPromoUse, redeemPromo } from "@/lib/promo";
 import { notifyBookingReceived } from "@/lib/notifications/events";
 import {
   checkHoursForSlot,
@@ -396,7 +396,7 @@ export async function createAppBooking(params: {
 
     // 8c. Claim the promo code use (the last use can only go to one booking).
     if (promo && quote.promo) {
-      const used = await usePromo({
+      const used = await redeemPromo({
         promoId: promo.promoId,
         code: promo.code,
         bookingId,

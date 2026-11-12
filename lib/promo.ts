@@ -58,7 +58,7 @@ export async function checkPromo(params: {
  * claims a use, so the last use can't be taken twice. Returns false if the
  * code ran out in the meantime.
  */
-export async function usePromo(params: {
+export async function redeemPromo(params: {
   promoId: string;
   code: string;
   bookingId: mongoose.Types.ObjectId | string;
@@ -92,7 +92,7 @@ export async function usePromo(params: {
   return true;
 }
 
-/** Undo usePromo when the booking could not be saved. */
+/** Undo redeemPromo when the booking could not be saved. */
 export async function undoPromoUse(bookingId: mongoose.Types.ObjectId | string): Promise<void> {
   const r = await PromoRedemption.findOneAndDelete({ bookingId, status: "used" }).lean();
   if (r) await PromoCode.updateOne({ _id: r.promoId, usedCount: { $gt: 0 } }, { $inc: { usedCount: -1 } });
