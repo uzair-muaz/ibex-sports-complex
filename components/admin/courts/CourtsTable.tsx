@@ -1,5 +1,6 @@
 "use client";
 
+import { priceUnit } from "@/lib/pricing-utils";
 import { Button, Card, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
@@ -62,19 +63,26 @@ export function CourtsTable({
       ),
     },
     {
-      title: "Price/Hour",
+      title: "Price",
       dataIndex: "pricePerHour",
       key: "pricePerHour",
       sorter: (a, b) => a.pricePerHour - b.pricePerHour,
       sortOrder: sortOrderFor("pricePerHour"),
-      render: (price: number) => (
-        <Space size="small">
-          <span className="font-semibold text-[#2DD4BF]">
-            PKR {price.toLocaleString()}
-          </span>
-          {price === 0 && <Tag>Free</Tag>}
-        </Space>
-      ),
+      render: (price: number, court) => {
+        const weekend = court.timeBasedPricingEnabled
+          ? court.pricingPeriods?.some((p) => p.weekendPricePerHour != null)
+          : court.weekendPricePerHour != null;
+        return (
+          <Space size="small" wrap>
+            <span className="font-semibold text-[#2DD4BF]">
+              PKR {price.toLocaleString()}
+              <span className="font-normal text-[var(--ant-color-text-secondary)]">{priceUnit(court).short}</span>
+            </span>
+            {price === 0 && <Tag>Free</Tag>}
+            {weekend && <Tag color="purple">Weekend price</Tag>}
+          </Space>
+        );
+      },
     },
     {
       title: "Status",

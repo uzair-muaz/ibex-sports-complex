@@ -7,11 +7,29 @@
 
 import { Resend } from 'resend';
 import { SESClient, SendEmailCommand, SendRawEmailCommand } from '@aws-sdk/client-ses';
+import { getAppSettings } from './app-settings';
 import { generateBookingConfirmationEmail, BookingEmailData, AppliedDiscountEmail } from './email-templates/booking-confirmation';
 
+/** Phone and email for the email footer, from Admin → App Settings. */
+async function venueContact(): Promise<{ email: string; phone: string } | undefined> {
+  try {
+    const { venue } = await getAppSettings();
+    return { email: venue.email, phone: venue.phone };
+  } catch {
+    return undefined; // the template falls back to today's contacts
+  }
+}
+
 // QR Code generation
-let QRCode: any;
+// Only the two calls used here (kept loose so the existing options are unchanged).
+type QRCodeLib = {
+  toDataURL(value: string, options?: object): Promise<string>;
+  toBuffer(value: string, options?: object): Promise<Buffer>;
+};
+let QRCode: QRCodeLib | undefined;
 try {
+  // Optional at runtime: emails still send without QR codes if it's missing.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   QRCode = require('qrcode');
 } catch (e) {
   console.warn('qrcode package not installed. QR codes in emails will not be generated.');
@@ -20,8 +38,17 @@ try {
 // Email provider configuration
 const EMAIL_PROVIDER = process.env.EMAIL_PROVIDER || 'resend'; // 'resend' or 'ses'
 
-// Resend configuration
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Resend configuration. Created on first send, so a missing key (e.g. local
+// testing) doesn't crash every page that imports this file. With no key, a
+// send fails with "Email is not configured" and nothing is sent.
+let resendClient: Resend | null = null;
+function getResend(): Resend {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('Email is not configured (RESEND_API_KEY is missing)');
+  }
+  resendClient ??= new Resend(process.env.RESEND_API_KEY);
+  return resendClient;
+}
 const resendFromEmail = process.env.RESEND_FROM_EMAIL || 'IBEX Sports <onboarding@resend.dev>';
 
 // SES configuration (kept for future use)
@@ -96,6 +123,8 @@ export interface BookingConfirmationEmailData {
   totalPrice: number;
   bookingId: string;
   baseUrl: string;
+  /** Advance % from Admin → App Settings. */
+  advancePercent?: number;
 }
 
 /**
@@ -133,6 +162,8 @@ async function sendViaResend(
       discountAmount: data.discountAmount,
       totalPrice: data.totalPrice,
       bookingId: data.bookingId,
+      advancePercent: (data as { advancePercent?: number }).advancePercent,
+      contact: await venueContact(),
       entryVerificationUrl,
       feedbackUrl,
       entryQRCode, // Data URL for inline display
@@ -153,7 +184,7 @@ async function sendViaResend(
     const subject = `Booking Confirmed - IBEX Sports Complex - ${formattedDate} at ${startTimeFormatted}`;
 
     // Send via Resend
-    const response = await resend.emails.send({
+    const response = await getResend().emails.send({
       from: resendFromEmail,
       to: validEmail,
       subject,
@@ -169,7 +200,8 @@ async function sendViaResend(
       success: true,
       emailId: response.data?.id,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Error sending email via Resend:', error);
     return {
       success: false,
@@ -224,6 +256,8 @@ async function sendViaSES(
       discountAmount: data.discountAmount,
       totalPrice: data.totalPrice,
       bookingId: data.bookingId,
+      advancePercent: (data as { advancePercent?: number }).advancePercent,
+      contact: await venueContact(),
       entryVerificationUrl,
       feedbackUrl,
       entryQRCode: 'cid:entry-qr-code',
@@ -306,7 +340,8 @@ async function sendViaSES(
       success: true,
       emailId: response.MessageId,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Error sending email via SES:', error);
     
     let errorMessage = 'Failed to send email';
@@ -383,7 +418,7 @@ export async function sendHtmlEmail(input: {
       return { success: true, emailId: response.MessageId };
     }
 
-    const response = await resend.emails.send({
+    const response = await getResend().emails.send({
       from: resendFromEmail,
       to,
       subject: input.subject,

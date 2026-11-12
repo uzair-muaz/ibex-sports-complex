@@ -4,6 +4,10 @@
  * This template generates the HTML email content for booking confirmations.
  * It includes booking details and a feedback link.
  */
+import { DEFAULT_VENUE, telHref } from '../venue-rules';
+
+const escapeHtml = (t: string) =>
+  t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 export interface AppliedDiscountEmail {
   discountId: string;
@@ -29,12 +33,18 @@ export interface BookingEmailData {
   feedbackUrl: string;
   entryQRCode: string; // CID reference for inline attachment (e.g., "cid:entry-qr-code")
   feedbackQRCode: string; // CID reference for inline attachment (e.g., "cid:feedback-qr-code")
+  /** Advance % from Admin → App Settings (left out of the text if unknown). */
+  advancePercent?: number;
+  /** Contacts from Admin → App Settings (today's values if left out). */
+  contact?: { email: string; phone: string };
 }
 
 /**
  * Generates the HTML email template for booking confirmation
  */
 export function generateBookingConfirmationEmail(data: BookingEmailData): string {
+  const contactEmail = escapeHtml(data.contact?.email || DEFAULT_VENUE.email);
+  const contactPhone = escapeHtml(data.contact?.phone || DEFAULT_VENUE.phone);
   const startTimeFormatted = `${Math.floor(data.startTime).toString().padStart(2, '0')}:${data.startTime % 1 === 0 ? '00' : '30'}`;
   const rawEndTime = data.startTime + data.duration;
   const endTime = ((rawEndTime % 24) + 24) % 24;
@@ -90,10 +100,10 @@ export function generateBookingConfirmationEmail(data: BookingEmailData): string
                 Your booking has been confirmed! We're excited to have you at IBEX Sports Complex.
               </p>
               <p style="margin: 0 0 12px 0; font-size: 13px; line-height: 1.6; color: #7dd3fc;">
-                Please pay <strong>50% advance</strong> to confirm your slot. Bookings without advance may be cancelled.
+                Please pay <strong>${typeof data.advancePercent === 'number' ? `${data.advancePercent}% advance` : 'the advance'}</strong> to confirm your slot. Bookings without advance may be cancelled.
               </p>
               <p style="margin: 0 0 30px 0; font-size: 13px; line-height: 1.6; color: #a1a1aa;">
-                <strong style="color: #e4e4e7;">Please note:</strong> Advance payments are <strong style="color: #e4e4e7;">non-refundable</strong> once made.
+                <strong style="color: #e4e4e7;">Please note:</strong> If you cancel in time from your IBEX account, what you paid goes to your <strong style="color: #e4e4e7;">IBEX wallet</strong> for your next booking.
               </p>
 
               <!-- Booking Details Card -->
@@ -193,8 +203,8 @@ export function generateBookingConfirmationEmail(data: BookingEmailData): string
               <!-- Footer -->
               <p style="margin: 30px 0 0 0; font-size: 14px; line-height: 1.6; color: #a1a1aa; text-align: center;">
                 If you have any questions, please contact us at 
-                <a href="mailto:ibexsportscomplex@gmail.com" style="color: #2DD4BF; text-decoration: none;">ibexsportscomplex@gmail.com</a>
-                or call <a href="tel:+923255429429" style="color: #2DD4BF; text-decoration: none;">+92 325 5429429</a>
+                <a href="mailto:${contactEmail}" style="color: #2DD4BF; text-decoration: none;">${contactEmail}</a>
+                or call <a href="${telHref(contactPhone)}" style="color: #2DD4BF; text-decoration: none;">${contactPhone}</a>
               </p>
               <p style="margin: 20px 0 0 0; font-size: 12px; line-height: 1.6; color: #71717a; text-align: center;">
                 © ${new Date().getFullYear()} IBEX Sports Complex. All rights reserved.

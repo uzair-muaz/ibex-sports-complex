@@ -112,12 +112,6 @@ export const HeroSection = () => {
               </Button>
             </motion.div>
           </Link>
-          <div className="flex flex-col text-xs font-mono text-zinc-400 uppercase tracking-widest text-center sm:text-left sm:border-l sm:border-zinc-700 sm:pl-5">
-            <span>Open Daily</span>
-            <span className="text-white font-bold">
-              12 PM — 4 AM
-            </span>
-          </div>
         </motion.div>
       </motion.div>
     </section>

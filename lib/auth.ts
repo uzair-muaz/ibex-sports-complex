@@ -1,9 +1,16 @@
+import { CredentialsSignin } from "next-auth";
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import connectDB from "./mongodb";
 import User from "@/models/User";
+import { grantSignUpBonus } from "@/lib/loyalty-bonus";
+
+/** Sign-in refused because the super admin blocked the account (the login page shows a message). */
+class AccountBlockedError extends CredentialsSignin {
+  code = "account_blocked";
+}
 
 const googleConfigured =
   !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
@@ -40,6 +47,8 @@ export const authOptions = {
           );
         }
 
+        let blocked = false;
+        const found = await (async () => {
         try {
           const email = (
             typeof credentials.email === "string"
@@ -58,6 +67,8 @@ export const authOptions = {
 
           const isPasswordValid = await bcrypt.compare(password, user.password);
           if (!isPasswordValid) return null;
+          // Checked after the password, so the message only goes to the account owner.
+          if (user.blockedAt && user.role === "user") blocked = true;
 
           // Email/password works for customers and staff (admin UI still role-gates).
           return {
@@ -72,6 +83,9 @@ export const authOptions = {
           console.error("Authentication error:", error);
           throw new Error("Authentication failed. Please try again.");
         }
+        })();
+        if (blocked) throw new AccountBlockedError();
+        return found;
       },
     }),
   ],
@@ -94,6 +108,8 @@ export const authOptions = {
         await connectDB();
         let dbUser = await User.findOne({ email });
 
+        if (dbUser?.blockedAt && dbUser.role === "user") return "/login?error=AccountBlocked";
+
         if (dbUser) {
           // Never elevate via Google; keep existing role
           if (!dbUser.googleId && account.providerAccountId) {
@@ -112,6 +128,7 @@ export const authOptions = {
             googleId: account.providerAccountId,
             emailVerified: profile?.email_verified ? new Date() : null,
           });
+          await grantSignUpBonus(String(dbUser._id));
         }
 
         (user as { id?: string; role?: string }).id = dbUser._id.toString();

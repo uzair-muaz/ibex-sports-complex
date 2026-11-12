@@ -35,6 +35,7 @@ export type MembershipRosterRow = {
     planName: string;
     planSlug?: string | null;
     hoursRemaining: number;
+    hoursBySport?: { sport: string; remaining: number }[];
     guestPassesRemaining: number;
     validUntil: string;
     status: string;
@@ -65,6 +66,8 @@ export async function activateAdminMembership(input: {
   userId: string;
   planId: string;
   carryForwardHours?: boolean;
+  hoursBySport?: { sport: string; hours: number }[];
+  payment?: { pricePaid: number; method: string; note?: string } | null;
 }) {
   return bffFetch("/api/v1/admin/ops", {
     method: "POST",

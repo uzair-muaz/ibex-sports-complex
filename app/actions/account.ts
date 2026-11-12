@@ -88,12 +88,15 @@ export async function setMyPassword(
     return {
       success: false as const,
       error: "New password must be at least 6 characters.",
+      code: "WEAK_PASSWORD" as const,
     };
   }
 
   await connectDB();
   const user = await User.findById(gate.userId).select("password");
-  if (!user) return { success: false as const, error: "User not found" };
+  if (!user) {
+    return { success: false as const, error: "User not found", code: "ACCOUNT_NOT_FOUND" as const };
+  }
 
   if (user.password) {
     const current = input.currentPassword || "";
@@ -101,6 +104,7 @@ export async function setMyPassword(
       return {
         success: false as const,
         error: "Current password is required.",
+        code: "VALIDATION_ERROR" as const,
       };
     }
     const ok = await bcrypt.compare(current, user.password);
@@ -108,6 +112,7 @@ export async function setMyPassword(
       return {
         success: false as const,
         error: "Current password is incorrect.",
+        code: "WRONG_PASSWORD" as const,
       };
     }
   }
@@ -140,7 +145,8 @@ export async function claimBookingsByEmail(opts?: {
       userEmail: email,
       $or: [{ userId: { $exists: false } }, { userId: null }],
     },
-    { $set: { userId: gate.userId } },
+    // The booking now belongs to the account, so its app guest code stops working.
+    { $set: { userId: gate.userId }, $unset: { guestAccessTokenHash: "" } },
   );
 
   revalidatePath("/account/bookings");

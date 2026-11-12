@@ -1,10 +1,10 @@
 "use client";
 
+import { useSportList } from "@/lib/tanstack/hooks/queries";
 import React from "react";
 import { Button, Checkbox, Form, InputNumber, Select, Space, Typography } from "antd";
 import type { CourtType, DiscountPricingTier } from "@/types";
 import {
-  COURT_TYPES,
   HOUR_OPTIONS,
   type DiscountFormState,
 } from "./discountHelpers";
@@ -26,6 +26,8 @@ export function DiscountTierFields({
   isTimeForm,
   isUniformTimeForm,
 }: DiscountTierFieldsProps) {
+  // Sports from Admin → App Settings.
+  const sportList = useSportList();
   const handleCourtTypeToggle = (courtType: CourtType) => {
     setDiscountForm((prev) => {
       const newCourtTypes = prev.courtTypes.includes(courtType)
@@ -147,7 +149,7 @@ export function DiscountTierFields({
           >
             All Courts
           </Button>
-          {COURT_TYPES.map((ct) => (
+          {sportList.map(({ sport: ct, label }) => (
             <Button
               key={ct}
               size="small"
@@ -156,7 +158,7 @@ export function DiscountTierFields({
               }
               onClick={() => handleCourtTypeToggle(ct)}
             >
-              {ct}
+              {label.toUpperCase()}
             </Button>
           ))}
         </Space>

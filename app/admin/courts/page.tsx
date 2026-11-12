@@ -14,6 +14,7 @@ import { DeleteCourtModal } from "@/components/admin/courts/DeleteCourtModal";
 import {
   createEmptyCourtForm,
   courtToFormState,
+  courtFormToPayload,
   sortCourts,
   type CourtFormState,
 } from "@/components/admin/courts/courtHelpers";
@@ -87,7 +88,7 @@ export default function CourtsPage() {
       if (editingCourt) {
         const result = await updateCourtMutation.mutateAsync({
           courtId: editingCourt._id,
-          ...courtForm,
+          ...courtFormToPayload(courtForm),
         });
 
         if (result.success) {
@@ -98,10 +99,9 @@ export default function CourtsPage() {
           message.error(result.error || "Failed to update court");
         }
       } else {
-        const result = await createCourtMutation.mutateAsync({
-          ...courtForm,
-          image: "",
-        });
+        const result = await createCourtMutation.mutateAsync(
+          courtFormToPayload(courtForm),
+        );
 
         if (result.success) {
           setShowCourtModal(false);

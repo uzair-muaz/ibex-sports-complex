@@ -1,15 +1,15 @@
-"use server";
-
+/**
+ * Server-only helpers. NOT a "use server" file on purpose: that would turn every
+ * export here (e.g. giving points) into an action anyone could call from a browser.
+ * The checked actions live in app/actions/.
+ */
 import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import LoyaltyAccount from "@/models/LoyaltyAccount";
 import LoyaltyTransaction from "@/models/LoyaltyTransaction";
 import Booking from "@/models/Booking";
-import {
-  maxRedeemablePoints,
-  pointsForDuration,
-  pkrFromPoints,
-} from "@/lib/loyalty-rules";
+import { maxUsablePoints, pointsDiscountPkr, pointsEarnedFor } from "@/lib/loyalty-rules";
+import { getAppSettings } from "@/lib/app-settings";
 
 export async function getOrCreateLoyaltyAccount(userId: string) {
   await connectDB();
@@ -41,7 +41,16 @@ export async function awardLoyaltyForCompletedBooking(bookingId: string) {
     return { success: true as const, skipped: true, points: existing.points };
   }
 
-  const points = pointsForDuration(booking.duration);
+  // Rules from Admin → App Settings (default = 10 points per hour played).
+  const { loyalty } = await getAppSettings();
+  const points = pointsEarnedFor(loyalty, {
+    paidTotal: booking.totalPrice,
+    durationMinutes: Math.round(booking.duration * 60),
+    membershipMinutes: booking.usedMembershipHours
+      ? Math.round((booking.membershipHoursUsed || booking.duration) * 60)
+      : 0,
+    membershipValuePkr: booking.membershipDiscountPkr ?? 0,
+  });
   if (points <= 0) {
     return { success: true as const, skipped: true, points: 0 };
   }
@@ -61,6 +70,9 @@ export async function awardLoyaltyForCompletedBooking(bookingId: string) {
     note: `Earned for completed booking (${booking.duration}h)`,
   });
 
+  const { notifyPointsEarned } = await import("@/lib/notifications/events");
+  await notifyPointsEarned({ userId: booking.userId, points, bookingId: booking._id });
+
   return { success: true as const, skipped: false, points };
 }
 
@@ -72,13 +84,11 @@ export async function redeemLoyaltyPoints(params: {
 }) {
   await connectDB();
   const current = await getOrCreateLoyaltyAccount(params.userId);
-  const allowed = maxRedeemablePoints(
-    current.balance,
-    params.totalPriceAfterPromo,
-  );
+  const { loyalty } = await getAppSettings();
+  const allowed = maxUsablePoints(current.balance, params.totalPriceAfterPromo, loyalty);
   const points = Math.min(params.points, allowed);
-  if (points < 100 && params.points > 0) {
-    throw new Error("Not enough points to redeem (minimum 100).");
+  if (points < loyalty.minRedeemPoints && params.points > 0) {
+    throw new Error(`Not enough points to redeem (minimum ${loyalty.minRedeemPoints}).`);
   }
   if (points <= 0) {
     return { points: 0, discountPkr: 0 };
@@ -102,7 +112,7 @@ export async function redeemLoyaltyPoints(params: {
     note: `Redeemed ${points} points`,
   });
 
-  return { points, discountPkr: pkrFromPoints(points) };
+  return { points, discountPkr: pointsDiscountPkr(points, params.totalPriceAfterPromo, loyalty) };
 }
 
 export async function refundLoyaltyForBooking(bookingId: string) {

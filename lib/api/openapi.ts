@@ -1,3 +1,11 @@
+import { authPaths, authSchemas } from "@/lib/api/openapi-auth";
+import { catalogPaths } from "@/lib/api/openapi-catalog";
+import { paymentPaths } from "@/lib/api/openapi-payments";
+import { walletPaths } from "@/lib/api/openapi-wallet";
+import { notificationPaths } from "@/lib/api/openapi-notifications";
+import { preferencesPaths } from "@/lib/api/openapi-preferences";
+import { membershipAdminPaths } from "@/lib/api/openapi-memberships-admin";
+
 /**
  * OpenAPI 3.0 document for the public HTTP API (`/api/v1`).
  * Served at GET /api/v1/openapi — UI at /docs.
@@ -20,7 +28,10 @@ export function getOpenApiDocument(baseUrl?: string) {
         "",
         "## Authentication",
         "- **Web**: NextAuth session cookie (`credentials: include`).",
-        "- **Flutter / mobile**: Google Sign-In ID token → `POST /api/v1/auth/google` → `Authorization: Bearer <accessToken>`.",
+        "- **Flutter / mobile**: `POST /api/v1/auth/google`, `/auth/apple`, `/auth/login` or `/auth/register` → `Authorization: Bearer <accessToken>`. Renew with `POST /api/v1/auth/refresh`.",
+        "",
+        "## Errors",
+        "Errors look like `{ \"error\": \"message for people\", \"code\": \"CODE_FOR_THE_APP\" }`. Times are ISO with +05:00.",
         "",
         "Customer routes reject admin roles (403). Admin routes reject customers (401).",
         "Never pass raw user IDs from the client for ownership — identity comes from cookie or Bearer.",
@@ -29,9 +40,16 @@ export function getOpenApiDocument(baseUrl?: string) {
         "Configure allowed origins with `API_CORS_ORIGINS` (comma-separated). Unlisted Origins do not receive `Access-Control-Allow-Origin`. All `/api/v1` routes support `OPTIONS`.",
       ].join("\n"),
     },
-    servers: [{ url: serverUrl, description: "API host" }],
+    servers: [
+      { url: serverUrl, description: "This server" },
+      ...[
+        { url: "https://staging.ibexsportscomplex.com", description: "Staging (test data; point the app here first)" },
+        { url: "https://ibexsportscomplex.com", description: "Live (only after the developer releases the mobile API)" },
+      ].filter((s) => s.url !== serverUrl),
+    ],
     tags: [
       { name: "Auth", description: "Mobile Google sign-in and session probe" },
+      { name: "Venue", description: "Venue, sports, booking policy and courts (public)" },
       { name: "Bookings", description: "Public booking create" },
       { name: "Account", description: "Customer profile, bookings, loyalty, membership, support" },
       { name: "Admin", description: "Staff-only operations" },
@@ -42,7 +60,7 @@ export function getOpenApiDocument(baseUrl?: string) {
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
-          description: "Access token from POST /api/v1/auth/google",
+          description: "Access token from any /api/v1/auth sign-in address",
         },
         cookieAuth: {
           type: "apiKey",
@@ -55,9 +73,13 @@ export function getOpenApiDocument(baseUrl?: string) {
       schemas: {
         Error: {
           type: "object",
-          properties: { error: { type: "string" } },
+          properties: {
+            error: { type: "string" },
+            code: { type: "string", example: "WRONG_PASSWORD" },
+          },
           required: ["error"],
         },
+        ...authSchemas,
         ApiUser: {
           type: "object",
           properties: {
@@ -95,61 +117,13 @@ export function getOpenApiDocument(baseUrl?: string) {
             userEmail: { type: "string", format: "email" },
             userPhone: { type: "string" },
             loyaltyPointsToRedeem: { type: "number" },
-            useMembershipHours: { type: "boolean" },
-            useGuestPass: { type: "boolean" },
+            useMembershipHours: { type: "boolean", description: "Use hours of this sport; uses what the member has, they pay the rest" },
+            useGuestPass: { type: "boolean", description: "Ignored (no guest passes any more)" },
           },
         },
       },
     },
     paths: {
-      "/api/v1/auth/google": {
-        post: {
-          tags: ["Auth"],
-          summary: "Exchange Google ID token for API access token",
-          description:
-            "Verify a Google ID token from the mobile/web SDK and return a Bearer JWT for subsequent API calls.",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["idToken"],
-                  properties: {
-                    idToken: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Authenticated",
-              content: {
-                "application/json": {
-                  schema: {
-                    type: "object",
-                    properties: {
-                      accessToken: { type: "string" },
-                      tokenType: { type: "string", example: "Bearer" },
-                      expiresIn: { type: "string", example: "30d" },
-                      user: { $ref: "#/components/schemas/ApiUser" },
-                    },
-                  },
-                },
-              },
-            },
-            "401": {
-              description: "Invalid token",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" },
-                },
-              },
-            },
-          },
-        },
-      },
       "/api/v1/auth/me": {
         get: {
           tags: ["Auth"],
@@ -185,7 +159,7 @@ export function getOpenApiDocument(baseUrl?: string) {
           tags: ["Auth"],
           summary: "Request a password reset email",
           description:
-            "Always returns a generic success message. Sends a 1-hour reset link when a customer account exists for the email (including Google-only accounts).",
+            "Always returns a generic success message. Sends a reset link (valid linkValidMinutes, 60 today) when a customer account exists for the email (including Google-only accounts).",
           requestBody: {
             required: true,
             content: {
@@ -201,7 +175,19 @@ export function getOpenApiDocument(baseUrl?: string) {
             },
           },
           responses: {
-            "200": { description: "Accepted" },
+            "200": {
+              description: "Accepted. The same answer whether or not an account exists for the email.",
+              content: {
+                "application/json": {
+                  example: {
+                    success: true,
+                    message: "If an account exists for that email, we sent a password reset link.",
+                    sentTo: "sara.khan@example.com",
+                    linkValidMinutes: 60,
+                  },
+                },
+              },
+            },
             "400": { description: "Missing email" },
           },
         },
@@ -231,26 +217,35 @@ export function getOpenApiDocument(baseUrl?: string) {
           },
         },
       },
-      "/api/v1/auth/register": {
+      "/api/v1/bookings": {
         post: {
-          tags: ["Auth"],
-          summary: "Register a customer account (email + password)",
-          description:
-            "Creates a role=user account. Does not return a session cookie — web clients should call NextAuth credentials sign-in after success. Never creates staff roles.",
+          tags: ["Bookings"],
+          summary: "Create a booking (guest or signed-in customer) — app or website",
+          description: [
+            "**App (body has courtId + start):** `{courtId, start, durationMinutes, useHours?, usePoints?, useWallet?, promoCode?}`; guests add `guest: {name, email, phone}`. Send an `Idempotency-Key` header (any unique string per tap of Book): sending it again returns the first booking (200) instead of a new one. Price is worked out exactly like POST /bookings/quote.",
+            "Response 201: `{booking, guestAccessToken}`. guestAccessToken (`gt_…`) is only for guests: keep it on the phone to open the booking later. It is shown once and never stored in plain form.",
+            "Status is `reserved` until the advance is verified (nothing is auto-cancelled). If hours, points or wallet cover the whole advance (toTransfer 0), the booking is `confirmed` straight away. The booking's `hoursUsed` and `price.hoursDiscount` show the hours used. No email is sent from the app path yet.",
+            "Errors: 400 VALIDATION_ERROR, INVALID_PHONE, PHONE_REQUIRED (signed-in customer with no phone in profile), DATE_IN_PAST, DATE_OUT_OF_WINDOW, INVALID_DURATION; 403 STAFF_ACCOUNT, ACCOUNT_BLOCKED (the account, guest email or phone was blocked by the super admin); 404 COURT_NOT_FOUND; 409 SLOT_UNAVAILABLE, COURT_CLOSED, POINTS_CHANGED, HOURS_CHANGED (membership hours dropped since the quote), WALLET_CHANGED (wallet balance dropped since the quote: quote again), REQUEST_IN_PROGRESS; 422 IDEMPOTENCY_KEY_REUSED (same key, different booking), PROMO_* (the promo code can't be used: same reason codes as the quote's promoError; the booking is not made), or with useHours: NO_MEMBERSHIP, SPORT_NOT_INCLUDED, NO_HOURS_LEFT, WEEKDAYS_ONLY, TOO_SOON, EXPIRES_BEFORE_BOOKING (same as quote hours.reasonCode); 429 GUEST_LIMIT_REACHED (a guest email/phone already holds 3 upcoming bookings, or 5 guest bookings from the same device in 24 hours).",
+            "",
+            "**Website:** body `CreateBookingInput` (courtType, date, startTime, duration …, optional promoCode). Guests may book without auth. Membership hours / loyalty redeem require a customer account.",
+          ].join("\n"),
+          security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
+          parameters: [
+            { name: "Idempotency-Key", in: "header", required: false, schema: { type: "string", maxLength: 200 } },
+          ],
           requestBody: {
             required: true,
             content: {
               "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["name", "email", "password", "phone"],
-                  properties: {
-                    name: { type: "string", minLength: 2 },
-                    email: { type: "string", format: "email" },
-                    password: { type: "string", minLength: 6 },
-                    phone: {
-                      type: "string",
-                      description: "Pakistani mobile, e.g. 03XXXXXXXXX",
+                schema: { $ref: "#/components/schemas/CreateBookingInput" },
+                examples: {
+                  app: {
+                    summary: "App (guest)",
+                    value: {
+                      courtId: "6650c0ffee0000000000c001",
+                      start: "2026-11-20T18:00:00+05:00",
+                      durationMinutes: 90,
+                      guest: { name: "Ali Raza", email: "ali@example.com", phone: "03001234567" },
                     },
                   },
                 },
@@ -259,54 +254,39 @@ export function getOpenApiDocument(baseUrl?: string) {
           },
           responses: {
             "201": {
-              description: "Created",
+              description: "App: booking made",
               content: {
                 "application/json": {
-                  schema: {
-                    type: "object",
-                    properties: {
-                      user: {
-                        type: "object",
-                        properties: {
-                          id: { type: "string" },
-                          email: { type: "string" },
-                          name: { type: "string" },
-                          role: { type: "string", example: "user" },
-                        },
+                  example: {
+                    booking: {
+                      id: "6650c0ffee0000000000b001",
+                      reference: "IBX-8821",
+                      courtId: "6650c0ffee0000000000c001",
+                      courtName: "Padel Court 1",
+                      sport: "PADEL",
+                      start: "2026-11-20T18:00:00+05:00",
+                      durationMinutes: 90,
+                      status: "reserved",
+                      price: { courtFee: 9000, promoCode: null, promoDiscount: 0, hoursDiscount: 0, pointsUsed: 0, pointsDiscount: 0, total: 9000 },
+                      payment: {
+                        status: "awaiting_proof",
+                        advanceRequired: 4500,
+                        amountVerified: 0,
+                        walletCreditUsed: 0,
+                        balanceDue: 9000,
+                        proofs: [],
                       },
+                      cancellation: { canCancel: false, cancelUntil: "2026-11-20T14:00:00+05:00" },
+                      refund: null,
+                      hoursUsed: 0,
+                      createdAt: "2026-11-07T15:00:00+05:00",
                     },
+                    guestAccessToken: "gt_9c1f0b2e7a4d4c55b1f3a8e6d2c7b901",
                   },
                 },
               },
             },
-            "400": {
-              description: "Validation error or email already registered",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" },
-                },
-              },
-            },
-          },
-        },
-      },
-      "/api/v1/bookings": {
-        post: {
-          tags: ["Bookings"],
-          summary: "Create a booking (guest or authenticated customer)",
-          description:
-            "Guests may book without auth. Authenticated customers (cookie or Bearer) are linked via userId. Membership hours / loyalty redeem require a customer account.",
-          security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/CreateBookingInput" },
-              },
-            },
-          },
-          responses: {
-            "200": { description: "Booking created" },
+            "200": { description: "Website: booking created. App: same Idempotency-Key again → the first booking." },
             "400": {
               description: "Validation error",
               content: {
@@ -321,62 +301,73 @@ export function getOpenApiDocument(baseUrl?: string) {
       "/api/v1/bookings/availability": {
         get: {
           tags: ["Bookings"],
-          summary: "Public availability quotes for a court type / date",
-          description:
-            "mode=times (default) returns priced start times; mode=quick returns per-slot court counts.",
+          summary: "Free times — one court (app) or a sport (website)",
+          description: [
+            "**App, one court:** `?courtId=&date=YYYY-MM-DD&durationMinutes=90`. Returns every start time of the day (courts are open 24 hours), free or taken (`available: false` — grey it out). Times already past (venue time) are left out. `price` is the full price for the duration after automatic discounts, whole PKR; `originalPrice` is before discounts. `rateType` is off_peak, standard or peak (at the start time). Times the venue closed (Admin → Closures) show as `available: false`; `closures` lists them as `[{start, end, note}]` so the app can say why (e.g. \"Closed for maintenance.\").",
+            "Errors: 400 DATE_IN_PAST, DATE_OUT_OF_WINDOW (window counts today: 14 days = today + 13), INVALID_DURATION (must be one of the sport's durationsMinutes from GET /sports), VALIDATION_ERROR; 404 COURT_NOT_FOUND.",
+            "",
+            "**Website, a sport (unchanged):** `?courtType=&date=&duration=&mode=times|quick&excludeBookingId=`.",
+          ].join("\n"),
           parameters: [
-            {
-              name: "courtType",
-              in: "query",
-              required: true,
-              schema: {
-                type: "string",
-                enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
-              },
-            },
+            { name: "courtId", in: "query", schema: { type: "string" }, description: "App mode" },
+            { name: "durationMinutes", in: "query", schema: { type: "integer", example: 90 }, description: "App mode" },
             {
               name: "date",
               in: "query",
               required: true,
-              schema: { type: "string", example: "2026-08-15" },
+              schema: { type: "string", example: "2026-11-05" },
             },
             {
-              name: "duration",
+              name: "courtType",
               in: "query",
-              schema: { type: "number", default: 1 },
+              schema: { type: "string", enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"] },
+              description: "Website mode",
             },
+            { name: "duration", in: "query", schema: { type: "number", default: 1 }, description: "Website mode (hours)" },
             {
               name: "mode",
               in: "query",
               schema: { type: "string", enum: ["times", "quick"], default: "times" },
+              description: "Website mode",
             },
-            {
-              name: "excludeBookingId",
-              in: "query",
-              schema: { type: "string" },
-            },
+            { name: "excludeBookingId", in: "query", schema: { type: "string" }, description: "Website mode" },
           ],
           responses: {
-            "200": { description: "OK" },
-            "400": { description: "Validation error" },
-          },
-        },
-      },
-      "/api/v1/courts": {
-        get: {
-          tags: ["Bookings"],
-          summary: "Public active courts catalog",
-          parameters: [
-            {
-              name: "type",
-              in: "query",
-              schema: {
-                type: "string",
-                enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: {
+                    courtId: "6650c0ffee0000000000c001",
+                    date: "2026-11-05",
+                    durationMinutes: 90,
+                    slots: [
+                      { start: "2026-11-05T16:30:00+05:00", available: true, rateType: "off_peak", price: 8250, originalPrice: 8250 },
+                      { start: "2026-11-05T18:00:00+05:00", available: false, rateType: "peak", price: 9000, originalPrice: 9000 },
+                    ],
+                  },
+                },
               },
             },
-          ],
-          responses: { "200": { description: "OK" } },
+            "400": {
+              description: "Wrong date or duration",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                  example: { error: "You can book up to 14 days ahead.", code: "DATE_OUT_OF_WINDOW" },
+                },
+              },
+            },
+            "404": {
+              description: "Court not found or not active",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                  example: { error: "Court not found", code: "COURT_NOT_FOUND" },
+                },
+              },
+            },
+          },
         },
       },
       "/api/v1/health": {
@@ -386,39 +377,6 @@ export function getOpenApiDocument(baseUrl?: string) {
           responses: {
             "200": { description: "Healthy" },
             "503": { description: "Database unavailable" },
-          },
-        },
-      },
-      "/api/v1/account/profile": {
-        get: {
-          tags: ["Account"],
-          summary: "Get my profile",
-          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-          responses: {
-            "200": { description: "OK" },
-            "401": { description: "Unauthorized" },
-          },
-        },
-        patch: {
-          tags: ["Account"],
-          summary: "Update my profile (name, phone)",
-          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-          requestBody: {
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string" },
-                    phone: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-          responses: {
-            "200": { description: "OK" },
-            "401": { description: "Unauthorized" },
           },
         },
       },
@@ -475,14 +433,39 @@ export function getOpenApiDocument(baseUrl?: string) {
         get: {
           tags: ["Account"],
           summary: "List my upcoming and past bookings",
+          description: [
+            "**App: add `?format=app`.** Answer: `{upcoming: [Booking], past: {items: [Booking], nextCursor}}` — the same booking object as POST /bookings returns.",
+            "- upcoming = reserved or confirmed and not finished yet, soonest first (all of them, no pages).",
+            "- past = finished, cancelled or completed, newest first, in pages of `limit` (default 20, max 50). For the next page send `cursor=<nextCursor>`; nextCursor is null on the last page.",
+            "- A confirmed booking whose time has passed shows status `completed`.",
+            "Errors: 400 VALIDATION_ERROR (bad cursor or limit); 401 UNAUTHORIZED; 403 STAFF_ACCOUNT or ACCOUNT_BLOCKED (any signed-in customer address gives this once the super admin blocks them: sign out).",
+            "",
+            "**Website (no format):** unchanged.",
+          ].join("\n"),
           security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-          responses: { "200": { description: "OK" } },
+          parameters: [
+            { name: "format", in: "query", required: false, schema: { type: "string", enum: ["app"] } },
+            { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50 } },
+          ],
+          responses: {
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: { upcoming: [{ id: "6650c0ffee0000000000b001", reference: "IBX-8821", status: "reserved" }], past: { items: [], nextCursor: null } },
+                },
+              },
+            },
+          },
         },
       },
       "/api/v1/account/bookings/{id}": {
         get: {
           tags: ["Account"],
           summary: "Get one of my bookings",
+          description:
+            "**App: add `?format=app`** → `{booking}` (the app's booking object). 404 BOOKING_NOT_FOUND if it isn't yours. **Website (no format):** unchanged `{booking, canCancel}`.",
           security: [{ bearerAuth: [] }, { cookieAuth: [] }],
           parameters: [
             {
@@ -491,10 +474,11 @@ export function getOpenApiDocument(baseUrl?: string) {
               required: true,
               schema: { type: "string" },
             },
+            { name: "format", in: "query", required: false, schema: { type: "string", enum: ["app"] } },
           ],
           responses: {
             "200": { description: "OK" },
-            "404": { description: "Not found" },
+            "404": { description: "Not found (app: code BOOKING_NOT_FOUND)" },
           },
         },
         delete: {
@@ -515,20 +499,178 @@ export function getOpenApiDocument(baseUrl?: string) {
           },
         },
       },
+      "/api/v1/loyalty/rules": {
+        get: {
+          tags: ["Account"],
+          summary: "Points rules (public, no sign-in)",
+          description: [
+            "For guests: checkout and the \"sign in to earn points\" sheet. Same values as `rules` and `pkrPerPoint` in `/account/loyalty`.",
+            "- Set by the super admin in Admin → App Settings. Don't hard-code them in the app.",
+            "- earnBasis `per_pkr`: earnPoints for every earnPerPkr PKR paid. `per_hour`: earnPoints per hour played. Points are added when staff mark the booking completed.",
+            "- Points can be used from minRedeemPoints, up to maxRedeemPercent of the court fee; 1 point = pkrPerPoint PKR.",
+            "- signUpBonusPoints: given once to new accounts (0 = off).",
+          ].join("\n"),
+          responses: {
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: {
+                    pkrPerPoint: 1,
+                    rules: { earnBasis: "per_pkr", earnPoints: 10, earnPerPkr: 100, minRedeemPoints: 500, maxRedeemPercent: 100, signUpBonusPoints: 200, earnOnMembershipHours: false },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       "/api/v1/account/loyalty": {
         get: {
           tags: ["Account"],
-          summary: "Loyalty balance, hours played, ledger",
+          summary: "My reward points: balance, rules, history",
+          description: [
+            "**App: add `?format=app[&cursor=&limit=]`.** Answer: `{points, pendingPoints, pkrPerPoint, rules, history: {items, nextCursor}}`.",
+            "- rules come from Admin → App Settings (earnBasis per_pkr or per_hour, earnPoints, earnPerPkr, minRedeemPoints, maxRedeemPercent, signUpBonusPoints, earnOnMembershipHours). Web and app use the same values.",
+            "- history items: `{id, type, status, points, title, bookingId, date}`. type: earned, redeemed, returned, bonus, adjusted (staff change). status: pending (match not played yet), completed, applied (used on a booking). points is signed: + added, − taken.",
+            "- Pending items (bookings not yet marked completed by staff) come first on the first page; their date is when the match ends. Then the history, newest first, in pages (limit default 20, max 50).",
+            "- New accounts get the sign-up bonus once (0 = off, the default).",
+            "**Website (no format):** unchanged, plus `rules`.",
+          ].join("\n"),
           security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-          responses: { "200": { description: "OK" } },
+          parameters: [
+            { name: "format", in: "query", required: false, schema: { type: "string", enum: ["app"] } },
+            { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50 } },
+          ],
+          responses: {
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: {
+                    points: 1850,
+                    pendingPoints: 600,
+                    pkrPerPoint: 1,
+                    rules: { earnBasis: "per_pkr", earnPoints: 10, earnPerPkr: 100, minRedeemPoints: 500, maxRedeemPercent: 100, signUpBonusPoints: 200, earnOnMembershipHours: false },
+                    history: {
+                      items: [
+                        { id: "pending:6650c0ffee0000000000b001", type: "earned", status: "pending", points: 600, title: "Padel match · IBX-8821", bookingId: "6650c0ffee0000000000b001", date: "2026-11-05T19:30:00+05:00" },
+                      ],
+                      nextCursor: null,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
       "/api/v1/account/membership": {
         get: {
           tags: ["Account"],
-          summary: "Active membership, history, and plan catalog",
+          summary: "My membership. App: add ?format=app for hours per sport",
+          description:
+            "With `?format=app` (PDF §15): `{ active: { planId, planName, startedAt, expiresAt, restriction, hoursBySport: [{sport, total, used, remaining}] } | null }`. Without it: the website's shape (membership, history, plans).",
           security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-          responses: { "200": { description: "OK" } },
+          parameters: [{ name: "format", in: "query", schema: { type: "string", enum: ["app"] } }],
+          responses: {
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: {
+                    active: {
+                      planId: "gold",
+                      planName: "Gold",
+                      startedAt: "2026-11-01T10:00:00+05:00",
+                      expiresAt: "2026-12-01T10:00:00+05:00",
+                      restriction: null,
+                      hoursBySport: [
+                        { sport: "PADEL", total: 10, used: 2.5, remaining: 7.5 },
+                        { sport: "FUTSAL", total: 6, used: 0, remaining: 6 },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/membership/plans": {
+        get: {
+          tags: ["Venue"],
+          summary: "Membership plans on sale (anyone) and the WhatsApp link to buy",
+          description: "Plans are made by the super admin (Admin → Memberships → Plans). Buying is on WhatsApp for now; staff then activate the plan.",
+          responses: {
+            "200": {
+              description: "OK",
+              content: {
+                "application/json": {
+                  example: {
+                    plans: [
+                      {
+                        id: "gold",
+                        name: "Gold",
+                        price: 60000,
+                        validityDays: 30,
+                        badge: "Best value",
+                        hours: [
+                          { sport: "PADEL", hours: 10 },
+                          { sport: "FUTSAL", hours: 6 },
+                        ],
+                        features: ["Priority booking"],
+                        restriction: null,
+                      },
+                    ],
+                    whatsAppUrl: "https://wa.me/923255429429",
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/admin/membership-plans": {
+        get: {
+          tags: ["Admin"],
+          summary: "Staff: every membership plan",
+          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+          responses: { "200": { description: "{ plans: [...] }" } },
+        },
+        post: {
+          tags: ["Admin"],
+          summary: "Super admin: make a plan",
+          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                example: {
+                  name: "Gold",
+                  price: 60000,
+                  validityDays: 30,
+                  hoursBySport: [
+                    { sport: "PADEL", hours: 10 },
+                    { sport: "FUTSAL", hours: 6 },
+                  ],
+                  weekdayOnly: false,
+                  badge: "Best value",
+                  features: ["Priority booking"],
+                },
+              },
+            },
+          },
+          responses: { "201": { description: "{ plan }" }, "400": { description: "VALIDATION_ERROR" }, "403": { description: "FORBIDDEN (not super admin)" } },
+        },
+      },
+      "/api/v1/admin/membership-plans/{id}": {
+        patch: {
+          tags: ["Admin"],
+          summary: "Super admin: change a plan (new activations only). { isActive: false } stops selling it.",
+          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "{ plan }" }, "404": { description: "PLAN_NOT_FOUND" } },
         },
       },
       "/api/v1/account/support": {
@@ -806,6 +948,13 @@ export function getOpenApiDocument(baseUrl?: string) {
           responses: { "200": { description: "OpenAPI 3.0 JSON" } },
         },
       },
+      ...authPaths,
+      ...catalogPaths,
+      ...paymentPaths,
+      ...walletPaths,
+      ...notificationPaths,
+      ...preferencesPaths,
+      ...membershipAdminPaths,
     },
   } as const;
 }

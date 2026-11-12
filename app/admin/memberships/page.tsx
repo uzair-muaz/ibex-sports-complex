@@ -1,5 +1,8 @@
 "use client";
 
+import { useSportList } from "@/lib/tanstack/hooks/queries";
+import Link from "next/link";
+
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,6 +22,11 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminTableSkeleton } from "@/components/admin/loaders";
+import { WalletModal } from "@/components/admin/WalletModal";
+import { HoursBankModal } from "@/components/admin/HoursBankModal";
+import { MEMBERSHIP_PAYMENT_METHODS, PAYMENT_METHOD_LABELS, type MembershipPaymentMethod } from "@/lib/membership-payment";
+import { MembershipPlansModal, SPORT_LABELS } from "@/components/admin/MembershipPlansModal";
+import { useSession } from "next-auth/react";
 import {
   activateAdminMembership,
   adjustAdminLoyalty,
@@ -40,6 +48,8 @@ const rosterKeys = {
 export default function AdminMembershipsPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  // Sports from Admin → App Settings.
+  const sportList = useSportList();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [membershipFilter, setMembershipFilter] = useState<
@@ -53,8 +63,20 @@ export default function AdminMembershipsPage() {
   const [loyaltyUser, setLoyaltyUser] = useState<MembershipRosterRow | null>(
     null,
   );
-  const [plans, setPlans] = useState<Array<{ _id: string; name: string }>>([]);
+  const [walletUser, setWalletUser] = useState<MembershipRosterRow | null>(
+    null,
+  );
+  type PlanOption = { _id: string; name: string; hoursBySport?: { sport: string; hours: number }[] };
+  const [plans, setPlans] = useState<PlanOption[]>([]);
   const [planId, setPlanId] = useState<string>();
+  const [hoursBySport, setHoursBySport] = useState<Record<string, number | null>>({});
+  const [plansOpen, setPlansOpen] = useState(false);
+  const [hoursUser, setHoursUser] = useState<MembershipRosterRow | null>(null);
+  const [payMethod, setPayMethod] = useState<MembershipPaymentMethod>();
+  const [payAmount, setPayAmount] = useState<number | null>(null);
+  const [payNote, setPayNote] = useState("");
+  const { data: session } = useSession();
+  const isSuperAdmin = session?.user?.role === "super_admin";
   const [carry, setCarry] = useState(true);
   const [delta, setDelta] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -76,9 +98,7 @@ export default function AdminMembershipsPage() {
         fetchAdminMembershipRoster(rosterInput),
         fetchAdminMembershipPlans(),
       ]);
-      setPlans(
-        (planResult.plans || []) as Array<{ _id: string; name: string }>,
-      );
+      setPlans((planResult.plans || []) as PlanOption[]);
       return {
         rows: (roster.rows || []) as MembershipRosterRow[],
         totalCount: roster.totalCount ?? roster.rows?.length ?? 0,
@@ -87,7 +107,11 @@ export default function AdminMembershipsPage() {
   });
 
   const columns: ColumnsType<MembershipRosterRow> = [
-    { title: "Name", dataIndex: "name" },
+    {
+      title: "Name",
+      dataIndex: "name",
+      render: (name: string, row) => <Link href={`/admin/customers/${row._id}`}>{name}</Link>,
+    },
     { title: "Email", dataIndex: "email" },
     {
       title: "Plan",
@@ -102,14 +126,12 @@ export default function AdminMembershipsPage() {
     {
       title: "Hours left",
       key: "hours",
-      width: 110,
-      render: (_, row) => row.membership?.hoursRemaining ?? "—",
-    },
-    {
-      title: "Guest passes",
-      key: "passes",
-      width: 120,
-      render: (_, row) => row.membership?.guestPassesRemaining ?? "—",
+      render: (_, row) => {
+        const rows = row.membership?.hoursBySport ?? [];
+        if (!row.membership) return "—";
+        if (rows.length === 0) return `${row.membership.hoursRemaining} (old plan)`;
+        return rows.map((h) => `${SPORT_LABELS[h.sport] ?? h.sport} ${h.remaining}h`).join(" · ");
+      },
     },
     {
       title: "Valid until",
@@ -133,8 +155,14 @@ export default function AdminMembershipsPage() {
           <Button size="small" onClick={() => setActivateUser(row)}>
             Activate
           </Button>
+          <Button size="small" onClick={() => setHoursUser(row)}>
+            Hours
+          </Button>
           <Button size="small" onClick={() => setLoyaltyUser(row)}>
             Adjust points
+          </Button>
+          <Button size="small" onClick={() => setWalletUser(row)}>
+            Wallet
           </Button>
         </Space>
       ),
@@ -149,10 +177,19 @@ export default function AdminMembershipsPage() {
         userId: activateUser._id,
         planId,
         carryForwardHours: carry,
+        hoursBySport: Object.entries(hoursBySport)
+          .filter(([, h]) => (h ?? 0) > 0)
+          .map(([sport, h]) => ({ sport, hours: h as number })),
+        payment: payMethod
+          ? { method: payMethod, pricePaid: payMethod === "free" ? 0 : (payAmount ?? 0), note: payNote.trim() || undefined }
+          : null,
       });
       message.success("Membership activated");
       setActivateUser(null);
       setPlanId(undefined);
+      setPayMethod(undefined);
+      setPayAmount(null);
+      setPayNote("");
       await queryClient.invalidateQueries({ queryKey: rosterKeys.all });
     } catch (e) {
       message.error(e instanceof Error ? e.message : "Failed");
@@ -213,6 +250,7 @@ export default function AdminMembershipsPage() {
             { value: "none", label: "No membership" },
           ]}
         />
+        {isSuperAdmin && <Button onClick={() => setPlansOpen(true)}>Plans</Button>}
       </Space>
 
       {rosterQuery.isLoading ? (
@@ -244,18 +282,74 @@ export default function AdminMembershipsPage() {
         onOk={onActivate}
         confirmLoading={busy}
         okText="Activate"
+        okButtonProps={{ disabled: !planId || (!!payMethod && payMethod !== "free" && !payAmount) }}
       >
         <Form layout="vertical" className="mt-4">
           <Form.Item label="Plan" required>
             <Select
               value={planId}
-              onChange={setPlanId}
+              onChange={(id) => {
+                setPlanId(id);
+                const plan = plans.find((p) => p._id === id);
+                setHoursBySport(
+                  Object.fromEntries((plan?.hoursBySport ?? []).map((h) => [h.sport, h.hours])),
+                );
+              }}
               options={plans.map((p) => ({ value: p._id, label: p.name }))}
-              placeholder="Select plan"
+              placeholder={plans.length ? "Select plan" : "No plans with hours per sport yet"}
             />
           </Form.Item>
+          {planId && (
+            <Form.Item label="Hours per sport (change for this customer if needed)">
+              <Space wrap>
+                {sportList.map(({ sport, label }) => (
+                  <InputNumber
+                    key={sport}
+                    min={0}
+                    step={0.5}
+                    prefix={label}
+                    value={hoursBySport[sport] ?? null}
+                    onChange={(v) => setHoursBySport((prev) => ({ ...prev, [sport]: v }))}
+                    style={{ width: 170 }}
+                  />
+                ))}
+              </Space>
+            </Form.Item>
+          )}
           <Form.Item label="Carry forward unused hours">
             <Switch checked={carry} onChange={setCarry} />
+          </Form.Item>
+          <Form.Item label="Payment received (optional, for reports)">
+            <Space wrap>
+              <Select
+                allowClear
+                placeholder="How they paid"
+                value={payMethod}
+                onChange={(v) => setPayMethod(v)}
+                style={{ width: 180 }}
+                options={MEMBERSHIP_PAYMENT_METHODS.map((m) => ({ value: m, label: PAYMENT_METHOD_LABELS[m] }))}
+              />
+              {payMethod && payMethod !== "free" && (
+                <InputNumber
+                  min={1}
+                  precision={0}
+                  prefix="PKR"
+                  placeholder="Amount"
+                  value={payAmount}
+                  onChange={(v) => setPayAmount(v)}
+                  style={{ width: 160 }}
+                />
+              )}
+            </Space>
+            {payMethod && (
+              <Input
+                className="mt-2"
+                maxLength={300}
+                placeholder="Note (optional), e.g. receipt number"
+                value={payNote}
+                onChange={(e) => setPayNote(e.target.value)}
+              />
+            )}
           </Form.Item>
         </Form>
       </Modal>
@@ -284,6 +378,21 @@ export default function AdminMembershipsPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <WalletModal user={walletUser} onClose={() => setWalletUser(null)} />
+      <HoursBankModal
+        user={hoursUser}
+        canEdit={isSuperAdmin}
+        onClose={() => setHoursUser(null)}
+        onChanged={() => void queryClient.invalidateQueries({ queryKey: rosterKeys.all })}
+      />
+      <MembershipPlansModal
+        open={plansOpen}
+        onClose={() => {
+          setPlansOpen(false);
+          void queryClient.invalidateQueries({ queryKey: rosterKeys.all });
+        }}
+      />
     </AdminLayout>
   );
 }

@@ -1,9 +1,13 @@
 'use server';
 
+import { closureSpansByCourt } from "@/lib/closures";
+import { auditBooking, bookingSnap } from "@/lib/audit-booking";
+import { isBookingBlocked } from "@/lib/customer-block";
+import { BLOCKED_MESSAGE } from "@/lib/customer-block-rules";
 import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 import Booking from '@/models/Booking';
-import Court from '@/models/Court';
+import Court, { type ICourt } from '@/models/Court';
 import Discount from '@/models/Discount';
 import { auth } from '@/lib/auth';
 import {
@@ -15,6 +19,10 @@ import {
 import { safeRevalidatePath } from '@/lib/safe-revalidate';
 import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
+import { acquireSlotLocks, releaseSlotLocks } from '@/lib/booking-locks';
+import { staffCancelBooking, type StaffRefundChoice } from '@/lib/staff-cancel';
+import { checkPromo, releasePromoForBooking, undoPromoUse, redeemPromo } from '@/lib/promo';
+import { nextBookingSerial } from '@/lib/booking-serial';
 import {
   getApplicableDiscounts,
   calculateDiscountedPrice,
@@ -26,17 +34,21 @@ import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from '@/lib/date-time';
 import {
   awardLoyaltyForCompletedBooking,
   redeemLoyaltyPoints,
-  refundLoyaltyForBooking,
 } from '@/lib/loyalty';
 import {
-  assertMembershipUsable,
-  deductMembershipForBooking,
-  refundMembershipHours,
-} from '@/lib/membership';
+  HOURS_REASON_TEXT,
+  checkHoursForSlot,
+  hoursCover,
+  loadMembershipForHours,
+  putBackSportHours,
+  takeSportHours,
+} from '@/lib/membership-hours';
+import { bookingLengthError } from '@/lib/booking-length';
+import { getAppSettings } from '@/lib/app-settings';
 
 async function getActiveDiscountsForBusinessDate(bookingDateKey: string) {
   const discountsRaw = await Discount.find({ isActive: true }).lean();
-  return discountsRaw.filter((d: any) => {
+  return discountsRaw.filter((d) => {
     const fromKey = toDateKeyInTimezone(new Date(d.validFrom), BUSINESS_TIMEZONE);
     const untilKey = toDateKeyInTimezone(new Date(d.validUntil), BUSINESS_TIMEZONE);
     return fromKey <= bookingDateKey && bookingDateKey <= untilKey;
@@ -71,16 +83,32 @@ async function findConflictBookings(params: {
 }) {
   const dateMinus = shiftDateUTC(params.date, -1);
   const datePlus = shiftDateUTC(params.date, 1);
-  return Booking.find({
-    courtId: { $in: params.courtIds },
-    date: { $in: [dateMinus, params.date, datePlus] },
-    status: { $in: [...ACTIVE_BOOKING_STATUSES] },
-  })
-    .select("courtId date startTime duration")
-    .lean();
+  const [bookings, closed] = await Promise.all([
+    Booking.find({
+      courtId: { $in: params.courtIds },
+      date: { $in: [dateMinus, params.date, datePlus] },
+      status: { $in: [...ACTIVE_BOOKING_STATUSES] },
+    })
+      .select("courtId date startTime duration")
+      .lean(),
+    closureSpansByCourt(params.courtIds, params.date),
+  ]);
+  // Closed times (Admin → Closures) count as taken.
+  const closures = [...closed].flatMap(([courtId, spans]) =>
+    spans.map((s) => ({
+      _id: `closure:${s.closureId}`,
+      courtId: new mongoose.Types.ObjectId(courtId),
+      date: s.date,
+      startTime: s.startTime,
+      duration: s.duration,
+    })),
+  );
+  return [...bookings, ...closures];
 }
 
-function toDiscountInput(d: any): DiscountInput {
+type LeanDiscount = Awaited<ReturnType<typeof getActiveDiscountsForBusinessDate>>[number];
+
+function toDiscountInput(d: LeanDiscount): DiscountInput {
   return {
     _id: d._id.toString(),
     name: d.name,
@@ -158,7 +186,7 @@ function bookingOverlapsCandidate(
 }
 
 export interface CreateBookingInput {
-  courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
+  courtType: string;
   date: string;
   startTime: number;
   duration: number;
@@ -167,16 +195,23 @@ export interface CreateBookingInput {
   userPhone: string;
   /** Optional: redeem this many loyalty points (logged-in only) */
   loyaltyPointsToRedeem?: number;
-  /** Optional: pay with membership hours (logged-in only) */
+  /** Optional: pay with membership hours of this sport (logged-in only). Uses the hours they have; they pay the rest. */
   useMembershipHours?: boolean;
-  /** Optional: consume a guest pass with membership hours */
+  /** No longer used (there are no guest passes). Ignored. */
   useGuestPass?: boolean;
+  /** Optional promo code; the booking is refused if it can't be used. */
+  promoCode?: string;
 }
 
 export async function createBooking(
   input: CreateBookingInput,
   options?: TrustedApiActor,
 ) {
+  let newBookingId: mongoose.Types.ObjectId | null = null;
+  let holdsLocks = false;
+  let hoursTaken: { membershipId: string; sport: string; hours: number } | null = null;
+  let bookingSaved = false;
+  let promoTaken = false;
   try {
     await connectDB();
 
@@ -197,13 +232,21 @@ export async function createBooking(
     if (!input.userPhone || input.userPhone.trim().length === 0) {
       throw new Error('Phone number is required');
     }
+    // Customers blocked by the super admin can't book (staff can still book for them).
+    const staffBooking = sessionRole === 'admin' || sessionRole === 'super_admin';
+    if (
+      !staffBooking &&
+      (await isBookingBlocked({ userId: sessionUserId ?? null, email: input.userEmail, phone: input.userPhone }))
+    ) {
+      throw new Error(BLOCKED_MESSAGE);
+    }
 
-    // Validate minimum booking time (1 hour for most courts, 1.5 hours for Futsal)
-    const minDuration = input.courtType === 'FUTSAL' ? 1.5 : 1;
-    if (input.duration < minDuration) {
-      throw new Error(input.courtType === 'FUTSAL' 
-        ? 'Minimum booking time for Futsal is 90 minutes' 
-        : 'Minimum booking time is 1 hour');
+    // Booking length from Admin → App Settings: customers pick one of the sport's
+    // lengths; staff may use any 30-minute step from the shortest.
+    const isStaffBooking = sessionRole === 'admin' || sessionRole === 'super_admin';
+    const lengthError = await bookingLengthError(input.courtType, input.duration, { exactList: !isStaffBooking });
+    if (lengthError) {
+      throw new Error(lengthError);
     }
 
     // Validate duration increments (can be 1, 1.5, 2, 2.5, etc.)
@@ -231,6 +274,7 @@ export async function createBooking(
 
     // Find available court
     let assignedCourt = null;
+    newBookingId = new mongoose.Types.ObjectId();
 
     for (const court of availableCourts) {
         // Check if this court has any conflicts
@@ -249,20 +293,32 @@ export async function createBooking(
       });
 
       if (!hasConflict) {
-        assignedCourt = court;
-        break;
+        // Claim the half hours so two people can't book the same court at once.
+        const locked = await acquireSlotLocks({
+          courtId: court._id,
+          bookingId: newBookingId,
+          dateKey: input.date,
+          startHour: input.startTime,
+          durationHours: input.duration,
+        });
+        if (locked) {
+          assignedCourt = court;
+          break;
+        }
       }
     }
 
     if (!assignedCourt) {
       throw new Error('No available courts for the selected time slot');
     }
+    holdsLocks = true;
 
     // Calculate original price (before discounts) with peak/off-peak support
     const { originalPrice } = calculateOriginalPrice(
       assignedCourt,
       input.startTime,
       input.duration,
+      input.date,
     );
 
     // Fetch active discounts using business timezone date boundary
@@ -299,41 +355,80 @@ export async function createBooking(
       amountSaved: d.amountSaved,
     }));
 
-    // Determine next booking serial number (incremental)
-    const lastBooking = await Booking.findOne().sort({ serialNumber: -1, createdAt: -1 });
-    const nextSerialNumber = (lastBooking?.serialNumber ?? 0) + 1;
+    // Promo code: comes off the court fee after automatic discounts, before hours and points.
+    let promo: { promoId: string; code: string; discount: number } | null = null;
+    if (input.promoCode && input.promoCode.trim()) {
+      const check = await checkPromo({
+        code: input.promoCode,
+        sport: input.courtType,
+        courtFee: finalPrice,
+        customer: { userId: shouldLinkUser ? sessionUserId : null, email: input.userEmail },
+      });
+      if (!check.ok) throw new Error(check.message);
+      promo = { promoId: check.promoId!, code: check.code, discount: check.discount };
+    }
+    const feeAfterPromo = finalPrice - (promo?.discount ?? 0);
 
-    let totalPrice = finalPrice;
+    // Next booking serial number (one atomic step, no duplicates)
+    const nextSerialNumber = await nextBookingSerial();
+
+    let totalPrice = feeAfterPromo;
     let loyaltyPointsRedeemed = 0;
     let loyaltyDiscountPkr = 0;
     let usedMembershipHours = false;
     let membershipId: mongoose.Types.ObjectId | undefined;
     let membershipHoursUsed = 0;
-    let usedGuestPass = false;
+    let membershipSport: string | undefined;
+    let membershipDiscountPkr = 0;
 
     if (input.useMembershipHours) {
       if (!shouldLinkUser || !sessionUserId) {
         throw new Error('Sign in required to use membership hours');
       }
-      const check = await assertMembershipUsable({
-        userId: sessionUserId,
-        date: input.date,
-        startTime: input.startTime,
-        duration: input.duration,
-        useGuestPass: input.useGuestPass,
+      const membership = await loadMembershipForHours(sessionUserId);
+      const check = checkHoursForSlot(membership, {
+        sport: input.courtType,
+        dateKey: input.date,
+        startHour: input.startTime,
       });
-      if (!check.ok) {
-        throw new Error(check.error);
+      if (!check.canUse || !membership) {
+        throw new Error(HOURS_REASON_TEXT[check.reasonCode ?? 'NO_MEMBERSHIP']);
       }
+      const cover = hoursCover({
+        available: check.available,
+        canUse: true,
+        useHours: true,
+        durationHours: input.duration,
+        courtFee: feeAfterPromo,
+      });
+      const take = { membershipId: membership.id, sport: input.courtType, hours: cover.used };
+      if (!(await takeSportHours(take))) {
+        throw new Error('Your membership hours changed. Please try again.');
+      }
+      hoursTaken = take;
       usedMembershipHours = true;
-      membershipId = check.membership._id as mongoose.Types.ObjectId;
-      membershipHoursUsed = input.duration;
-      usedGuestPass = !!input.useGuestPass;
-      totalPrice = 0;
+      membershipId = new mongoose.Types.ObjectId(membership.id);
+      membershipHoursUsed = cover.used;
+      membershipSport = input.courtType;
+      membershipDiscountPkr = cover.discount;
+      totalPrice = feeAfterPromo - cover.discount;
+    }
+
+    if (promo) {
+      const used = await redeemPromo({
+        promoId: promo.promoId,
+        code: promo.code,
+        bookingId: newBookingId!,
+        customer: { userId: shouldLinkUser ? sessionUserId : null, email: input.userEmail },
+        discountPkr: promo.discount,
+      });
+      if (!used) throw new Error('This promo code has just been fully used.');
+      promoTaken = true;
     }
 
     // Create booking with discount information
     const booking = await Booking.create({
+      _id: newBookingId,
       courtId: assignedCourt._id,
       date: input.date,
       startTime: input.startTime,
@@ -346,27 +441,25 @@ export async function createBooking(
       originalPrice,
       discounts: discountsForDB,
       discountAmount,
+      promoCode: promo?.code,
+      promoDiscountPkr: promo?.discount ?? 0,
       totalPrice,
       loyaltyPointsRedeemed: 0,
       loyaltyDiscountPkr: 0,
       usedMembershipHours,
       membershipId,
       membershipHoursUsed,
-      usedGuestPass,
-      status: usedMembershipHours ? 'confirmed' : 'pending_payment',
-      amountPaid: usedMembershipHours ? 0 : 0,
+      membershipSport,
+      membershipDiscountPkr,
+      usedGuestPass: false,
+      // Nothing left to pay (hours covered it all) → confirmed straight away.
+      status: totalPrice === 0 ? 'confirmed' : 'pending_payment',
+      amountPaid: 0,
     });
-
-    if (usedMembershipHours && membershipId) {
-      await deductMembershipForBooking({
-        membershipId: membershipId.toString(),
-        duration: input.duration,
-        useGuestPass: usedGuestPass,
-      });
-    }
+    holdsLocks = false; // the booking now exists, so its locks are valid
+    bookingSaved = true; // the hours now belong to the booking (cancel gives them back)
 
     if (
-      !usedMembershipHours &&
       shouldLinkUser &&
       sessionUserId &&
       input.loyaltyPointsToRedeem &&
@@ -376,21 +469,22 @@ export async function createBooking(
         userId: sessionUserId,
         points: input.loyaltyPointsToRedeem,
         bookingId: booking._id,
-        totalPriceAfterPromo: finalPrice,
+        totalPriceAfterPromo: feeAfterPromo - membershipDiscountPkr,
       });
       loyaltyPointsRedeemed = redeemed.points;
       loyaltyDiscountPkr = redeemed.discountPkr;
-      totalPrice = Math.max(0, finalPrice - loyaltyDiscountPkr);
+      totalPrice = Math.max(0, feeAfterPromo - membershipDiscountPkr - loyaltyDiscountPkr);
       booking.loyaltyPointsRedeemed = loyaltyPointsRedeemed;
       booking.loyaltyDiscountPkr = loyaltyDiscountPkr;
       booking.totalPrice = totalPrice;
+      if (totalPrice === 0) booking.status = 'confirmed';
       await booking.save();
     }
 
     await booking.populate('courtId');
 
     // Send confirmation email (non-blocking)
-    const court = booking.courtId as any;
+    const court = booking.courtId as unknown as { name?: string } | null;
     const emailResult = await sendBookingConfirmationEmail({
       userName: input.userName,
       userEmail: input.userEmail.toLowerCase(),
@@ -404,6 +498,7 @@ export async function createBooking(
       totalPrice: booking.totalPrice,
       bookingId: booking._id.toString(),
       baseUrl: getBaseUrl(),
+      advancePercent: (await getAppSettings()).payments.minAdvancePercent,
     }).catch((error) => {
       // Log error but don't fail the booking creation
       console.error('Failed to send confirmation email:', error);
@@ -421,8 +516,18 @@ export async function createBooking(
       emailSent: emailResult?.success || false,
       emailMessage: emailResult?.message,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Booking creation error:', error);
+    if (hoursTaken && !bookingSaved) {
+      await putBackSportHours(hoursTaken).catch(() => {});
+    }
+    if (promoTaken && !bookingSaved && newBookingId) {
+      await undoPromoUse(newBookingId).catch(() => {});
+    }
+    if (holdsLocks && newBookingId) {
+      await releaseSlotLocks(newBookingId).catch(() => {});
+    }
     return {
       success: false,
       error: error.message || 'Failed to create booking',
@@ -431,7 +536,7 @@ export async function createBooking(
 }
 
 export interface GetAvailableStartTimesInput {
-  courtType: 'PADEL' | 'CRICKET' | 'PICKLEBALL' | 'FUTSAL';
+  courtType: string;
   date: string; // YYYY-MM-DD (calendar day semantics)
   duration: number; // hours in 0.5 increments
   /** When editing a booking, omit it from conflict checks so its time stays bookable */
@@ -464,16 +569,9 @@ export async function getAvailableStartTimes(
       return { success: false, error: 'Duration must be greater than 0', startTimes: [] };
     }
 
-    const minDuration = input.courtType === 'FUTSAL' ? 1.5 : 1;
-    if (input.duration < minDuration) {
-      return {
-        success: false,
-        error:
-          input.courtType === 'FUTSAL'
-            ? 'Minimum booking time for Futsal is 90 minutes'
-            : 'Minimum booking time is 1 hour',
-        startTimes: [],
-      };
+    const lengthError = await bookingLengthError(input.courtType, input.duration, { exactList: false });
+    if (lengthError) {
+      return { success: false, error: lengthError, startTimes: [] };
     }
 
     if (input.duration % 0.5 !== 0) {
@@ -495,7 +593,7 @@ export async function getAvailableStartTimes(
 
     // Performance: group bookings by courtId once so we don't scan every booking
     // for every court/time slot. This reduces the inner-loop work substantially.
-    const bookingsByCourtId = new Map<string, any[]>();
+    const bookingsByCourtId = new Map<string, (typeof existingBookings)[number][]>();
     for (const b of existingBookings) {
       const key = b?.courtId?.toString?.();
       if (!key) continue;
@@ -542,6 +640,7 @@ export async function getAvailableStartTimes(
         assignedCourt,
         startTime,
         input.duration,
+        input.date,
       );
       const applicable = getApplicableDiscounts(discountsData, {
         courtType: input.courtType,
@@ -573,7 +672,8 @@ export async function getAvailableStartTimes(
     }
 
     return { success: true, startTimes: results };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('getAvailableStartTimes error:', error);
     return { success: false, error: error.message || 'Failed to fetch availability', startTimes: [] };
   }
@@ -589,16 +689,9 @@ export async function getQuickSlotCourtAvailability(
       return { success: false, error: 'Duration must be greater than 0', slots: [] };
     }
 
-    const minDuration = input.courtType === 'FUTSAL' ? 1.5 : 1;
-    if (input.duration < minDuration) {
-      return {
-        success: false,
-        error:
-          input.courtType === 'FUTSAL'
-            ? 'Minimum booking time for Futsal is 90 minutes'
-            : 'Minimum booking time is 1 hour',
-        slots: [],
-      };
+    const lengthError = await bookingLengthError(input.courtType, input.duration, { exactList: false });
+    if (lengthError) {
+      return { success: false, error: lengthError, slots: [] };
     }
 
     if (input.duration % 0.5 !== 0) {
@@ -618,7 +711,7 @@ export async function getQuickSlotCourtAvailability(
     });
 
     // Group bookings by courtId to reduce inner-loop scanning.
-    const bookingsByCourtId = new Map<string, any[]>();
+    const bookingsByCourtId = new Map<string, (typeof existingBookings)[number][]>();
     for (const b of existingBookings) {
       const key = b?.courtId?.toString?.();
       if (!key) continue;
@@ -652,14 +745,24 @@ export async function getQuickSlotCourtAvailability(
     }
 
     return { success: true, slots };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('getQuickSlotCourtAvailability error:', error);
     return { success: false, error: error.message || 'Failed to fetch quick availability', slots: [] };
   }
 }
 
-export async function getBookingsByDate(date: string) {
+/** Fields the public entry-pass page (/booking/verify/[id]) shows. Nothing else leaves the server. */
+const ENTRY_PASS_FIELDS =
+  "courtId date startTime duration status userName userEmail userPhone totalPrice originalPrice discountAmount discounts amountPaid";
+
+/** Staff only: every booking on a day, with customer contact details. */
+export async function getBookingsByDate(date: string, opts?: StaffActorOpts) {
   try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) {
+      return { success: false, error: gate.error, bookings: [] };
+    }
     await connectDB();
 
     const bookings = await Booking.find({
@@ -674,7 +777,8 @@ export async function getBookingsByDate(date: string) {
       success: true,
       bookings: JSON.parse(JSON.stringify(bookings)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get bookings error:', error);
     return {
       success: false,
@@ -706,7 +810,8 @@ export async function getAllBookings(opts?: StaffActorOpts) {
       success: true,
       bookings: JSON.parse(JSON.stringify(bookings)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get all bookings error:', error);
     return {
       success: false,
@@ -832,7 +937,7 @@ export async function getBookingsPaginated(input: GetBookingsPaginatedInput, opt
     const limit = Math.max(1, Math.min(100, Number(input.limit) || 20));
     const skip = (page - 1) * limit;
 
-    const query: any = {};
+    const query: Record<string, unknown> = {};
 
     if (input.dateRange && input.dateRange.from && input.dateRange.to) {
       query.date = {
@@ -847,7 +952,7 @@ export async function getBookingsPaginated(input: GetBookingsPaginatedInput, opt
       const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const regex = new RegExp(escaped, "i");
 
-      const or: any[] = [{ userName: regex }, { userEmail: regex }];
+      const or: Record<string, unknown>[] = [{ userName: regex }, { userEmail: regex }];
       if (mongoose.Types.ObjectId.isValid(search)) {
         or.push({ _id: new mongoose.Types.ObjectId(search) });
       }
@@ -872,7 +977,8 @@ export async function getBookingsPaginated(input: GetBookingsPaginatedInput, opt
       page,
       limit,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error("Get bookings paginated error:", error);
     return {
       success: false,
@@ -885,51 +991,34 @@ export async function getBookingsPaginated(input: GetBookingsPaginatedInput, opt
   }
 }
 
-export async function cancelBooking(bookingId: string, opts?: StaffActorOpts) {
+export async function cancelBooking(
+  bookingId: string,
+  opts?: StaffActorOpts,
+  refund?: { choice?: StaffRefundChoice; note?: string },
+) {
   try {
     const gate = await requireStaffActor(opts);
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
-
-    const booking = await Booking.findById(bookingId);
-    if (!booking) {
-      throw new Error('Booking not found');
-    }
-    if (booking.status === 'cancelled') {
-      return {
-        success: true,
-        booking: JSON.parse(JSON.stringify(booking)),
-      };
-    }
-
-    booking.status = 'cancelled';
-    await booking.save();
-
-    await refundLoyaltyForBooking(bookingId);
-
-    if (booking.usedMembershipHours && booking.membershipId) {
-      await refundMembershipHours({
-        membershipId: booking.membershipId.toString(),
-        hours: booking.membershipHoursUsed || booking.duration,
-        refundGuestPass: !!booking.usedGuestPass,
-      });
-    }
+    const auditBefore = await bookingSnap(bookingId);
+    const result = await staffCancelBooking({ bookingId, staffId: gate.userId, refund: refund?.choice, note: refund?.note });
+    if (!result.ok) return { success: false, error: result.error };
+    await auditBooking(gate, bookingId, "cancel", auditBefore);
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');
     safeRevalidatePath('/account/bookings');
-    scheduleAnalyticsDailyRebuild([booking.date]);
-
+    const booking = await Booking.findById(bookingId).lean();
+    if (booking) scheduleAnalyticsDailyRebuild([booking.date]);
     return {
       success: true,
       booking: JSON.parse(JSON.stringify(booking)),
+      refund: result,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Cancel booking error:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to cancel booking',
-    };
+    return { success: false, error: error.message || 'Failed to cancel booking' };
   }
 }
 
@@ -948,6 +1037,10 @@ export interface UpdateBookingInput {
   amountPaid?: number;
   amountReceivedOnline?: number;
   amountReceivedCash?: number;
+  /** With status "cancelled": what to give back (wallet, paid_back, none). Default: wallet (guests: paid_back). */
+  cancelRefund?: StaffRefundChoice;
+  /** With status "cancelled": reason (needed when the money is kept). */
+  cancelNote?: string;
 }
 
 export async function updateBooking(input: UpdateBookingInput, opts?: StaffActorOpts) {
@@ -956,7 +1049,24 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
-    const { bookingId, ...updateData } = input;
+    const { bookingId, cancelRefund, cancelNote, ...updateData } = input;
+    const auditBefore = await bookingSnap(bookingId);
+
+    // Cancelling goes through the shared staff cancel, so money, points and hours come back the same way.
+    if (updateData.status === 'cancelled') {
+      const cancelled = await staffCancelBooking({ bookingId, staffId: gate.userId, refund: cancelRefund, note: cancelNote });
+      if (!cancelled.ok) return { success: false, error: cancelled.error };
+      delete updateData.status;
+      const others = Object.values(updateData).some((v) => v !== undefined);
+      if (!others) {
+        await auditBooking(gate, bookingId, "cancel", auditBefore);
+        safeRevalidatePath('/admin');
+        safeRevalidatePath('/booking');
+        safeRevalidatePath('/account/bookings');
+        const fresh = await Booking.findById(bookingId).populate('courtId');
+        return { success: true, booking: JSON.parse(JSON.stringify(fresh)), refund: cancelled };
+      }
+    }
     const existingForRollup = await Booking.findById(bookingId).select("date").lean();
     const previousDate = existingForRollup?.date as string | undefined;
 
@@ -969,9 +1079,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
     if (updateData.amountReceivedOnline !== undefined || updateData.amountReceivedCash !== undefined) {
       const online = updateData.amountReceivedOnline ?? 0;
       const cash = updateData.amountReceivedCash ?? 0;
-      (updateData as any).amountPaid = online + cash;
-      (updateData as any).amountReceivedOnline = online;
-      (updateData as any).amountReceivedCash = cash;
+      Object.assign(updateData, { amountPaid: online + cash, amountReceivedOnline: online, amountReceivedCash: cash });
     }
     // If amountPaid is provided and > 0, automatically change status to confirmed
     // BUT only if status wasn't explicitly set (to allow manual status changes like 'completed')
@@ -986,7 +1094,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
         throw new Error('Booking not found');
       }
 
-      const originalCourt = booking.courtId as any;
+      const originalCourt = booking.courtId as unknown as ICourt;
       const finalDate = updateData.date || booking.date;
       const finalStartTime = updateData.startTime !== undefined ? updateData.startTime : booking.startTime;
       const finalDuration = updateData.duration || booking.duration;
@@ -1040,6 +1148,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
         courtForSlot,
         finalStartTime,
         finalDuration,
+        finalDate,
       );
 
       // Fetch active discounts using business timezone date boundary
@@ -1066,9 +1175,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
         },
       );
 
-      (updateData as any).originalPrice = originalPrice;
-      (updateData as any).discounts = appliedDiscounts;
-      (updateData as any).discountAmount = discountAmount;
+      Object.assign(updateData, { originalPrice, discounts: appliedDiscounts, discountAmount });
       updateData.totalPrice = finalPrice;
     }
 
@@ -1088,6 +1195,8 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
       );
     }
 
+    // Cancelling was handled above by staffCancelBooking (money, points, hours, message).
+
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');
     safeRevalidatePath('/account/bookings');
@@ -1096,12 +1205,14 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
       updatedBooking.date,
       previousDate,
     ]);
+    await auditBooking(gate, bookingId, auditBefore?.status !== "cancelled" && updatedBooking.status === "cancelled" ? "cancel" : "update", auditBefore);
 
     return {
       success: true,
       booking: JSON.parse(JSON.stringify(updatedBooking)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Update booking error:', error);
     return {
       success: false,
@@ -1159,7 +1270,8 @@ export async function checkBookingExtensionAvailability(bookingId: string, opts?
       canExtend60,
       hasAnyOption: canExtend30 || canExtend60,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error("checkBookingExtensionAvailability error:", error);
     return { success: false, error: error.message || "Failed to check extension availability" };
   }
@@ -1194,7 +1306,8 @@ export async function extendBooking(input: ExtendBookingInput, opts?: StaffActor
       bookingId: input.bookingId,
       duration: nextDuration,
     }, opts);
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error("Extend booking error:", error);
     return { success: false, error: error.message || "Failed to extend booking" };
   }
@@ -1212,11 +1325,15 @@ export async function deleteBooking(bookingId: string, opts?: StaffActorOpts) {
 
     await connectDB();
 
+    const auditBefore = await bookingSnap(bookingId);
     const booking = await Booking.findByIdAndDelete(bookingId);
 
     if (!booking) {
       throw new Error('Booking not found');
     }
+    // A deleted booking doesn't keep its promo code use.
+    if (booking.status !== 'cancelled') await releasePromoForBooking(bookingId).catch(() => {});
+    await auditBooking(gate, bookingId, "delete", auditBefore, ` — was ${booking.status}, PKR ${Math.round(booking.amountPaid ?? 0)} paid`);
 
     safeRevalidatePath('/admin');
     safeRevalidatePath('/booking');
@@ -1225,7 +1342,8 @@ export async function deleteBooking(bookingId: string, opts?: StaffActorOpts) {
     return {
       success: true,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Delete booking error:', error);
     return {
       success: false,
@@ -1243,7 +1361,11 @@ export async function getBookingForVerification(bookingId: string) {
     if (!bookingId || bookingId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(bookingId)) {
       return { success: false as const, error: "Invalid booking ID", booking: null };
     }
-    const booking = await Booking.findById(bookingId).populate("courtId");
+    // Public page (entry pass link): send only what the page shows.
+    const booking = await Booking.findById(bookingId)
+      .select(ENTRY_PASS_FIELDS)
+      .populate("courtId", "name type")
+      .lean();
     if (!booking) {
       return { success: false as const, error: "Booking not found", booking: null };
     }

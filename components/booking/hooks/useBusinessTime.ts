@@ -19,6 +19,7 @@ export function useBusinessTime(openingDate: Date) {
   const [nowTick, setNowTick] = useState<number>(0);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- start the clock after mount, so server and browser render the same first
     setNowTick(Date.now());
     const interval = setInterval(() => setNowTick(Date.now()), 30_000);
     return () => clearInterval(interval);

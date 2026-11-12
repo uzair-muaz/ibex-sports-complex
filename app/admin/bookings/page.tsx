@@ -11,6 +11,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminTableSkeleton } from "@/components/admin/loaders";
 import { BookingViewModal } from "@/components/admin/bookings/BookingViewModal";
 import { BookingCancelModal } from "@/components/admin/bookings/BookingCancelModal";
+import type { StaffRefundChoice } from "@/lib/staff-refund-plan";
 import { BookingDeleteModal } from "@/components/admin/bookings/BookingDeleteModal";
 import { BookingRangeModal } from "@/components/admin/bookings/BookingRangeModal";
 import { BookingFiltersBar } from "@/components/admin/bookings/BookingFiltersBar";
@@ -196,7 +197,7 @@ export default function BookingsPage() {
     setShowCancelModal(true);
   };
 
-  const confirmCancelBooking = async () => {
+  const confirmCancelBooking = async (refund: { choice: StaffRefundChoice; note: string }) => {
     if (!cancellingBooking) return;
 
     setIsCancelling(true);
@@ -204,9 +205,12 @@ export default function BookingsPage() {
       const result = await updateBookingMutation.mutateAsync({
         bookingId: cancellingBooking._id,
         status: "cancelled",
+        cancelRefund: refund.choice,
+        cancelNote: refund.note || undefined,
       });
 
       if (result.success) {
+        message.success("Booking cancelled");
         setShowCancelModal(false);
         setCancellingBooking(null);
       } else {
@@ -459,6 +463,7 @@ export default function BookingsPage() {
       />
 
       <BookingCancelModal
+        key={cancellingBooking?._id ?? "none"}
         booking={cancellingBooking}
         open={showCancelModal}
         isCancelling={isCancelling}

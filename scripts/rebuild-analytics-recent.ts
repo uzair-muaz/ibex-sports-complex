@@ -2,7 +2,10 @@
  * Rebuild AnalyticsDaily for the last N days (inclusive of today, UTC date keys).
  * Usage: tsx scripts/rebuild-analytics-recent.ts [days=14]
  */
+// Load .env.local before the imports below read it (require keeps this first).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 require("dotenv").config({
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   path: require("path").resolve(process.cwd(), ".env.local"),
 });
 

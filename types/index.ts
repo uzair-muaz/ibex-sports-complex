@@ -1,4 +1,5 @@
-export type CourtType = "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
+/** A sport code, e.g. "PADEL". Sports are set in App Settings (lib/sport-rules.ts). */
+export type CourtType = string;
 
 export type PricingLabel = "off_peak" | "peak";
 
@@ -18,6 +19,8 @@ export interface CourtPricingPeriod {
   endHour: number;
   /** Price per hour during this period */
   pricePerHour: number;
+  /** Saturday and Sunday price for this period. Empty = same as pricePerHour. */
+  weekendPricePerHour?: number | null;
   /** If true, applies all day regardless of hours */
   allDay?: boolean;
 }
@@ -29,11 +32,21 @@ export interface Court {
   image: string;
   description: string;
   pricePerHour: number;
+  /** Saturday and Sunday price. Empty = same as pricePerHour. */
+  weekendPricePerHour?: number | null;
+  /** Minutes the price is for: 60 (default) or 90 (Futsal games). */
+  priceUnitMinutes?: number | null;
   isActive: boolean;
   /** Enable time-based peak/off-peak pricing */
   timeBasedPricingEnabled?: boolean;
   /** Optional list of peak/off-peak pricing periods */
   pricingPeriods?: CourtPricingPeriod[];
+  /** Mobile app card details */
+  surfaceLabel?: string;
+  isIndoor?: boolean;
+  hasRacketRental?: boolean;
+  features?: { key: string; label: string }[];
+  highlight?: { key: string; label: string } | null;
 }
 
 export interface AppliedDiscount {
@@ -68,6 +81,8 @@ export interface Booking {
   usedGuestPass?: boolean;
   totalPrice: number;
   amountPaid: number;
+  /** Wallet credit used to pay for this booking. */
+  walletCreditUsed?: number;
   amountReceivedOnline?: number;
   amountReceivedCash?: number;
   createdAt: string;

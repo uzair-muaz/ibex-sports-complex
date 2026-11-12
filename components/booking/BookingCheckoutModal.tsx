@@ -35,15 +35,27 @@ type BookingCheckoutModalProps = {
   maxLoyaltyRedeem: number;
   useLoyalty: boolean;
   loyaltyPointsToRedeem: number;
+  /** PKR value of 1 point (Admin → App Settings). Default 1. */
+  pkrPerPoint?: number;
   hasMembership: boolean;
+  /** Hours left for this booking's sport. */
   membershipHoursRemaining: number;
-  guestPassesRemaining: number;
+  /** Hours this booking would use, and the PKR they cover. */
+  membershipHoursUsed: number;
+  membershipDiscount: number;
   useMembershipHours: boolean;
-  useGuestPass: boolean;
+  promoInput: string;
+  /** A checked promo code and the PKR it takes off (null when none). */
+  appliedPromo: { code: string; discount: number; description: string } | null;
+  /** Why the typed code can't be used. */
+  promoMessage: string;
+  promoChecking: boolean;
+  onPromoInputChange: (value: string) => void;
+  onApplyPromo: () => void;
+  onRemovePromo: () => void;
   onUseLoyaltyChange: (value: boolean) => void;
   onLoyaltyPointsChange: (value: number) => void;
   onUseMembershipChange: (value: boolean) => void;
-  onUseGuestPassChange: (value: boolean) => void;
   onClose: () => void;
   onContinueAsGuest: () => void;
   onFieldChange: (field: keyof FormData, value: string) => void;
@@ -66,27 +78,34 @@ export function BookingCheckoutModal({
   maxLoyaltyRedeem,
   useLoyalty,
   loyaltyPointsToRedeem,
+  pkrPerPoint = 1,
   hasMembership,
   membershipHoursRemaining,
-  guestPassesRemaining,
+  membershipHoursUsed,
+  membershipDiscount,
   useMembershipHours,
-  useGuestPass,
+  promoInput,
+  appliedPromo,
+  promoMessage,
+  promoChecking,
+  onPromoInputChange,
+  onApplyPromo,
+  onRemovePromo,
   onUseLoyaltyChange,
   onLoyaltyPointsChange,
   onUseMembershipChange,
-  onUseGuestPassChange,
   onClose,
   onContinueAsGuest,
   onFieldChange,
   onSubmit,
 }: BookingCheckoutModalProps) {
-  const displayTotal = useMembershipHours
-    ? 0
-    : Math.max(
-        0,
-        (selectedQuote?.totalPrice || 0) -
-          (useLoyalty ? loyaltyPointsToRedeem : 0),
-      );
+  const displayTotal = Math.max(
+    0,
+    (selectedQuote?.totalPrice || 0) -
+      (appliedPromo?.discount ?? 0) -
+      (useMembershipHours ? membershipDiscount : 0) -
+      (useLoyalty ? Math.floor(loyaltyPointsToRedeem * pkrPerPoint) : 0),
+  );
 
   const showIdentityChooser = !isLoggedIn && identityStep === "choose";
   const loginHref = "/login?callbackUrl=/booking";
@@ -287,28 +306,20 @@ export function BookingCheckoutModal({
                         className="mt-1"
                       />
                       <span>
-                        Use membership hours ({membershipHoursRemaining}h left)
-                        — covers this {durationHours}h slot fully
-                        {guestPassesRemaining > 0 ? (
-                          <span className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
-                            <input
-                              type="checkbox"
-                              checked={useGuestPass}
-                              disabled={!useMembershipHours}
-                              onChange={(e) =>
-                                onUseGuestPassChange(e.target.checked)
-                              }
-                            />
-                            Use guest pass ({guestPassesRemaining} left)
+                        Use membership hours ({membershipHoursRemaining}h left
+                        for this sport)
+                        {useMembershipHours && membershipHoursUsed > 0 ? (
+                          <span className="mt-1 block text-xs text-zinc-400">
+                            {membershipHoursUsed >= durationHours
+                              ? `Covers this ${durationHours}h booking fully`
+                              : `Covers ${membershipHoursUsed}h of ${durationHours}h — you pay the rest`}
                           </span>
                         ) : null}
                       </span>
                     </label>
                   ) : null}
 
-                  {isLoggedIn &&
-                  !useMembershipHours &&
-                  maxLoyaltyRedeem >= 100 ? (
+                  {isLoggedIn && maxLoyaltyRedeem > 0 ? (
                     <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2 text-sm text-zinc-200">
                       <label className="flex items-center gap-3">
                         <input
@@ -334,10 +345,70 @@ export function BookingCheckoutModal({
                     </div>
                   ) : null}
 
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                      Promo code
+                    </label>
+                    {appliedPromo ? (
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-[#2DD4BF]/40 bg-[#2DD4BF]/10 px-4 py-3 text-sm text-zinc-200">
+                        <span>
+                          <span className="font-semibold text-white">{appliedPromo.code}</span>
+                          {" "}takes PKR {appliedPromo.discount.toLocaleString("en-PK")} off
+                          {appliedPromo.description ? (
+                            <span className="block text-xs text-zinc-400">{appliedPromo.description}</span>
+                          ) : null}
+                        </span>
+                        <button type="button" onClick={onRemovePromo} className="text-xs text-zinc-400 hover:text-white">
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={promoInput}
+                          onChange={(e) => onPromoInputChange(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              onApplyPromo();
+                            }
+                          }}
+                          placeholder="Have a code?"
+                          maxLength={20}
+                          autoCapitalize="characters"
+                          className="min-w-0 flex-1 bg-zinc-900/70 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder:text-zinc-400 outline-none focus:border-[#2DD4BF]/70 focus:ring-2 focus:ring-[#2DD4BF]/20 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={onApplyPromo}
+                          disabled={!promoInput.trim() || promoChecking}
+                          className="shrink-0 rounded-xl border border-zinc-600 px-4 text-sm font-semibold text-zinc-100 hover:border-[#2DD4BF] disabled:opacity-40"
+                        >
+                          {promoChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
+                        </button>
+                      </div>
+                    )}
+                    {promoMessage ? <p className="text-xs text-red-400">{promoMessage}</p> : null}
+                  </div>
+
                   <PriceBreakdown
                     originalPrice={selectedQuote.originalPrice}
-                    discounts={selectedQuote.appliedDiscounts}
-                    discountAmount={selectedQuote.discountAmount}
+                    discounts={
+                      appliedPromo
+                        ? [
+                            ...(selectedQuote.appliedDiscounts ?? []),
+                            {
+                              discountId: `promo-${appliedPromo.code}`,
+                              name: `Promo ${appliedPromo.code}`,
+                              type: "fixed" as const,
+                              value: appliedPromo.discount,
+                              amountSaved: appliedPromo.discount,
+                            },
+                          ]
+                        : selectedQuote.appliedDiscounts
+                    }
+                    discountAmount={(selectedQuote.discountAmount ?? 0) + (appliedPromo?.discount ?? 0)}
                     totalPrice={displayTotal}
                     className="w-full"
                   />

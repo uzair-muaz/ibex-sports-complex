@@ -13,13 +13,6 @@ import type {
   DayRuleRateMode,
 } from "@/types";
 
-export const COURT_TYPES: CourtType[] = [
-  "PADEL",
-  "CRICKET",
-  "PICKLEBALL",
-  "FUTSAL",
-];
-
 export type DayRuleForm = {
   days: number[];
   rateMode: DayRuleRateMode;

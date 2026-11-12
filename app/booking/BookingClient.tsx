@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronRight, Clock, Info, Zap } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 
 import { BookingSectionHeader } from "@/components/booking/BookingSectionHeader";
 import { BookingChipSelector } from "@/components/booking/BookingChipSelector";
@@ -29,7 +30,10 @@ import {
   getQuickSlotCourtAvailability,
   type AvailableStartTimeQuote,
 } from "../actions/bookings";
-import { maxRedeemablePoints } from "@/lib/loyalty-rules";
+import { maxUsablePoints } from "@/lib/loyalty-rules";
+import { isWeekendDateKey } from "@/lib/membership-rules";
+import { labelFromSportCode, priceUnitMinutesFor } from "@/lib/sport-rules";
+import { hoursCover } from "@/lib/membership-hours-rules";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
@@ -51,12 +55,15 @@ type CheckoutFormErrors = {
 type CourtRecord = {
   type?: CourtType;
   pricePerHour?: number;
+  weekendPricePerHour?: number | null;
+  priceUnitMinutes?: number | null;
   pricingPeriods?: Array<{
     label?: string;
     startHour?: number;
     endHour?: number;
     allDay?: boolean;
     pricePerHour?: number;
+    weekendPricePerHour?: number | null;
   }>;
 };
 
@@ -71,13 +78,19 @@ type CreatedBooking = {
   discountAmount?: number;
 };
 
-const durationPresets: { hours: number; label: string }[] = [
-  { hours: 1, label: "60 mins" },
-  { hours: 1.5, label: "90 mins" },
-  { hours: 2, label: "2 hours" },
-];
+/** Booking lengths for each sport come from Admin → App Settings (via GET /api/v1/sports). */
+type SportBookingRules = {
+  sport: CourtType;
+  label?: string;
+  booking: { durationsMinutes: number[]; defaultDurationMinutes: number };
+};
 
-const sportHeadingMap: Record<CourtType, { title: string; subtitle: string }> =
+function durationLabel(minutes: number): string {
+  if (minutes % 60 !== 0 || minutes === 60) return `${minutes} mins`;
+  return `${minutes / 60} hours`;
+}
+
+const sportHeadingMap: Record<string, { title: string; subtitle: string }> =
   {
     PADEL: {
       title: "PADEL COURT",
@@ -97,6 +110,11 @@ const sportHeadingMap: Record<CourtType, { title: string; subtitle: string }> =
     },
   };
 
+/** A sport added in App Settings: "TABLE_TENNIS" → "Table Tennis" COURT, with a plain subtitle. */
+function sportHeading(type: CourtType, label: string): { title: string; subtitle: string } {
+  return sportHeadingMap[type] ?? { title: `${label.toUpperCase()} COURT`, subtitle: "Book online in a few taps" };
+}
+
 function courtTypeLabel(type: CourtType): string {
   switch (type) {
     case "PADEL":
@@ -108,7 +126,7 @@ function courtTypeLabel(type: CourtType): string {
     case "FUTSAL":
       return "Futsal";
     default:
-      return type;
+      return labelFromSportCode(type);
   }
 }
 
@@ -151,7 +169,14 @@ export default function BookingClient() {
   const [useLoyalty, setUseLoyalty] = useState(false);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
   const [useMembershipHours, setUseMembershipHours] = useState(false);
-  const [useGuestPass, setUseGuestPass] = useState(false);
+  // Promo code: kept with the slot it was checked for, so picking another slot drops it.
+  const [promoInput, setPromoInput] = useState("");
+  const [promoState, setPromoState] = useState<{
+    forKey: string;
+    applied: { code: string; discount: number; description: string } | null;
+    message: string;
+  } | null>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
   const canQuickCheck = userRole === "admin" || userRole === "super_admin";
 
   const courtsQuery = usePublicCourts();
@@ -161,12 +186,9 @@ export default function BookingClient() {
 
   const loyaltyBalance = loyaltyQuery.data?.balance ?? 0;
   const membership = membershipQuery.data?.membership as
-    | { hoursRemaining?: number; guestPassesRemaining?: number }
+    | { hoursBySport?: { sport: string; remaining: number }[] }
     | null
     | undefined;
-  const hasMembership = !!membership;
-  const membershipHoursRemaining = membership?.hoursRemaining || 0;
-  const guestPassesRemaining = membership?.guestPassesRemaining || 0;
 
   // Default to opening date if today is before it
   const getInitialDate = () => {
@@ -179,6 +201,36 @@ export default function BookingClient() {
     null,
   );
   const [selectedDurationHours, setSelectedDurationHours] = useState<number>(1);
+
+  const sportRulesQuery = useQuery({
+    queryKey: ["public", "sport-booking-rules"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/sports?includeHidden=true");
+      if (!res.ok) throw new Error("Could not load booking lengths");
+      return ((await res.json()) as { sports: SportBookingRules[] }).sports;
+    },
+    staleTime: 5 * 60_000,
+  });
+  // Sport names from App Settings (a sport added later has no built-in name).
+  const sportName = useCallback(
+    (type: CourtType) => sportRulesQuery.data?.find((s) => s.sport === type)?.label ?? courtTypeLabel(type),
+    [sportRulesQuery.data],
+  );
+  // Advance % from Admin → App Settings.
+  const paymentRulesQuery = useQuery({
+    queryKey: ["public", "payment-instructions"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/payments/instructions");
+      if (!res.ok) throw new Error("Could not load payment rules");
+      return (await res.json()) as { minAdvancePercent: number };
+    },
+    staleTime: 5 * 60_000,
+  });
+  const advancePercent = paymentRulesQuery.data?.minAdvancePercent ?? null;
+  const selectedSportRules = sportRulesQuery.data?.find((s) => s.sport === selectedCourtType) ?? null;
+  const durationReady =
+    !!selectedSportRules &&
+    selectedSportRules.booking.durationsMinutes.includes(Math.round(selectedDurationHours * 60));
 
   const [selectedQuote, setSelectedQuote] =
     useState<AvailableStartTimeQuote | null>(null);
@@ -267,10 +319,35 @@ export default function BookingClient() {
     );
   }, [selectedCourtType, allCourts]);
 
+  // Membership hours for the chosen sport (Phase 12): use what they have, pay the rest.
+  const membershipHoursRemaining =
+    membership?.hoursBySport?.find((h) => h.sport === selectedCourtType)?.remaining ?? 0;
+  const hasMembership = membershipHoursRemaining > 0;
+  const promoKey = selectedQuote
+    ? `${selectedCourtType}|${dateString}|${selectedQuote.startTime}|${selectedDurationHours}|${selectedQuote.totalPrice}`
+    : "";
+  const promoNow = promoState && promoState.forKey === promoKey ? promoState : null;
+  const appliedPromo = promoNow?.applied ?? null;
+  const promoDiscount = appliedPromo ? Math.min(appliedPromo.discount, selectedQuote?.totalPrice ?? 0) : 0;
+  const feeAfterPromo = Math.max(0, (selectedQuote?.totalPrice ?? 0) - promoDiscount);
+
+  const membershipCover = hoursCover({
+    available: membershipHoursRemaining,
+    canUse: hasMembership,
+    useHours: useMembershipHours,
+    durationHours: selectedDurationHours,
+    courtFee: feeAfterPromo,
+  });
+  const priceAfterHours = Math.max(0, feeAfterPromo - membershipCover.discount);
+
   const maxLoyaltyRedeem = useMemo(() => {
     if (!selectedQuote) return 0;
-    return maxRedeemablePoints(loyaltyBalance, selectedQuote.totalPrice);
-  }, [loyaltyBalance, selectedQuote]);
+    // Same rules as the server (Admin → App Settings).
+    const rules = loyaltyQuery.data?.rules;
+    return rules
+      ? maxUsablePoints(loyaltyBalance, priceAfterHours, rules)
+      : 0; // points can be used once the rules from App Settings have loaded
+  }, [loyaltyBalance, selectedQuote, priceAfterHours, loyaltyQuery.data?.rules]);
 
   useEffect(() => {
     if (!useLoyalty) {
@@ -282,16 +359,10 @@ export default function BookingClient() {
     );
   }, [useLoyalty, maxLoyaltyRedeem]);
 
-  useEffect(() => {
-    if (useMembershipHours) {
-      setUseLoyalty(false);
-      setLoyaltyPointsToRedeem(0);
-    }
-  }, [useMembershipHours]);
-
   const { availableStartTimes, isLoadingAvailability, refreshAvailability } =
     useBookingAvailability({
-      selectedCourtType,
+      // Wait until the sport's lengths have loaded, so we never ask for a length it doesn't allow.
+      selectedCourtType: durationReady ? selectedCourtType : null,
       dateString,
       selectedDurationHours,
       onBeforeLoad: handleAvailabilityBeforeLoad,
@@ -309,8 +380,14 @@ export default function BookingClient() {
     [selectedTypeCourts],
   );
 
+  // Court prices are saved per hour, or per 90 minutes for courts sold in 90-minute games (Futsal).
+  const priceUnit = activeCourt && priceUnitMinutesFor(activeCourt) === 90 ? "90 MIN" : "HR";
+  // Saturday and Sunday use the weekend prices set in Admin → Courts (when set).
+  const isWeekendDay = Boolean(dateString) && isWeekendDateKey(dateString);
   const courtPricing = useMemo(() => {
-    const fallback = activeCourt?.pricePerHour || 0;
+    const rate = (p?: { pricePerHour?: number; weekendPricePerHour?: number | null }) =>
+      p ? (isWeekendDay && p.weekendPricePerHour != null ? p.weekendPricePerHour : p.pricePerHour) : undefined;
+    const fallback = rate(activeCourt) || 0;
     const periods = Array.isArray(activeCourt?.pricingPeriods)
       ? activeCourt.pricingPeriods
       : [];
@@ -333,15 +410,18 @@ export default function BookingClient() {
       return `${formatTime12(period.startHour)} - ${formatTime12(period.endHour)}`;
     };
     return {
-      offPeak: offPeak?.pricePerHour ?? fallback,
-      peak: peak?.pricePerHour ?? fallback,
+      offPeak: rate(offPeak) ?? fallback,
+      peak: rate(peak) ?? fallback,
       offPeakHours: formatRange(offPeak),
       peakHours: formatRange(peak),
       peakPeriod: peak,
       hasSplitPricing,
       basePrice: fallback,
+      weekendRates:
+        isWeekendDay &&
+        (activeCourt?.weekendPricePerHour != null || periods.some((p) => p.weekendPricePerHour != null)),
     };
-  }, [activeCourt]);
+  }, [activeCourt, isWeekendDay]);
 
   const getIsPeakTime = useCallback(
     (hour: number) => {
@@ -393,18 +473,23 @@ export default function BookingClient() {
     }
   }, [selectedQuote, dateString, todayBusinessKey, nowBusinessHourDecimal]);
 
-  const visibleDurationPresets = useMemo(() => {
-    if (selectedCourtType === "FUTSAL") {
-      return durationPresets.filter((d) => d.hours >= 1.5);
-    }
-    return durationPresets;
-  }, [selectedCourtType]);
+  const visibleDurationPresets = useMemo(
+    () =>
+      (selectedSportRules?.booking.durationsMinutes ?? []).map((m) => ({
+        hours: m / 60,
+        label: durationLabel(m),
+      })),
+    [selectedSportRules],
+  );
 
+  // Pick the sport's default length when the sport changes (or the current one isn't allowed).
   useEffect(() => {
-    if (selectedCourtType === "FUTSAL" && selectedDurationHours < 1.5) {
-      setSelectedDurationHours(1.5);
+    if (!selectedSportRules) return;
+    const allowed = selectedSportRules.booking.durationsMinutes;
+    if (!allowed.includes(Math.round(selectedDurationHours * 60))) {
+      setSelectedDurationHours(selectedSportRules.booking.defaultDurationMinutes / 60);
     }
-  }, [selectedCourtType, selectedDurationHours]);
+  }, [selectedSportRules, selectedDurationHours]);
 
   useEffect(() => {
     if (!showCheckoutModal) return;
@@ -501,6 +586,37 @@ export default function BookingClient() {
     [quickCheckDateKey, selectedCourtType, selectedDurationHours],
   );
 
+  const applyPromo = async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code || !selectedQuote || !selectedCourtType) return;
+    setPromoChecking(true);
+    try {
+      const res = await fetch("/api/v1/promo-codes/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          sport: selectedCourtType,
+          courtFee: selectedQuote.totalPrice,
+          email: formData.email.trim() || undefined,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      const d = json?.data ?? json;
+      if (!res.ok) {
+        setPromoState({ forKey: promoKey, applied: null, message: json?.error || "Could not check the code." });
+      } else if (d?.valid) {
+        setPromoState({ forKey: promoKey, applied: { code: d.code, discount: d.discount, description: d.description ?? "" }, message: "" });
+      } else {
+        setPromoState({ forKey: promoKey, applied: null, message: d?.message || "This code can't be used." });
+      }
+    } catch {
+      setPromoState({ forKey: promoKey, applied: null, message: "Could not check the code. Please try again." });
+    } finally {
+      setPromoChecking(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedCourtType || !selectedQuote) return;
     if (formStatus === "loading") return;
@@ -549,15 +665,10 @@ export default function BookingClient() {
         userEmail: email,
         userPhone: normalizedPhone,
         loyaltyPointsToRedeem:
-          isCustomerLoggedIn && useLoyalty && !useMembershipHours
-            ? loyaltyPointsToRedeem
-            : undefined,
+          isCustomerLoggedIn && useLoyalty ? loyaltyPointsToRedeem : undefined,
         useMembershipHours:
-          isCustomerLoggedIn && useMembershipHours ? true : undefined,
-        useGuestPass:
-          isCustomerLoggedIn && useMembershipHours && useGuestPass
-            ? true
-            : undefined,
+          isCustomerLoggedIn && useMembershipHours && hasMembership ? true : undefined,
+        promoCode: appliedPromo?.code,
       });
 
       if (result.success) {
@@ -605,9 +716,10 @@ export default function BookingClient() {
             subtitle="Real-time availability for our premium courts."
           />
           <div className="mb-6 rounded-2xl border border-[#2DD4BF]/40 bg-[#2DD4BF]/10 px-4 py-3 text-sm text-zinc-200">
-            A 50% advance payment is required to confirm bookings. Reservations
-            without advance may be cancelled. All advance payments are
-            non-refundable.
+            {advancePercent !== null ? `A ${advancePercent}% advance payment` : "An advance payment"} is required to confirm bookings. Reservations
+            without advance may be cancelled. If you cancel in time from
+            your account, what you paid goes to your IBEX wallet for your
+            next booking.
             {!isCustomerLoggedIn ? (
               <>
                 {" "}
@@ -662,7 +774,7 @@ export default function BookingClient() {
             className="mb-6"
             items={(isLoadingTypes ? [] : activeCourtTypes).map((type) => ({
               key: type,
-              label: courtTypeLabel(type).toUpperCase(),
+              label: sportName(type).toUpperCase(),
             }))}
             activeKey={selectedCourtType}
             onSelect={(type) => {
@@ -706,13 +818,14 @@ export default function BookingClient() {
               <div className="mb-6">
                 <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight gradient-text mb-2">
                   {selectedCourtType
-                    ? sportHeadingMap[selectedCourtType].title
+                    ? sportHeading(selectedCourtType, sportName(selectedCourtType)).title
                     : "COURT"}
                 </h2>
                 <p className="text-zinc-500 text-xs sm:text-sm font-medium tracking-wide">
                   {selectedCourtType
-                    ? sportHeadingMap[selectedCourtType].subtitle
+                    ? sportHeading(selectedCourtType, sportName(selectedCourtType)).subtitle
                     : "Premium Surface"}
+                  {courtPricing.weekendRates && " · Weekend prices"}
                 </p>
               </div>
               {selectedTypeCourts.length > 0 ? (
@@ -727,7 +840,7 @@ export default function BookingClient() {
                           Off-Peak
                         </div>
                         <div className="text-lg font-semibold text-white tracking-tight leading-none mb-1">
-                          PKR {courtPricing.offPeak.toLocaleString()}/HR
+                          PKR {courtPricing.offPeak.toLocaleString()}/{priceUnit}
                         </div>
                         <div className="text-[9px] font-black text-zinc-500 uppercase tracking-wider">
                           {courtPricing.offPeakHours}
@@ -743,7 +856,7 @@ export default function BookingClient() {
                           Peak Hours
                         </div>
                         <div className="text-lg font-semibold text-white tracking-tight leading-none mb-1">
-                          PKR {courtPricing.peak.toLocaleString()}/HR
+                          PKR {courtPricing.peak.toLocaleString()}/{priceUnit}
                         </div>
                         <div className="text-[9px] font-black text-zinc-500 uppercase tracking-wider">
                           {courtPricing.peakHours}
@@ -758,10 +871,10 @@ export default function BookingClient() {
                     </div>
                     <div>
                       <div className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">
-                        Price per Hour
+                        {priceUnit === "HR" ? "Price per Hour" : "Price per 90 min"}
                       </div>
                       <div className="text-lg font-semibold text-white tracking-tight leading-none">
-                        PKR {courtPricing.basePrice.toLocaleString()}/HR
+                        PKR {courtPricing.basePrice.toLocaleString()}/{priceUnit}
                       </div>
                     </div>
                   </div>
@@ -773,7 +886,7 @@ export default function BookingClient() {
                   </div>
                   <div>
                     <div className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">
-                      Price per Hour
+                      {priceUnit === "HR" ? "Price per Hour" : "Price per 90 min"}
                     </div>
                     <div className="text-lg font-semibold text-white tracking-tight leading-none">
                       Loading...
@@ -798,6 +911,9 @@ export default function BookingClient() {
               activeKey={selectedDurationHours.toString()}
               onSelect={(hours) => setSelectedDurationHours(Number(hours))}
             />
+            {sportRulesQuery.isError && (
+              <p className="text-sm text-red-400">Couldn&apos;t load booking lengths. Please refresh the page.</p>
+            )}
           </div>
 
           <BookingSlotsGrid
@@ -1006,15 +1122,25 @@ export default function BookingClient() {
         maxLoyaltyRedeem={maxLoyaltyRedeem}
         useLoyalty={useLoyalty}
         loyaltyPointsToRedeem={loyaltyPointsToRedeem}
+        pkrPerPoint={loyaltyQuery.data?.rules?.pkrPerPoint ?? 1}
         hasMembership={hasMembership}
         membershipHoursRemaining={membershipHoursRemaining}
-        guestPassesRemaining={guestPassesRemaining}
+        membershipHoursUsed={membershipCover.used}
+        membershipDiscount={membershipCover.discount}
         useMembershipHours={useMembershipHours}
-        useGuestPass={useGuestPass}
+        promoInput={promoInput}
+        appliedPromo={appliedPromo ? { ...appliedPromo, discount: promoDiscount } : null}
+        promoMessage={promoNow?.message ?? ""}
+        promoChecking={promoChecking}
+        onPromoInputChange={setPromoInput}
+        onApplyPromo={applyPromo}
+        onRemovePromo={() => {
+          setPromoState(null);
+          setPromoInput("");
+        }}
         onUseLoyaltyChange={setUseLoyalty}
         onLoyaltyPointsChange={setLoyaltyPointsToRedeem}
         onUseMembershipChange={setUseMembershipHours}
-        onUseGuestPassChange={setUseGuestPass}
         onClose={() => setShowCheckoutModal(false)}
         onContinueAsGuest={() => setCheckoutIdentityStep("details")}
         onFieldChange={handleFieldChange}
@@ -1024,7 +1150,7 @@ export default function BookingClient() {
         selectedQuote={selectedQuote}
         selectedCourtLabel={
           selectedCourtType
-            ? courtTypeLabel(selectedCourtType).toUpperCase()
+            ? sportName(selectedCourtType).toUpperCase()
             : "SPORT"
         }
         selectedDateLabel={selectedDate
@@ -1039,6 +1165,7 @@ export default function BookingClient() {
         open={formStatus === "success"}
         createdBooking={createdBooking}
         selectedQuote={selectedQuote}
+        advancePercent={advancePercent}
         onDone={resetAfterSuccess}
       />
 

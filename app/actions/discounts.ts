@@ -1,5 +1,6 @@
 'use server';
 
+import { audit, snapshot } from '@/lib/audit';
 import connectDB from '@/lib/mongodb';
 import Discount from '@/models/Discount';
 import type {
@@ -209,7 +210,8 @@ export async function getDiscounts(opts?: StaffActorOpts) {
       success: true,
       discounts: JSON.parse(JSON.stringify(discounts)).map(serializeDiscount),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get discounts error:', error);
     return {
       success: false,
@@ -234,7 +236,8 @@ export async function getDiscountById(discountId: string, opts?: StaffActorOpts)
       success: true as const,
       discount: serializeDiscount(JSON.parse(JSON.stringify(discount))),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get discount error:', error);
     return {
       success: false as const,
@@ -285,7 +288,7 @@ export async function getActiveDiscounts() {
     // Date-only check to avoid timezone edge cases on boundary days.
     const todayKey = toDateKeyInTimezone(new Date(), BUSINESS_TIMEZONE);
     const discountsRaw = await Discount.find({ isActive: true }).sort({ createdAt: -1 });
-    const discounts = discountsRaw.filter((d: any) => {
+    const discounts = discountsRaw.filter((d) => {
       const fromKey = toDateKeyInTimezone(new Date(d.validFrom), BUSINESS_TIMEZONE);
       const untilKey = toDateKeyInTimezone(new Date(d.validUntil), BUSINESS_TIMEZONE);
       return fromKey <= todayKey && todayKey <= untilKey;
@@ -295,7 +298,8 @@ export async function getActiveDiscounts() {
       success: true,
       discounts: JSON.parse(JSON.stringify(discounts)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get active discounts error:', error);
     return {
       success: false,
@@ -333,7 +337,7 @@ export interface CreateDiscountInput {
 
 export async function createDiscount(input: CreateDiscountInput, opts?: StaffActorOpts) {
   try {
-    const gate = await requireStaffActor(opts);
+    const gate = await requireStaffActor(opts, { superAdmin: true });
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
@@ -432,6 +436,7 @@ export async function createDiscount(input: CreateDiscountInput, opts?: StaffAct
     applyDayRulesToDoc(doc, input.dayRules);
 
     const discount = await Discount.create(doc);
+    await audit({ actor: gate, area: "discounts", action: "create", targetId: discount._id, targetLabel: discount.name, summary: `Made discount ${discount.name}`, after: snapshot(discount) });
 
     safeRevalidatePath('/admin/discounts');
     safeRevalidatePath('/');
@@ -441,7 +446,8 @@ export async function createDiscount(input: CreateDiscountInput, opts?: StaffAct
       success: true,
       discount: JSON.parse(JSON.stringify(discount)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Create discount error:', error);
     return {
       success: false,
@@ -474,7 +480,7 @@ export interface UpdateDiscountInput {
 
 export async function updateDiscount(input: UpdateDiscountInput, opts?: StaffActorOpts) {
   try {
-    const gate = await requireStaffActor(opts);
+    const gate = await requireStaffActor(opts, { superAdmin: true });
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
@@ -634,11 +640,24 @@ export async function updateDiscount(input: UpdateDiscountInput, opts?: StaffAct
     if (Object.keys($set).length > 0) updatePayload.$set = $set;
     if (Object.keys($unset).length > 0) updatePayload.$unset = $unset;
 
+    const before = await Discount.findById(discountId);
     const discount = await Discount.findByIdAndUpdate(
       discountId,
       updatePayload,
       { new: true, runValidators: true },
     );
+    if (discount) {
+      await audit({
+        actor: gate,
+        area: "discounts",
+        action: "update",
+        targetId: discount._id,
+        targetLabel: discount.name,
+        summary: `Changed discount ${discount.name}`,
+        before: snapshot(before),
+        after: snapshot(discount),
+      });
+    }
 
     safeRevalidatePath('/admin/discounts');
     safeRevalidatePath('/');
@@ -648,7 +667,8 @@ export async function updateDiscount(input: UpdateDiscountInput, opts?: StaffAct
       success: true,
       discount: JSON.parse(JSON.stringify(discount)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Update discount error:', error);
     return {
       success: false,
@@ -659,7 +679,7 @@ export async function updateDiscount(input: UpdateDiscountInput, opts?: StaffAct
 
 export async function deleteDiscount(discountId: string, opts?: StaffActorOpts) {
   try {
-    const gate = await requireStaffActor(opts);
+    const gate = await requireStaffActor(opts, { superAdmin: true });
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
@@ -668,6 +688,7 @@ export async function deleteDiscount(discountId: string, opts?: StaffActorOpts) 
     if (!discount) {
       throw new Error('Discount not found');
     }
+    await audit({ actor: gate, area: "discounts", action: "delete", targetId: discount._id, targetLabel: discount.name, summary: `Deleted discount ${discount.name}`, before: snapshot(discount) });
 
     safeRevalidatePath('/admin/discounts');
     safeRevalidatePath('/');
@@ -676,7 +697,8 @@ export async function deleteDiscount(discountId: string, opts?: StaffActorOpts) 
     return {
       success: true,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Delete discount error:', error);
     return {
       success: false,
@@ -687,7 +709,7 @@ export async function deleteDiscount(discountId: string, opts?: StaffActorOpts) 
 
 export async function toggleDiscountActive(discountId: string, opts?: StaffActorOpts) {
   try {
-    const gate = await requireStaffActor(opts);
+    const gate = await requireStaffActor(opts, { superAdmin: true });
     if (!gate.ok) return { success: false, error: gate.error };
     await connectDB();
 
@@ -699,6 +721,14 @@ export async function toggleDiscountActive(discountId: string, opts?: StaffActor
 
     discount.isActive = !discount.isActive;
     await discount.save();
+    await audit({
+      actor: gate,
+      area: "discounts",
+      action: discount.isActive ? "switch_on" : "switch_off",
+      targetId: discount._id,
+      targetLabel: discount.name,
+      summary: `Switched discount ${discount.name} ${discount.isActive ? "on" : "off"}`,
+    });
 
     safeRevalidatePath('/admin/discounts');
     safeRevalidatePath('/');
@@ -708,7 +738,8 @@ export async function toggleDiscountActive(discountId: string, opts?: StaffActor
       success: true,
       discount: JSON.parse(JSON.stringify(discount)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Toggle discount error:', error);
     return {
       success: false,

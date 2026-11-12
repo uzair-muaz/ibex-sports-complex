@@ -14,11 +14,16 @@ import {
   Space,
 } from "antd";
 import {
+  BankOutlined,
+  BarcodeOutlined,
   BarChartOutlined,
+  FileTextOutlined,
+  HistoryOutlined,
   CalendarOutlined,
   TagOutlined,
   MessageOutlined,
   AppstoreOutlined,
+  SettingOutlined,
   TeamOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -26,6 +31,8 @@ import {
   LogoutOutlined,
   CustomerServiceOutlined,
   GiftOutlined,
+  StopOutlined,
+  NotificationOutlined,
   BulbOutlined,
   BulbFilled,
 } from "@ant-design/icons";
@@ -66,11 +73,18 @@ export function AdminLayout({
   const menuItems = useMemo(() => {
     const items = [];
     if (isSuperAdmin) {
-      items.push({
-        key: "/admin/analytics",
-        icon: <BarChartOutlined />,
-        label: "Analytics",
-      });
+      items.push(
+        {
+          key: "/admin/analytics",
+          icon: <BarChartOutlined />,
+          label: "Analytics",
+        },
+        {
+          key: "/admin/reports",
+          icon: <FileTextOutlined />,
+          label: "Reports",
+        },
+      );
     }
     items.push(
       {
@@ -79,9 +93,19 @@ export function AdminLayout({
         label: "Bookings",
       },
       {
+        key: "/admin/payments",
+        icon: <BankOutlined />,
+        label: "Payments",
+      },
+      {
         key: "/admin/discounts",
         icon: <TagOutlined />,
         label: "Discounts",
+      },
+      {
+        key: "/admin/promo-codes",
+        icon: <BarcodeOutlined />,
+        label: "Promo codes",
       },
       {
         key: "/admin/feedback",
@@ -98,6 +122,16 @@ export function AdminLayout({
         icon: <GiftOutlined />,
         label: "Memberships",
       },
+      {
+        key: "/admin/closures",
+        icon: <StopOutlined />,
+        label: "Closures",
+      },
+      {
+        key: "/admin/messages",
+        icon: <NotificationOutlined />,
+        label: "Messages",
+      },
     );
     if (isSuperAdmin) {
       items.push(
@@ -110,6 +144,16 @@ export function AdminLayout({
           key: "/admin/users",
           icon: <TeamOutlined />,
           label: "Users",
+        },
+        {
+          key: "/admin/settings",
+          icon: <SettingOutlined />,
+          label: "App Settings",
+        },
+        {
+          key: "/admin/audit",
+          icon: <HistoryOutlined />,
+          label: "Audit log",
         },
       );
     }

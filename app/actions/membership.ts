@@ -1,15 +1,18 @@
 "use server";
 
+import { audit } from "@/lib/audit";
+import { pkrText } from "@/lib/audit-rules";
 import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import MembershipPlan from "@/models/MembershipPlan";
 import UserMembership from "@/models/UserMembership";
 import {
   activateMembership,
-  ensureMembershipPlansSeeded,
   getActiveMembershipForUser,
 } from "@/lib/membership";
 import { revalidatePath } from "next/cache";
+import { cleanMembershipPayment } from "@/lib/membership-payment";
+import { cleanHoursBySport } from "@/lib/membership-plans";
 import {
   resolveCustomerActor,
   requireStaffActor,
@@ -17,8 +20,7 @@ import {
 } from "@/lib/action-auth";
 
 export async function listMembershipPlans() {
-  await ensureMembershipPlansSeeded();
-  const plans = await MembershipPlan.find({ isActive: true })
+  const plans = await MembershipPlan.find({ isActive: true, "hoursBySport.0": { $exists: true } })
     .sort({ sortOrder: 1 })
     .lean();
   return {
@@ -36,7 +38,6 @@ export async function getMyMembership(opts?: {
     return { success: false as const, error: gate.error };
   }
 
-  await ensureMembershipPlansSeeded();
   const membership = await getActiveMembershipForUser(gate.userId);
   const history = await UserMembership.find({ userId: gate.userId })
     .populate("planId")
@@ -58,6 +59,10 @@ export async function adminActivateMembership(
     userId: string;
     planId: string;
     carryForwardHours?: boolean;
+    /** Hours per sport for this customer; defaults to the plan's. */
+    hoursBySport?: { sport: string; hours: number }[];
+    /** Optional: what the customer paid. */
+    payment?: unknown;
   },
   opts?: StaffActorOpts,
 ) {
@@ -65,10 +70,30 @@ export async function adminActivateMembership(
   if (!gate.ok) {
     return { success: false as const, error: gate.error };
   }
+  const payment = cleanMembershipPayment(input.payment);
+  if (payment === "invalid") {
+    return { success: false as const, error: "Amount paid must be a whole PKR amount, with how it was paid." };
+  }
 
   try {
-    await ensureMembershipPlansSeeded();
-    const membership = await activateMembership(input);
+      const membership = await activateMembership({
+      payment,
+      byUserId: gate.userId,
+      userId: input.userId,
+      planId: input.planId,
+      carryForwardHours: input.carryForwardHours,
+      hoursBySport: input.hoursBySport ? cleanHoursBySport(input.hoursBySport) : undefined,
+    });
+    const plan = await MembershipPlan.findById(input.planId).select("name").lean();
+    await audit({
+      actor: gate,
+      area: "memberships",
+      action: "activate",
+      targetId: membership._id,
+      targetLabel: plan?.name ?? null,
+      customerId: input.userId,
+      summary: `Activated ${plan?.name ?? "a plan"}${payment ? ` — paid ${payment.method === "free" ? "nothing (free)" : `${pkrText(payment.pricePaid)} by ${payment.method.replace("_", " ")}`}` : ""}${input.carryForwardHours ? ", hours carried over" : ""}`,
+    });
     revalidatePath("/admin/users");
     revalidatePath("/account/membership");
     return {
@@ -220,6 +245,10 @@ export async function adminListMembershipRoster(
             planName: plan?.name || "Plan",
             planSlug: plan?.slug || null,
             hoursRemaining: membership.hoursRemaining,
+            hoursBySport: (membership.hoursBySport ?? []).map((h) => ({
+              sport: h.sport,
+              remaining: h.remaining,
+            })),
             guestPassesRemaining: membership.guestPassesRemaining,
             validUntil: membership.validUntil,
             status: membership.status,

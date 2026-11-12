@@ -1,6 +1,11 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import { COURT_FEATURE_KEYS, type CourtFeature } from "@/lib/court-features";
+import { SPORT_CODE_RE } from "@/lib/sport-rules";
 
-export type CourtType = "PADEL" | "CRICKET" | "PICKLEBALL" | "FUTSAL";
+/** A sport code, e.g. "PADEL". Sports are set in App Settings. */
+export type CourtType = string;
+
+export { COURT_FEATURE_KEYS, type CourtFeature, type CourtFeatureKey } from "@/lib/court-features";
 
 export interface ICourt extends Document {
   name: string;
@@ -8,6 +13,10 @@ export interface ICourt extends Document {
   image: string;
   description: string;
   pricePerHour: number; // 0 for free courts
+  /** Saturday and Sunday price. Null = same as pricePerHour. */
+  weekendPricePerHour?: number | null;
+  /** Minutes the price is for: 60 or 90. Empty = 90 for Futsal, else 60. */
+  priceUnitMinutes?: number | null;
   isActive: boolean;
   /** Enable time-based peak/off-peak pricing */
   timeBasedPricingEnabled?: boolean;
@@ -17,11 +26,26 @@ export interface ICourt extends Document {
     startHour: number;
     endHour: number;
     pricePerHour: number;
+    weekendPricePerHour?: number | null;
     allDay?: boolean;
   }[];
+  /** Mobile app card details (all optional; the website ignores them). */
+  surfaceLabel?: string;
+  isIndoor?: boolean;
+  hasRacketRental?: boolean;
+  features?: CourtFeature[];
+  highlight?: CourtFeature | null;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const CourtFeatureSchema = new Schema(
+  {
+    key: { type: String, enum: COURT_FEATURE_KEYS, required: true },
+    label: { type: String, required: true, trim: true, maxlength: 40 },
+  },
+  { _id: false },
+);
 
 const CourtSchema: Schema = new Schema(
   {
@@ -32,7 +56,7 @@ const CourtSchema: Schema = new Schema(
     },
     type: {
       type: String,
-      enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
+      match: [SPORT_CODE_RE, "Unknown sport"],
       required: [true, "Court type is required"],
     },
     image: {
@@ -50,6 +74,10 @@ const CourtSchema: Schema = new Schema(
       min: 0,
       default: 0,
     },
+    // Saturday and Sunday price. Null = same as pricePerHour.
+    weekendPricePerHour: { type: Number, min: 0, default: null },
+    // Minutes the price is for (60 or 90). Null = 90 for Futsal, else 60.
+    priceUnitMinutes: { type: Number, enum: [60, 90, null], default: null },
     isActive: {
       type: Boolean,
       default: true,
@@ -58,6 +86,11 @@ const CourtSchema: Schema = new Schema(
       type: Boolean,
       default: false,
     },
+    surfaceLabel: { type: String, trim: true, maxlength: 40, default: "" },
+    isIndoor: { type: Boolean, default: false },
+    hasRacketRental: { type: Boolean, default: false },
+    features: { type: [CourtFeatureSchema], default: [] },
+    highlight: { type: CourtFeatureSchema, default: null },
     pricingPeriods: [
       {
         label: {
@@ -82,6 +115,7 @@ const CourtSchema: Schema = new Schema(
           min: 0,
           required: true,
         },
+        weekendPricePerHour: { type: Number, min: 0, default: null },
         allDay: {
           type: Boolean,
           default: false,

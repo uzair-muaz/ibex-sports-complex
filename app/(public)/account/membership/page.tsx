@@ -1,17 +1,20 @@
 "use client";
 
-import { useMyMembership } from "@/lib/tanstack/hooks/queries";
+import { useMyMembership, useVenue } from "@/lib/tanstack/hooks/queries";
+import { waHref } from "@/lib/venue-rules";
 import { Button } from "@/components/ui/button";
 import { Loader2, MessageCircle } from "lucide-react";
 
-const WHATSAPP_URL = "https://wa.me/923255429429";
+const SPORT: Record<string, string> = { PADEL: "Padel", PICKLEBALL: "Pickleball", FUTSAL: "Futsal", CRICKET: "Cricket" };
 
 export default function MembershipPage() {
   const membershipQuery = useMyMembership();
+  // WhatsApp number from Admin → App Settings.
+  const WHATSAPP_URL = waHref(useVenue().whatsApp) ?? "";
   const membership = membershipQuery.data?.membership as {
     planId?: { name?: string };
     hoursRemaining?: number;
-    guestPassesRemaining?: number;
+    hoursBySport?: { sport: string; total: number; remaining: number }[];
     validUntil?: string;
   } | null;
   const history = (membershipQuery.data?.history ?? []) as Array<{
@@ -26,8 +29,9 @@ export default function MembershipPage() {
     name: string;
     price: number;
     hours: number;
+    hoursBySport?: { sport: string; hours: number }[];
+    validityDays?: number;
     weekdayOnly?: boolean;
-    guestPassesPerPeriod?: number;
   }>;
 
   if (membershipQuery.isPending) {
@@ -51,12 +55,23 @@ export default function MembershipPage() {
             <h2 className="text-2xl font-bold text-white">
               {plan?.name || "Plan"}
             </h2>
-            <p className="text-zinc-300">
-              <span className="text-[#2DD4BF] font-semibold">
-                {membership.hoursRemaining}h
-              </span>{" "}
-              remaining · Guest passes: {membership.guestPassesRemaining}
-            </p>
+            {membership.hoursBySport?.length ? (
+              <ul className="space-y-1 text-zinc-300">
+                {membership.hoursBySport.map((h) => (
+                  <li key={h.sport}>
+                    {SPORT[h.sport] ?? h.sport}:{" "}
+                    <span className="text-[#2DD4BF] font-semibold">{h.remaining}h</span> left of {h.total}h
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-zinc-300">
+                <span className="text-[#2DD4BF] font-semibold">
+                  {membership.hoursRemaining}h
+                </span>{" "}
+                remaining
+              </p>
+            )}
             <p className="text-sm text-zinc-500">
               Valid until{" "}
               {membership.validUntil
@@ -94,11 +109,13 @@ export default function MembershipPage() {
               </p>
             </div>
             <p className="mt-2 text-sm text-zinc-400">
-              {p.hours} hours ·{" "}
+              {(p.hoursBySport ?? [])
+                .map((h) => `${SPORT[h.sport] ?? h.sport} ${h.hours}h`)
+                .join(" · ")}
+            </p>
+            <p className="text-sm text-zinc-500">
+              {p.validityDays ?? 30} days ·{" "}
               {p.weekdayOnly ? "Weekdays only" : "Full week"}
-              {p.guestPassesPerPeriod
-                ? ` · ${p.guestPassesPerPeriod} guest passes`
-                : ""}
             </p>
           </div>
         ))}

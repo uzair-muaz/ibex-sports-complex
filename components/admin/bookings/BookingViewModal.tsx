@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import React from "react";
 import { Button, Modal, QRCode, Space, Tag, Typography } from "antd";
 import type { Booking } from "@/types";
@@ -90,7 +92,13 @@ export function BookingViewModal({
               <Text type="secondary" className="text-xs">
                 User Name
               </Text>
-              <p className="text-[var(--ant-color-text)]">{booking.userName}</p>
+              <p className="text-[var(--ant-color-text)]">
+                {booking.userId ? (
+                  <Link href={`/admin/customers/${booking.userId}`}>{booking.userName}</Link>
+                ) : (
+                  <>{booking.userName} <span className="text-xs opacity-60">(guest)</span></>
+                )}
+              </p>
             </div>
             <div className="space-y-1">
               <Text type="secondary" className="text-xs">

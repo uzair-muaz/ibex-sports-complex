@@ -31,6 +31,8 @@ type DiscountTablesProps = {
   onEdit: (discount: Discount) => void;
   onDelete: (discount: Discount) => void;
   onToggleActive: (discount: Discount) => void;
+  /** Only the super admin can change discounts; staff see them read-only. */
+  canEdit?: boolean;
 };
 
 export function DiscountTables({
@@ -43,6 +45,7 @@ export function DiscountTables({
   onEdit,
   onDelete,
   onToggleActive,
+  canEdit = true,
 }: DiscountTablesProps) {
   const sortOrderFor = (column: keyof Discount) =>
     sortColumn === column
@@ -51,7 +54,10 @@ export function DiscountTables({
         : "descend"
       : null;
 
-  const renderActions = (discount: Discount) => (
+  const renderActions = (discount: Discount) =>
+    !canEdit ? (
+      <Text type="secondary">{discount.isActive ? "On" : "Off"}</Text>
+    ) : (
     <Space size="small">
       <Switch
         size="small"
@@ -150,7 +156,8 @@ export function DiscountTables({
         render: (_: unknown, discount: Discount) => renderActions(discount),
       },
     ],
-    [sortColumn, sortDirection, togglingDiscountId],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- renderActions only changes with these
+    [sortColumn, sortDirection, togglingDiscountId, canEdit],
   );
 
   const timeBasedColumns: ColumnsType<Discount> = useMemo(
@@ -264,7 +271,8 @@ export function DiscountTables({
         render: (_: unknown, discount: Discount) => renderActions(discount),
       },
     ],
-    [sortColumn, sortDirection, togglingDiscountId],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- renderActions only changes with these
+    [sortColumn, sortDirection, togglingDiscountId, canEdit],
   );
 
   return (

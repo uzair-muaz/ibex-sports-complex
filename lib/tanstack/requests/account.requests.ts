@@ -1,3 +1,4 @@
+import type { LoyaltyRules } from "@/lib/app-settings";
 import { bffFetch } from "@/lib/bff/client";
 import type { CreateBookingInput } from "@/app/actions/bookings";
 
@@ -58,6 +59,7 @@ export async function fetchMyLoyalty() {
     hoursPlayed: number;
     pointsPerHour: number;
     minRedeem: number;
+    rules?: LoyaltyRules;
     transactions: unknown[];
   }>("/api/v1/account/loyalty");
 }

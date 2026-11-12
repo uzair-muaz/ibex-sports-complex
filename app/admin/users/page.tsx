@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -94,8 +96,8 @@ export default function UsersPage() {
   const sortedUsers = [...users].sort((a, b) => {
     if (!sortColumn) return 0;
 
-    let aValue: any = a[sortColumn];
-    let bValue: any = b[sortColumn];
+    let aValue = a[sortColumn] as unknown as string | number;
+    let bValue = b[sortColumn] as unknown as string | number;
 
     if (sortColumn === "createdAt") {
       aValue = new Date(aValue).getTime();
@@ -222,7 +224,21 @@ export default function UsersPage() {
       dataIndex: "name",
       key: "name",
       minWidth: 120,
-      render: (name: string) => <span className="font-medium">{name}</span>,
+      render: (name: string, user: { _id: string; role: string; blockedAt?: string | null }) =>
+        user.role === "user" ? (
+          <span>
+            <Link href={`/admin/customers/${user._id}`} className="font-medium">
+              {name}
+            </Link>
+            {user.blockedAt && (
+              <Tag color="red" className="ml-2">
+                Blocked
+              </Tag>
+            )}
+          </span>
+        ) : (
+          <span className="font-medium">{name}</span>
+        ),
     },
     {
       title: <SortTitle column="email" label="Email" />,
@@ -262,7 +278,7 @@ export default function UsersPage() {
             onClick={() => handleEditUser(user)}
             aria-label="Edit user"
           />
-          {user._id !== (session?.user as any)?.id && (
+          {user._id !== (session?.user as { id?: string } | undefined)?.id && (
             <Button
               type="text"
               danger

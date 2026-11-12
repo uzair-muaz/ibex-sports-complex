@@ -5,6 +5,7 @@ import { verifyMobileAccessToken } from "@/lib/api/mobile-jwt";
 import type { ApiUser } from "@/lib/api/types";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
+import { BLOCKED_CODE, BLOCKED_MESSAGE } from "@/lib/customer-block-rules";
 
 function bearerToken(request: Request): string | null {
   const header = request.headers.get("authorization") || "";
@@ -15,7 +16,20 @@ function bearerToken(request: Request): string | null {
 async function userFromSession(): Promise<ApiUser | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
+  // Customers: check the block on every request (website sessions last a long time).
+  let blocked = false;
+  if (!isStaffRole(session.user.role)) {
+    try {
+      await connectDB();
+      const row = await User.findById(session.user.id).select("blockedAt deletedAt").lean();
+      if (row?.deletedAt) return null;
+      blocked = !!row?.blockedAt;
+    } catch {
+      /* keep going */
+    }
+  }
   return {
+    blocked,
     id: session.user.id,
     email: session.user.email,
     name: session.user.name,
@@ -35,9 +49,10 @@ async function userFromBearer(request: Request): Promise<ApiUser | null> {
   try {
     await connectDB();
     const dbUser = await User.findById(claims.sub).select(
-      "email name role phone image",
+      "email name role phone image blockedAt deletedAt",
     );
-    if (!dbUser) return null;
+    // Deleted accounts: old tokens stop working.
+    if (!dbUser || dbUser.deletedAt) return null;
     return {
       id: dbUser._id.toString(),
       email: dbUser.email,
@@ -45,6 +60,7 @@ async function userFromBearer(request: Request): Promise<ApiUser | null> {
       role: dbUser.role,
       phone: dbUser.phone,
       image: dbUser.image,
+      blocked: !!dbUser.blockedAt,
     };
   } catch {
     return {
@@ -73,13 +89,21 @@ export async function requireApiCustomer(request: Request) {
   if (!user) {
     return {
       ok: false as const,
-      response: apiError("Unauthorized", 401, request),
+      response: apiError("Unauthorized", 401, request, { code: "UNAUTHORIZED" }),
     };
   }
   if (isStaffRole(user.role)) {
     return {
       ok: false as const,
-      response: apiError("Customer account required", 403, request),
+      response: apiError("Customer account required", 403, request, {
+        code: "STAFF_ACCOUNT",
+      }),
+    };
+  }
+  if (user.blocked) {
+    return {
+      ok: false as const,
+      response: apiError(BLOCKED_MESSAGE, 403, request, { code: BLOCKED_CODE }),
     };
   }
   return { ok: true as const, user };

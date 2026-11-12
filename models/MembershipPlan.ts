@@ -1,3 +1,4 @@
+import { SPORT_CODE_RE } from "@/lib/sport-rules";
 import mongoose, { Schema, Document, Model } from "mongoose";
 import type { CourtType } from "@/types";
 
@@ -5,7 +6,13 @@ export interface IMembershipPlan extends Document {
   slug: string;
   name: string;
   price: number;
+  /** Old single pool of hours (kept for older screens; = sum of hoursBySport). */
   hours: number;
+  /** Hours included for each sport (Phase 12). */
+  hoursBySport: { sport: CourtType; hours: number }[];
+  validityDays: number;
+  badge: string | null;
+  features: string[];
   weekdayOnly: boolean;
   guestPassesPerPeriod: number;
   priorityBadge: boolean;
@@ -28,12 +35,25 @@ const MembershipPlanSchema = new Schema(
     name: { type: String, required: true, trim: true },
     price: { type: Number, required: true, min: 0 },
     hours: { type: Number, required: true, min: 0 },
+    hoursBySport: {
+      type: [
+        {
+          _id: false,
+          sport: { type: String, match: SPORT_CODE_RE, required: true },
+          hours: { type: Number, required: true, min: 0 },
+        },
+      ],
+      default: [],
+    },
+    validityDays: { type: Number, default: 30, min: 1 },
+    badge: { type: String, default: null, trim: true },
+    features: { type: [String], default: [] },
     weekdayOnly: { type: Boolean, default: false },
     guestPassesPerPeriod: { type: Number, default: 0, min: 0 },
     priorityBadge: { type: Boolean, default: false },
     courtTypes: {
       type: [String],
-      enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
+      validate: { validator: (v: string[]) => v.every((x) => SPORT_CODE_RE.test(x)), message: "Unknown sport" },
       default: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
     },
     isActive: { type: Boolean, default: true },

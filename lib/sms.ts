@@ -45,7 +45,7 @@ function formatPhoneNumber(phone: string): string {
   }
 
   // Remove all spaces, dashes, parentheses, and other formatting characters except +
-  let cleaned = phone.trim().replace(/[\s\-\(\)\.]/g, '');
+  const cleaned = phone.trim().replace(/[\s\-\(\)\.]/g, '');
   
   // Check if it already starts with +92 (already in correct format, just clean spaces)
   if (cleaned.startsWith('+92')) {

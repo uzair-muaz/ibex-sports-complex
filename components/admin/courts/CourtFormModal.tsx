@@ -1,5 +1,6 @@
 "use client";
 
+import { useSportList } from "@/lib/tanstack/hooks/queries";
 import React from "react";
 import {
   Button,
@@ -15,7 +16,6 @@ import {
 import { DeleteOutlined } from "@ant-design/icons";
 import type { Court, PricingLabel } from "@/types";
 import {
-  COURT_TYPE_OPTIONS,
   PRICING_LABEL_OPTIONS,
   TIME_OPTIONS,
   appendPricingPeriod,
@@ -23,8 +23,16 @@ import {
   patchPricingPeriod,
   type CourtFormState,
 } from "./courtHelpers";
+import { COURT_FEATURE_LABELS } from "@/lib/court-features";
+import { priceUnit } from "@/lib/pricing-utils";
+import { priceUnitMinutesFor } from "@/lib/sport-rules";
+import { PhotoUpload } from "@/components/admin/PhotoUpload";
 
 const { Text } = Typography;
+
+const FEATURE_OPTIONS = Object.entries(COURT_FEATURE_LABELS).map(
+  ([value, label]) => ({ value, label }),
+);
 const { TextArea } = Input;
 
 type CourtFormModalProps = {
@@ -46,6 +54,11 @@ export function CourtFormModal({
   onClose,
   onSubmit,
 }: CourtFormModalProps) {
+  // Sports from Admin → App Settings.
+  const sportList = useSportList();
+  // Futsal prices are saved per 90 minutes, other sports per hour.
+  const unit = priceUnit(courtForm);
+
   const addPricingPeriod = (label: PricingLabel) => {
     setCourtForm((prev) => appendPricingPeriod(prev, label));
   };
@@ -96,7 +109,24 @@ export function CourtFormModal({
                   type: v as Court["type"],
                 })
               }
-              options={COURT_TYPE_OPTIONS}
+              options={sportList.map(({ sport, label }) => ({ value: sport, label }))}
+            />
+          </Form.Item>
+          <Form.Item
+            label="Price is for"
+            extra={
+              <Text type="secondary" className="text-[11px]">
+                Choose 90 minutes for sports sold as 90-minute games, like Futsal.
+              </Text>
+            }
+          >
+            <Select
+              value={priceUnitMinutesFor(courtForm)}
+              onChange={(v) => setCourtForm((prev) => ({ ...prev, priceUnitMinutes: v }))}
+              options={[
+                { value: 60, label: "1 hour" },
+                { value: 90, label: "90 minutes" },
+              ]}
             />
           </Form.Item>
         </div>
@@ -114,7 +144,7 @@ export function CourtFormModal({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Form.Item
-            label="Base Price Per Hour (PKR)"
+            label={`Base Price ${unit.long} (PKR)`}
             required
             extra={
               <Text type="secondary" className="text-[11px]">
@@ -124,7 +154,7 @@ export function CourtFormModal({
             }
           >
             <InputNumber
-              className="w-full"
+              style={{ width: "100%" }}
               min={0}
               step={0.01}
               value={courtForm.pricePerHour}
@@ -135,6 +165,29 @@ export function CourtFormModal({
                 })
               }
               placeholder="5000"
+              disabled={courtForm.timeBasedPricingEnabled}
+            />
+          </Form.Item>
+          <Form.Item
+            label={`Weekend Price ${unit.long} (Sat–Sun)`}
+            extra={
+              <Text type="secondary" className="text-[11px]">
+                Leave empty to charge the base price on weekends too.
+              </Text>
+            }
+          >
+            <InputNumber
+              style={{ width: "100%" }}
+              min={0}
+              step={0.01}
+              value={courtForm.weekendPricePerHour}
+              onChange={(v) =>
+                setCourtForm({
+                  ...courtForm,
+                  weekendPricePerHour: typeof v === "number" ? v : null,
+                })
+              }
+              placeholder="Same as base price"
               disabled={courtForm.timeBasedPricingEnabled}
             />
           </Form.Item>
@@ -225,9 +278,9 @@ export function CourtFormModal({
                           />
                         </Form.Item>
 
-                        <Form.Item label="Price / Hour (PKR)" className="mb-0">
+                        <Form.Item label={`Price ${unit.long} (PKR)`} className="mb-0">
                           <InputNumber
-                            className="w-full"
+                            style={{ width: "100%" }}
                             size="small"
                             min={0}
                             step={0.01}
@@ -239,6 +292,23 @@ export function CourtFormModal({
                             }
                           />
                         </Form.Item>
+
+                        <Form.Item label={`Weekend Price ${unit.long} (Sat–Sun)`} className="mb-0">
+                          <InputNumber
+                            style={{ width: "100%" }}
+                            size="small"
+                            min={0}
+                            step={0.01}
+                            placeholder="Same as weekday"
+                            value={period.weekendPricePerHour ?? null}
+                            onChange={(v) =>
+                              updatePricingPeriod(index, {
+                                weekendPricePerHour: typeof v === "number" ? v : null,
+                              })
+                            }
+                          />
+                        </Form.Item>
+                        <div className="hidden md:block" />
 
                         <Form.Item label="Start Time" className="mb-0">
                           <Select
@@ -291,6 +361,93 @@ export function CourtFormModal({
             )}
           </div>
         )}
+
+        <div className="mt-6 rounded-lg border border-white/10 p-4">
+          <Text strong className="block">
+            Mobile app details
+          </Text>
+          <Text type="secondary" className="mb-3 block text-[11px]">
+            Shown on the court card in the app. The website ignores these.
+          </Text>
+          <Form.Item
+            label="Photo link"
+            extra={
+              <Text type="secondary" className="text-[11px]">
+                Upload a photo, or paste an https:// link (or /images/… on this
+                site). Leave empty to use the sport&apos;s photo.
+              </Text>
+            }
+          >
+            <PhotoUpload
+              kind="court_photo"
+              value={courtForm.image}
+              onChange={(image) => setCourtForm((prev) => ({ ...prev, image }))}
+              placeholder="https://…/court1.jpg"
+            />
+          </Form.Item>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Form.Item label="Surface">
+              <Input
+                value={courtForm.surfaceLabel}
+                maxLength={40}
+                onChange={(e) =>
+                  setCourtForm({ ...courtForm, surfaceLabel: e.target.value })
+                }
+                placeholder="Pro turf"
+              />
+            </Form.Item>
+            <Form.Item label="Filters">
+              <Space direction="vertical">
+                <Checkbox
+                  checked={courtForm.isIndoor}
+                  onChange={(e) =>
+                    setCourtForm({ ...courtForm, isIndoor: e.target.checked })
+                  }
+                >
+                  Indoor
+                </Checkbox>
+                <Checkbox
+                  checked={courtForm.hasRacketRental}
+                  onChange={(e) =>
+                    setCourtForm({
+                      ...courtForm,
+                      hasRacketRental: e.target.checked,
+                    })
+                  }
+                >
+                  Racket rental
+                </Checkbox>
+              </Space>
+            </Form.Item>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Form.Item label="Features">
+              <Select
+                mode="multiple"
+                value={courtForm.featureKeys}
+                onChange={(v) =>
+                  setCourtForm({ ...courtForm, featureKeys: v as string[] })
+                }
+                options={FEATURE_OPTIONS}
+                placeholder="LED lighting, Benches…"
+              />
+            </Form.Item>
+            <Form.Item label="Main feature (highlight)">
+              <Select
+                allowClear
+                value={courtForm.highlightKey ?? undefined}
+                onChange={(v) =>
+                  setCourtForm({
+                    ...courtForm,
+                    highlightKey: (v as string | undefined) ?? null,
+                  })
+                }
+                options={FEATURE_OPTIONS}
+                placeholder="Match replay"
+              />
+            </Form.Item>
+          </div>
+        </div>
 
         <Form.Item className="mb-0 mt-6">
           <Space className="flex justify-end">

@@ -1,5 +1,6 @@
 "use client";
 
+import { priceUnit } from "@/lib/pricing-utils";
 import { Modal, Tag, Typography } from "antd";
 import type { Court } from "@/types";
 
@@ -48,8 +49,8 @@ export function DeleteCourtModal({
               <Text>{court.type}</Text>
             </div>
             <div className="flex items-center justify-between">
-              <Text type="secondary">Price/Hour:</Text>
-              <Text>PKR {court.pricePerHour.toLocaleString()}</Text>
+              <Text type="secondary">Price:</Text>
+              <Text>PKR {court.pricePerHour.toLocaleString()}{priceUnit(court).short}</Text>
             </div>
             <div className="flex items-center justify-between">
               <Text type="secondary">Status:</Text>

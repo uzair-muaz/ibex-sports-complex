@@ -13,6 +13,7 @@ export default function RewardsPage() {
         hoursPlayed: loyaltyQuery.data.hoursPlayed,
         pointsPerHour: loyaltyQuery.data.pointsPerHour,
         minRedeem: loyaltyQuery.data.minRedeem,
+        rules: loyaltyQuery.data.rules,
         transactions: loyaltyQuery.data.transactions as Array<{
           _id: string;
           type: string;
@@ -33,6 +34,15 @@ export default function RewardsPage() {
   }
 
   const canRedeem = summary.balance >= summary.minRedeem;
+  // From Admin → App Settings (falls back to today's rules).
+  const rules = summary.rules;
+  const earnText = !rules
+    ? `${summary.pointsPerHour} pts / hour`
+    : rules.earnBasis === "per_hour"
+      ? `${rules.earnPoints} pts / hour`
+      : `${rules.earnPoints} pts / PKR ${rules.earnPerPkr}`;
+  const pkrPerPoint = rules?.pkrPerPoint ?? 1;
+  const maxPercent = rules?.maxRedeemPercent ?? 50;
 
   return (
     <div className="space-y-6">
@@ -56,10 +66,10 @@ export default function RewardsPage() {
         <div className="rounded-3xl border border-white/10 bg-zinc-900/60 p-6">
           <p className="text-xs uppercase tracking-wide text-zinc-500">Earn rate</p>
           <p className="mt-2 text-lg font-semibold text-white">
-            {summary.pointsPerHour} pts / hour
+            {earnText}
           </p>
           <p className="mt-1 text-xs text-zinc-500">
-            Redeem from {summary.minRedeem} pts (1 pt = PKR 1), up to 50% off
+            Redeem from {summary.minRedeem} pts (1 pt = PKR {pkrPerPoint}), up to {maxPercent}% off
           </p>
         </div>
       </div>
@@ -69,7 +79,7 @@ export default function RewardsPage() {
           <h3 className="font-semibold text-white">Redeem at checkout</h3>
           <p className="mt-1 text-sm text-zinc-400">
             {canRedeem
-              ? "Apply points on your next booking — up to 50% of the post-promo price."
+              ? `Apply points on your next booking — up to ${maxPercent}% of the post-promo price.`
               : `Earn at least ${summary.minRedeem} points before redeeming at checkout.`}
           </p>
         </div>

@@ -43,3 +43,6 @@ yarn-error.log*
 next-env.d.ts
 config.bat
 .env.local
+
+# Local private uploads (payment screenshots) — never commit
+/.uploads

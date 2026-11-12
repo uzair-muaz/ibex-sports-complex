@@ -15,8 +15,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('dark');
 
   useEffect(() => {
-    // Force dark theme on first load, ignore system preferences
-    setTheme('dark');
+    // Force dark theme on first load, ignore system preferences (state already starts as 'dark').
     if (typeof window !== 'undefined') {
       localStorage.setItem('theme', 'dark');
     }

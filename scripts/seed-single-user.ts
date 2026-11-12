@@ -2,7 +2,10 @@
 // Usage:
 //   npx tsx scripts/seed-single-user.ts --email you@example.com --password 'Secret123!' --role admin
 
+// Load .env.local before the imports below read it (require keeps this first).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 require("dotenv").config({
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   path: require("path").resolve(process.cwd(), ".env.local"),
 });
 

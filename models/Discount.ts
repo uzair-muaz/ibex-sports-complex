@@ -1,3 +1,4 @@
+import { SPORT_CODE_RE } from "@/lib/sport-rules";
 import mongoose, { Schema, Document, Model } from "mongoose";
 import { CourtType } from "./Court";
 
@@ -126,8 +127,7 @@ const DiscountSchema: Schema = new Schema(
       },
     },
     courtTypes: {
-      type: [String],
-      enum: ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"],
+      type: [{ type: String, match: SPORT_CODE_RE }],
       default: [], // Empty means all court types
     },
     discountCategory: {

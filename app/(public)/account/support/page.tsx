@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   useCreateSupportTicketMutation,
   useReplySupportTicketMutation,
@@ -12,27 +13,32 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const FAQS = [
+/** Shown only if the FAQs can't be loaded. The real ones come from /api/v1/content/faqs. */
+const FALLBACK_FAQS = [
   {
-    q: "How do I pay for a booking?",
-    a: "Bookings start as pending payment. Pay the 50% advance as instructed after booking; the venue confirms your slot.",
+    question: "How do I pay for a booking?",
+    answer: "Send the advance by bank transfer and upload the payment screenshot. Our team checks it and confirms your booking.",
   },
   {
-    q: "How do loyalty points work?",
-    a: "You earn 10 points per hour on completed bookings. Redeem 100+ points at checkout (1 pt = PKR 1), up to 50% off.",
-  },
-  {
-    q: "How do memberships work?",
-    a: "Buy a package via WhatsApp. Once activated, use membership hours at checkout to cover full slot durations.",
-  },
-  {
-    q: "Can I cancel online?",
-    a: "Yes, if the booking is pending/confirmed and starts in 4+ hours. Points or membership hours are refunded.",
+    question: "Need help?",
+    answer: "Open a ticket below and our team will get back to you.",
   },
 ];
 
+type Faq = { question: string; answer: string };
+
 export default function SupportPage() {
   const ticketsQuery = useMySupportTickets();
+  const faqsQuery = useQuery({
+    queryKey: ["content", "faqs"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/content/faqs");
+      if (!res.ok) throw new Error("Could not load FAQs");
+      return ((await res.json()) as { items: Faq[] }).items;
+    },
+    staleTime: 5 * 60_000,
+  });
+  const faqs = faqsQuery.data?.length ? faqsQuery.data : faqsQuery.isError ? FALLBACK_FAQS : [];
   const createTicket = useCreateSupportTicketMutation();
   const replyTicket = useReplySupportTicketMutation();
   const tickets = (ticketsQuery.data?.tickets ?? []) as Array<{
@@ -81,10 +87,10 @@ export default function SupportPage() {
       <div className="rounded-3xl border border-white/10 bg-zinc-900/60 p-6 space-y-4">
         <h2 className="text-lg font-semibold text-white">FAQs</h2>
         <ul className="space-y-4">
-          {FAQS.map((f) => (
-            <li key={f.q}>
-              <p className="font-medium text-white">{f.q}</p>
-              <p className="mt-1 text-sm text-zinc-400">{f.a}</p>
+          {faqs.map((f) => (
+            <li key={f.question}>
+              <p className="font-medium text-white">{f.question}</p>
+              <p className="mt-1 text-sm text-zinc-400">{f.answer}</p>
             </li>
           ))}
         </ul>

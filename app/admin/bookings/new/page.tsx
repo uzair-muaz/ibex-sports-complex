@@ -1,8 +1,10 @@
 "use client";
 
+import { useSportList } from "@/lib/tanstack/hooks/queries";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { Alert, App, Button, DatePicker, Form, Input, Select } from "antd";
 import type { Dayjs } from "dayjs";
@@ -23,7 +25,6 @@ import {
 import { useCreateBookingMutation } from "@/lib/tanstack/hooks/mutations";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
 
-const COURT_TYPES: CourtType[] = ["PADEL", "CRICKET", "PICKLEBALL", "FUTSAL"];
 
 type BookingFormValues = {
   courtType: CourtType;
@@ -43,6 +44,8 @@ function dateToDayjs(date: Date): Dayjs {
 
 export default function AdminNewBookingPage() {
   const { data: session } = useSession();
+  // Sports from Admin → App Settings.
+  const sportList = useSportList();
   const router = useRouter();
   const { message } = App.useApp();
   const [form] = Form.useForm<BookingFormValues>();
@@ -90,8 +93,29 @@ export default function AdminNewBookingPage() {
     isFetching: isFetchingCourts,
   });
 
+  // Lengths per sport from Admin → App Settings (same list customers see).
+  const sportRulesQuery = useQuery({
+    queryKey: ["public", "sport-booking-rules"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/sports?includeHidden=true");
+      if (!res.ok) throw new Error("Could not load booking lengths");
+      return ((await res.json()) as {
+        sports: { sport: string; booking: { durationsMinutes: number[] } }[];
+      }).sports;
+    },
+    staleTime: 5 * 60_000,
+  });
+  const durationPresets = useMemo(
+    () =>
+      (sportRulesQuery.data?.find((s) => s.sport === courtType)?.booking.durationsMinutes ?? []).map((m) => ({
+        hours: m / 60,
+        label: m % 60 === 0 ? `${m / 60} hour${m === 60 ? "" : "s"}` : `${Math.floor(m / 60)}h ${m % 60}m`,
+      })),
+    [sportRulesQuery.data, courtType],
+  );
+
   const availabilityInput =
-    courtType && dateStr
+    courtType && dateStr && durationPresets.some((p) => p.hours === durationHours)
       ? {
           courtType,
           date: dateStr,
@@ -118,22 +142,6 @@ export default function AdminNewBookingPage() {
     (availabilityInput != null && quotesLoading.isInitialLoading);
 
   const createBookingMutation = useCreateBookingMutation();
-
-  const durationPresets = useMemo(() => {
-    if (courtType === "FUTSAL") {
-      return [
-        { hours: 1.5, label: "1h 30m" },
-        { hours: 2, label: "2h" },
-        { hours: 2.5, label: "2h 30m" },
-        { hours: 3, label: "3h" },
-      ];
-    }
-    return [
-      { hours: 1, label: "1 hour" },
-      { hours: 1.5, label: "1h 30m" },
-      { hours: 2, label: "2 hours" },
-    ];
-  }, [courtType]);
 
   useEffect(() => {
     const first = durationPresets[0]?.hours ?? 1;
@@ -238,9 +246,9 @@ export default function AdminNewBookingPage() {
               rules={[{ required: true, message: "Please select a court type" }]}
             >
               <Select
-                options={COURT_TYPES.map((type) => ({
-                  value: type,
-                  label: type,
+                options={sportList.map(({ sport, label }) => ({
+                  value: sport,
+                  label,
                 }))}
               />
             </Form.Item>

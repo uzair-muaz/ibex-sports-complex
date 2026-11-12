@@ -5,17 +5,21 @@ export type CourtFormState = {
   type: Court["type"];
   description: string;
   pricePerHour: number;
+  /** Saturday and Sunday price. null = same as weekday. */
+  weekendPricePerHour: number | null;
+  /** Minutes the price is for: 60, 90, or null (90 for Futsal, else 60). */
+  priceUnitMinutes: number | null;
   isActive: boolean;
   timeBasedPricingEnabled: boolean;
   pricingPeriods: CourtPricingPeriod[];
+  /** Mobile app details */
+  image: string;
+  surfaceLabel: string;
+  isIndoor: boolean;
+  hasRacketRental: boolean;
+  featureKeys: string[];
+  highlightKey: string | null;
 };
-
-export const COURT_TYPE_OPTIONS = [
-  { value: "PADEL" as const, label: "Padel" },
-  { value: "CRICKET" as const, label: "Cricket" },
-  { value: "PICKLEBALL" as const, label: "Pickleball" },
-  { value: "FUTSAL" as const, label: "Futsal" },
-];
 
 export const PRICING_LABEL_OPTIONS = [
   { value: "off_peak" as const, label: "Off-peak" },
@@ -28,9 +32,17 @@ export function createEmptyCourtForm(): CourtFormState {
     type: "PADEL",
     description: "",
     pricePerHour: 0,
+    weekendPricePerHour: null,
+    priceUnitMinutes: null,
     isActive: true,
     timeBasedPricingEnabled: false,
     pricingPeriods: [],
+    image: "",
+    surfaceLabel: "",
+    isIndoor: false,
+    hasRacketRental: false,
+    featureKeys: [],
+    highlightKey: null,
   };
 }
 
@@ -40,10 +52,24 @@ export function courtToFormState(court: Court): CourtFormState {
     type: court.type,
     description: court.description,
     pricePerHour: court.pricePerHour,
+    weekendPricePerHour: court.weekendPricePerHour ?? null,
+    priceUnitMinutes: court.priceUnitMinutes ?? null,
     isActive: court.isActive,
     timeBasedPricingEnabled: court.timeBasedPricingEnabled ?? false,
     pricingPeriods: court.pricingPeriods ?? [],
+    image: court.image ?? "",
+    surfaceLabel: court.surfaceLabel ?? "",
+    isIndoor: court.isIndoor ?? false,
+    hasRacketRental: court.hasRacketRental ?? false,
+    featureKeys: (court.features ?? []).map((f) => f.key),
+    highlightKey: court.highlight?.key ?? null,
   };
+}
+
+/** Form state → what the courts API saves (features sent as keys; labels filled on the server). */
+export function courtFormToPayload(form: CourtFormState) {
+  const { featureKeys, highlightKey, ...rest } = form;
+  return { ...rest, features: featureKeys, highlight: highlightKey };
 }
 
 export function formatHourLabel(hour: number): string {
@@ -93,6 +119,7 @@ export function appendPricingPeriod(
         startHour: defaultStart,
         endHour: defaultEnd,
         pricePerHour: prev.pricePerHour || 0,
+        weekendPricePerHour: null,
         allDay: false,
       },
     ],

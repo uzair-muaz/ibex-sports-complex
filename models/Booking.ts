@@ -29,11 +29,46 @@ export interface IBooking extends Document {
   usedMembershipHours?: boolean;
   membershipId?: mongoose.Types.ObjectId;
   membershipHoursUsed?: number;
+  /** Which sport's hours were used (Phase 12). Missing on older bookings (one shared pool). */
+  membershipSport?: string;
+  /** PKR the hours covered (Phase 12). */
+  membershipDiscountPkr?: number;
+  /** Set once the hours are given back on cancel, so they are never given back twice. */
+  membershipHoursReturnedAt?: Date;
+  /** When the 2-hour reminder was sent (so it's sent once). */
+  reminderSentAt?: Date;
   usedGuestPass?: boolean;
   totalPrice: number; // Final price after discounts
   amountPaid: number; // Total received (online + cash), kept for backward compatibility
   amountReceivedOnline?: number; // Payment received online (e.g. bank transfer)
   amountReceivedCash?: number; // Payment received in cash at venue
+  /** Mobile app: where the booking came from ("web" when missing). */
+  source?: 'web' | 'app';
+  /** Mobile app: advance the customer must pay (whole PKR) and the % used. */
+  advanceRequired?: number;
+  advancePercent?: number;
+  /** Mobile app: wallet credit used (Phase 11). */
+  walletCreditUsed?: number;
+  /** Mobile app guests: SHA-256 of their guestAccessToken (never the token). */
+  guestAccessTokenHash?: string | null;
+  /** Mobile app guests: scrambled IP address, only to limit fake bookings. */
+  guestIpHash?: string | null;
+  /** Mobile app cancel: who, when, why, and what went back. */
+  cancelledAt?: Date | null;
+  cancelledBy?: 'customer' | 'staff' | null;
+  cancelReason?: 'weather' | 'teammate_unavailable' | 'schedule_conflict' | 'other' | null;
+  cancelNote?: string | null;
+  /** Money returned on cancel (whole PKR) and where it went. */
+  refundAmount?: number | null;
+  refundTo?: 'wallet' | null;
+  /** Promo code the customer typed, and PKR it took off the court fee. */
+  promoCode?: string | null;
+  promoDiscountPkr?: number | null;
+  /** Staff cancel: what staff chose to give back. */
+  refundChoice?: 'wallet' | 'paid_back' | 'none' | null;
+  /** Staff cancel: PKR paid back outside the app (cash or bank). */
+  refundPaidBackPkr?: number | null;
+  cancelledByUserId?: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -163,6 +198,10 @@ const BookingSchema: Schema = new Schema(
       type: Boolean,
       default: false,
     },
+    membershipSport: { type: String, required: false },
+    membershipDiscountPkr: { type: Number, default: 0, min: 0 },
+    membershipHoursReturnedAt: { type: Date, required: false },
+    reminderSentAt: { type: Date, required: false },
     totalPrice: {
       type: Number,
       required: true,
@@ -183,6 +222,41 @@ const BookingSchema: Schema = new Schema(
       default: 0,
       min: 0,
     },
+    source: {
+      type: String,
+      enum: ['web', 'app'],
+      required: false,
+    },
+    advanceRequired: { type: Number, min: 0, required: false },
+    advancePercent: { type: Number, min: 0, max: 100, required: false },
+    walletCreditUsed: { type: Number, min: 0, default: 0 },
+    guestAccessTokenHash: {
+      type: String,
+      required: false,
+      default: null,
+      select: false,
+      index: { sparse: true },
+    },
+    guestIpHash: {
+      type: String,
+      required: false,
+      select: false,
+    },
+    cancelledAt: { type: Date, required: false },
+    cancelledBy: { type: String, enum: ['customer', 'staff'], required: false },
+    cancelReason: {
+      type: String,
+      enum: ['weather', 'teammate_unavailable', 'schedule_conflict', 'other'],
+      required: false,
+    },
+    cancelNote: { type: String, required: false, maxlength: 300 },
+    refundAmount: { type: Number, required: false, min: 0 },
+    refundTo: { type: String, enum: ['wallet'], required: false },
+    promoCode: { type: String, required: false },
+    promoDiscountPkr: { type: Number, required: false, min: 0 },
+    refundChoice: { type: String, enum: ['wallet', 'paid_back', 'none'], required: false },
+    refundPaidBackPkr: { type: Number, required: false, min: 0 },
+    cancelledByUserId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
   },
   {
     timestamps: true,
