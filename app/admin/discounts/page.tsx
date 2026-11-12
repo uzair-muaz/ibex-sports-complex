@@ -41,7 +41,7 @@ export default function DiscountsPage() {
   const { message } = App.useApp();
   const { data: session } = useSession();
   const router = useRouter();
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as { role?: string } | undefined)?.role;
   const isSuperAdmin = userRole === "super_admin";
   const isAdmin = userRole === "admin" || isSuperAdmin;
 
@@ -96,6 +96,7 @@ export default function DiscountsPage() {
   useEffect(() => {
     if (!discountByIdQuery.data) return;
     const fresh = discountByIdQuery.data as Discount;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- copy the freshly loaded discount into the edit form
     setEditingDiscount(fresh);
     setDiscountForm(discountToFormState(fresh));
   }, [discountByIdQuery.data]);

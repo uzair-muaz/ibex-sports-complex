@@ -148,6 +148,7 @@ export function AdminAntdProvider({ children }: { children: React.ReactNode }) {
     try {
       const stored = localStorage.getItem(STORAGE_KEY) as AdminThemeMode | null;
       if (stored === "light" || stored === "dark") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- read the saved theme only after mount, so server and browser render the same first
         setModeState(stored);
       }
     } catch {

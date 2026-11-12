@@ -47,7 +47,8 @@ export async function createUser(input: CreateUserInput, opts?: StaffActorOpts) 
       success: true,
       user: JSON.parse(JSON.stringify(user)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Create user error:', error);
     return {
       success: false,
@@ -120,7 +121,8 @@ export async function updateUser(input: UpdateUserInput, opts?: StaffActorOpts) 
       success: true,
       user: JSON.parse(JSON.stringify(user)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Update user error:', error);
     return {
       success: false,
@@ -147,7 +149,8 @@ export async function deleteUser(userId: string, opts?: StaffActorOpts) {
     return {
       success: true,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Delete user error:', error);
     return {
       success: false,
@@ -170,7 +173,8 @@ export async function getAllUsers(opts?: StaffActorOpts) {
       success: true,
       users: JSON.parse(JSON.stringify(users)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get all users error:', error);
     return {
       success: false,

@@ -96,8 +96,8 @@ export default function UsersPage() {
   const sortedUsers = [...users].sort((a, b) => {
     if (!sortColumn) return 0;
 
-    let aValue: any = a[sortColumn];
-    let bValue: any = b[sortColumn];
+    let aValue = a[sortColumn] as unknown as string | number;
+    let bValue = b[sortColumn] as unknown as string | number;
 
     if (sortColumn === "createdAt") {
       aValue = new Date(aValue).getTime();
@@ -278,7 +278,7 @@ export default function UsersPage() {
             onClick={() => handleEditUser(user)}
             aria-label="Edit user"
           />
-          {user._id !== (session?.user as any)?.id && (
+          {user._id !== (session?.user as { id?: string } | undefined)?.id && (
             <Button
               type="text"
               danger

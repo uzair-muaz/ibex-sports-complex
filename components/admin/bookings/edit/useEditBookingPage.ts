@@ -199,6 +199,7 @@ export function useEditBookingPage() {
     }
 
     userChangedSlotRef.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- copy the loaded booking into the form once
     setLoadedBooking(booking);
     setSavedBookingPricing({
       totalPrice: Number(booking.totalPrice) || 0,
@@ -246,6 +247,7 @@ export function useEditBookingPage() {
   ]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the picked slot when date, sport or length changes
     setSelectedQuote(null);
   }, [selectedDate, courtType, durationHours]);
 
@@ -265,6 +267,7 @@ export function useEditBookingPage() {
         q.startTime === loadedBooking.startTime &&
         String(q.assignedCourtId) === String(courtId),
     );
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-select the booking's current slot once times load
     if (match) setSelectedQuote(match);
   }, [
     loadedBooking,

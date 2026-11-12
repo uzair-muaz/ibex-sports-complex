@@ -210,7 +210,8 @@ export async function getDiscounts(opts?: StaffActorOpts) {
       success: true,
       discounts: JSON.parse(JSON.stringify(discounts)).map(serializeDiscount),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get discounts error:', error);
     return {
       success: false,
@@ -235,7 +236,8 @@ export async function getDiscountById(discountId: string, opts?: StaffActorOpts)
       success: true as const,
       discount: serializeDiscount(JSON.parse(JSON.stringify(discount))),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get discount error:', error);
     return {
       success: false as const,
@@ -286,7 +288,7 @@ export async function getActiveDiscounts() {
     // Date-only check to avoid timezone edge cases on boundary days.
     const todayKey = toDateKeyInTimezone(new Date(), BUSINESS_TIMEZONE);
     const discountsRaw = await Discount.find({ isActive: true }).sort({ createdAt: -1 });
-    const discounts = discountsRaw.filter((d: any) => {
+    const discounts = discountsRaw.filter((d) => {
       const fromKey = toDateKeyInTimezone(new Date(d.validFrom), BUSINESS_TIMEZONE);
       const untilKey = toDateKeyInTimezone(new Date(d.validUntil), BUSINESS_TIMEZONE);
       return fromKey <= todayKey && todayKey <= untilKey;
@@ -296,7 +298,8 @@ export async function getActiveDiscounts() {
       success: true,
       discounts: JSON.parse(JSON.stringify(discounts)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get active discounts error:', error);
     return {
       success: false,
@@ -443,7 +446,8 @@ export async function createDiscount(input: CreateDiscountInput, opts?: StaffAct
       success: true,
       discount: JSON.parse(JSON.stringify(discount)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Create discount error:', error);
     return {
       success: false,
@@ -663,7 +667,8 @@ export async function updateDiscount(input: UpdateDiscountInput, opts?: StaffAct
       success: true,
       discount: JSON.parse(JSON.stringify(discount)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Update discount error:', error);
     return {
       success: false,
@@ -692,7 +697,8 @@ export async function deleteDiscount(discountId: string, opts?: StaffActorOpts) 
     return {
       success: true,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Delete discount error:', error);
     return {
       success: false,
@@ -732,7 +738,8 @@ export async function toggleDiscountActive(discountId: string, opts?: StaffActor
       success: true,
       discount: JSON.parse(JSON.stringify(discount)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Toggle discount error:', error);
     return {
       success: false,

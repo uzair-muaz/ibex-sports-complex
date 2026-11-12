@@ -21,8 +21,15 @@ async function venueContact(): Promise<{ email: string; phone: string } | undefi
 }
 
 // QR Code generation
-let QRCode: any;
+// Only the two calls used here (kept loose so the existing options are unchanged).
+type QRCodeLib = {
+  toDataURL(value: string, options?: object): Promise<string>;
+  toBuffer(value: string, options?: object): Promise<Buffer>;
+};
+let QRCode: QRCodeLib | undefined;
 try {
+  // Optional at runtime: emails still send without QR codes if it's missing.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   QRCode = require('qrcode');
 } catch (e) {
   console.warn('qrcode package not installed. QR codes in emails will not be generated.');
@@ -193,7 +200,8 @@ async function sendViaResend(
       success: true,
       emailId: response.data?.id,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Error sending email via Resend:', error);
     return {
       success: false,
@@ -332,7 +340,8 @@ async function sendViaSES(
       success: true,
       emailId: response.MessageId,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Error sending email via SES:', error);
     
     let errorMessage = 'Failed to send email';

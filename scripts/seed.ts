@@ -1,6 +1,9 @@
 // Load environment variables from .env.local BEFORE any other imports
 // Using require to ensure synchronous execution before module evaluation
+// Load .env.local before the imports below read it (require keeps this first).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 require("dotenv").config({
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   path: require("path").resolve(process.cwd(), ".env.local"),
 });
 

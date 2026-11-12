@@ -93,6 +93,7 @@ export const Navbar = () => {
   }, [isMobileMenuOpen]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close the menus when the page changes
     setIsMobileMenuOpen(false);
     setAccountOpen(false);
   }, [pathname]);

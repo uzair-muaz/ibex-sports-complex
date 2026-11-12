@@ -70,7 +70,8 @@ export async function createFeedback(input: CreateFeedbackInput) {
       success: true,
       feedback: JSON.parse(JSON.stringify(feedback)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Feedback creation error:', error);
     return {
       success: false,
@@ -110,7 +111,8 @@ export async function getAllFeedback(opts?: StaffActorOpts) {
       success: true,
       feedbacks: JSON.parse(JSON.stringify(feedbacksWithCourtType)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get all feedback error:', error);
     return {
       success: false,
@@ -150,7 +152,8 @@ export async function getFeedbackByBookingId(bookingId: string) {
       success: true,
       feedback: JSON.parse(JSON.stringify(feedback)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get feedback error:', error);
     return {
       success: false,
@@ -191,7 +194,8 @@ export async function getBookingById(bookingId: string) {
       success: true,
       booking: JSON.parse(JSON.stringify(booking)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get booking error:', error);
     return {
       success: false,

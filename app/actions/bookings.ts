@@ -7,7 +7,7 @@ import { BLOCKED_MESSAGE } from "@/lib/customer-block-rules";
 import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 import Booking from '@/models/Booking';
-import Court from '@/models/Court';
+import Court, { type ICourt } from '@/models/Court';
 import Discount from '@/models/Discount';
 import { auth } from '@/lib/auth';
 import {
@@ -48,7 +48,7 @@ import { getAppSettings } from '@/lib/app-settings';
 
 async function getActiveDiscountsForBusinessDate(bookingDateKey: string) {
   const discountsRaw = await Discount.find({ isActive: true }).lean();
-  return discountsRaw.filter((d: any) => {
+  return discountsRaw.filter((d) => {
     const fromKey = toDateKeyInTimezone(new Date(d.validFrom), BUSINESS_TIMEZONE);
     const untilKey = toDateKeyInTimezone(new Date(d.validUntil), BUSINESS_TIMEZONE);
     return fromKey <= bookingDateKey && bookingDateKey <= untilKey;
@@ -106,7 +106,9 @@ async function findConflictBookings(params: {
   return [...bookings, ...closures];
 }
 
-function toDiscountInput(d: any): DiscountInput {
+type LeanDiscount = Awaited<ReturnType<typeof getActiveDiscountsForBusinessDate>>[number];
+
+function toDiscountInput(d: LeanDiscount): DiscountInput {
   return {
     _id: d._id.toString(),
     name: d.name,
@@ -482,7 +484,7 @@ export async function createBooking(
     await booking.populate('courtId');
 
     // Send confirmation email (non-blocking)
-    const court = booking.courtId as any;
+    const court = booking.courtId as unknown as { name?: string } | null;
     const emailResult = await sendBookingConfirmationEmail({
       userName: input.userName,
       userEmail: input.userEmail.toLowerCase(),
@@ -514,7 +516,8 @@ export async function createBooking(
       emailSent: emailResult?.success || false,
       emailMessage: emailResult?.message,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Booking creation error:', error);
     if (hoursTaken && !bookingSaved) {
       await putBackSportHours(hoursTaken).catch(() => {});
@@ -590,7 +593,7 @@ export async function getAvailableStartTimes(
 
     // Performance: group bookings by courtId once so we don't scan every booking
     // for every court/time slot. This reduces the inner-loop work substantially.
-    const bookingsByCourtId = new Map<string, any[]>();
+    const bookingsByCourtId = new Map<string, (typeof existingBookings)[number][]>();
     for (const b of existingBookings) {
       const key = b?.courtId?.toString?.();
       if (!key) continue;
@@ -669,7 +672,8 @@ export async function getAvailableStartTimes(
     }
 
     return { success: true, startTimes: results };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('getAvailableStartTimes error:', error);
     return { success: false, error: error.message || 'Failed to fetch availability', startTimes: [] };
   }
@@ -707,7 +711,7 @@ export async function getQuickSlotCourtAvailability(
     });
 
     // Group bookings by courtId to reduce inner-loop scanning.
-    const bookingsByCourtId = new Map<string, any[]>();
+    const bookingsByCourtId = new Map<string, (typeof existingBookings)[number][]>();
     for (const b of existingBookings) {
       const key = b?.courtId?.toString?.();
       if (!key) continue;
@@ -741,7 +745,8 @@ export async function getQuickSlotCourtAvailability(
     }
 
     return { success: true, slots };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('getQuickSlotCourtAvailability error:', error);
     return { success: false, error: error.message || 'Failed to fetch quick availability', slots: [] };
   }
@@ -772,7 +777,8 @@ export async function getBookingsByDate(date: string, opts?: StaffActorOpts) {
       success: true,
       bookings: JSON.parse(JSON.stringify(bookings)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get bookings error:', error);
     return {
       success: false,
@@ -804,7 +810,8 @@ export async function getAllBookings(opts?: StaffActorOpts) {
       success: true,
       bookings: JSON.parse(JSON.stringify(bookings)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get all bookings error:', error);
     return {
       success: false,
@@ -930,7 +937,7 @@ export async function getBookingsPaginated(input: GetBookingsPaginatedInput, opt
     const limit = Math.max(1, Math.min(100, Number(input.limit) || 20));
     const skip = (page - 1) * limit;
 
-    const query: any = {};
+    const query: Record<string, unknown> = {};
 
     if (input.dateRange && input.dateRange.from && input.dateRange.to) {
       query.date = {
@@ -945,7 +952,7 @@ export async function getBookingsPaginated(input: GetBookingsPaginatedInput, opt
       const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const regex = new RegExp(escaped, "i");
 
-      const or: any[] = [{ userName: regex }, { userEmail: regex }];
+      const or: Record<string, unknown>[] = [{ userName: regex }, { userEmail: regex }];
       if (mongoose.Types.ObjectId.isValid(search)) {
         or.push({ _id: new mongoose.Types.ObjectId(search) });
       }
@@ -970,7 +977,8 @@ export async function getBookingsPaginated(input: GetBookingsPaginatedInput, opt
       page,
       limit,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error("Get bookings paginated error:", error);
     return {
       success: false,
@@ -1007,7 +1015,8 @@ export async function cancelBooking(
       booking: JSON.parse(JSON.stringify(booking)),
       refund: result,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Cancel booking error:', error);
     return { success: false, error: error.message || 'Failed to cancel booking' };
   }
@@ -1070,9 +1079,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
     if (updateData.amountReceivedOnline !== undefined || updateData.amountReceivedCash !== undefined) {
       const online = updateData.amountReceivedOnline ?? 0;
       const cash = updateData.amountReceivedCash ?? 0;
-      (updateData as any).amountPaid = online + cash;
-      (updateData as any).amountReceivedOnline = online;
-      (updateData as any).amountReceivedCash = cash;
+      Object.assign(updateData, { amountPaid: online + cash, amountReceivedOnline: online, amountReceivedCash: cash });
     }
     // If amountPaid is provided and > 0, automatically change status to confirmed
     // BUT only if status wasn't explicitly set (to allow manual status changes like 'completed')
@@ -1087,7 +1094,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
         throw new Error('Booking not found');
       }
 
-      const originalCourt = booking.courtId as any;
+      const originalCourt = booking.courtId as unknown as ICourt;
       const finalDate = updateData.date || booking.date;
       const finalStartTime = updateData.startTime !== undefined ? updateData.startTime : booking.startTime;
       const finalDuration = updateData.duration || booking.duration;
@@ -1168,9 +1175,7 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
         },
       );
 
-      (updateData as any).originalPrice = originalPrice;
-      (updateData as any).discounts = appliedDiscounts;
-      (updateData as any).discountAmount = discountAmount;
+      Object.assign(updateData, { originalPrice, discounts: appliedDiscounts, discountAmount });
       updateData.totalPrice = finalPrice;
     }
 
@@ -1206,7 +1211,8 @@ export async function updateBooking(input: UpdateBookingInput, opts?: StaffActor
       success: true,
       booking: JSON.parse(JSON.stringify(updatedBooking)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Update booking error:', error);
     return {
       success: false,
@@ -1264,7 +1270,8 @@ export async function checkBookingExtensionAvailability(bookingId: string, opts?
       canExtend60,
       hasAnyOption: canExtend30 || canExtend60,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error("checkBookingExtensionAvailability error:", error);
     return { success: false, error: error.message || "Failed to check extension availability" };
   }
@@ -1299,7 +1306,8 @@ export async function extendBooking(input: ExtendBookingInput, opts?: StaffActor
       bookingId: input.bookingId,
       duration: nextDuration,
     }, opts);
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error("Extend booking error:", error);
     return { success: false, error: error.message || "Failed to extend booking" };
   }
@@ -1334,7 +1342,8 @@ export async function deleteBooking(bookingId: string, opts?: StaffActorOpts) {
     return {
       success: true,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Delete booking error:', error);
     return {
       success: false,

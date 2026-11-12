@@ -104,7 +104,7 @@ export async function getCourts(type?: string) {
   try {
     await connectDB();
 
-    const query: any = { isActive: true };
+    const query: Record<string, unknown> = { isActive: true };
     if (type) {
       query.type = type;
     }
@@ -115,7 +115,8 @@ export async function getCourts(type?: string) {
       success: true,
       courts: JSON.parse(JSON.stringify(courts)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get courts error:', error);
     return {
       success: false,
@@ -137,7 +138,8 @@ export async function getAllCourts(opts?: StaffActorOpts) {
       success: true,
       courts: JSON.parse(JSON.stringify(courts)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Get all courts error:', error);
     return {
       success: false,
@@ -214,7 +216,8 @@ export async function createCourt(input: CreateCourtInput, opts?: StaffActorOpts
       success: true,
       court: JSON.parse(JSON.stringify(court)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Create court error:', error);
     return {
       success: false,
@@ -303,7 +306,8 @@ export async function updateCourt(input: UpdateCourtInput, opts?: StaffActorOpts
       success: true,
       court: JSON.parse(JSON.stringify(court)),
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Update court error:', error);
     return {
       success: false,
@@ -332,7 +336,8 @@ export async function deleteCourt(courtId: string, opts?: StaffActorOpts) {
     return {
       success: true,
     };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as Error;
     console.error('Delete court error:', error);
     return {
       success: false,
