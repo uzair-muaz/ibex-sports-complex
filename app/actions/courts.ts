@@ -9,30 +9,8 @@ import type { CourtFeature } from '@/models/Court';
 import { sanitizeCourtAppFields } from '@/lib/court-app-fields';
 import { safeRevalidatePath } from '@/lib/safe-revalidate';
 import type { CourtPricingPeriod } from '@/types';
+import { checkPricingPeriods } from '@/lib/pricing-periods';
 import { requireStaffActor, type StaffActorOpts } from '@/lib/action-auth';
-
-const FULL_DAY_HOURS = 24;
-
-function addPeriodSlots(
-  covered: Set<number>,
-  startHour: number,
-  endHour: number,
-): void {
-  if (startHour < endHour) {
-    for (let t = startHour; t < endHour; t += 0.5) {
-      covered.add(Number(t.toFixed(2)));
-    }
-    return;
-  }
-
-  // Wraps past midnight, e.g. 10:00 PM – 2:00 AM
-  for (let t = startHour; t < FULL_DAY_HOURS; t += 0.5) {
-    covered.add(Number(t.toFixed(2)));
-  }
-  for (let t = 0; t < endHour; t += 0.5) {
-    covered.add(Number(t.toFixed(2)));
-  }
-}
 
 /** A court's sport must be one listed in App Settings (built-in or added). */
 async function checkSportExists(type: unknown): Promise<string | null> {
@@ -61,44 +39,8 @@ function cleanWeekendPrices(input: { weekendPricePerHour?: number | null; priceU
   return null;
 }
 
-function validateTimeBasedPricing(periods: CourtPricingPeriod[]): string | null {
-  if (!periods.length) {
-    return 'Please add at least one peak/off-peak period when dynamic pricing is enabled.';
-  }
-
-  const covered = new Set<number>();
-
-  for (const period of periods) {
-    const start = period.startHour;
-    const end = period.endHour;
-
-    if (
-      typeof start !== 'number' ||
-      typeof end !== 'number' ||
-      start < 0 ||
-      start > FULL_DAY_HOURS ||
-      end < 0 ||
-      end > FULL_DAY_HOURS
-    ) {
-      return 'Peak/off-peak hours must be within a full 24-hour day (12:00 AM to 12:00 AM).';
-    }
-
-    if (start === end) {
-      return 'Each peak/off-peak period must have an end time after its start time.';
-    }
-
-    addPeriodSlots(covered, start, end);
-  }
-
-  for (let t = 0; t < FULL_DAY_HOURS; t += 0.5) {
-    const key = Number(t.toFixed(2));
-    if (!covered.has(key)) {
-      return 'Peak/off-peak periods must fully cover the full 24 hours without gaps.';
-    }
-  }
-
-  return null;
-}
+/** No gaps and no overlaps between peak/off-peak times (see lib/pricing-periods). */
+const validateTimeBasedPricing = checkPricingPeriods;
 
 export async function getCourts(type?: string) {
   try {

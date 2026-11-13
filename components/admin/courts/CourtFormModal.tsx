@@ -3,6 +3,7 @@
 import { useSportList } from "@/lib/tanstack/hooks/queries";
 import React from "react";
 import {
+  Alert,
   Button,
   Checkbox,
   Form,
@@ -26,6 +27,7 @@ import {
 } from "./courtHelpers";
 import { COURT_FEATURE_LABELS } from "@/lib/court-features";
 import { priceUnit } from "@/lib/pricing-utils";
+import { checkPricingPeriods } from "@/lib/pricing-periods";
 import { priceUnitMinutesFor } from "@/lib/sport-rules";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 
@@ -352,11 +354,19 @@ export function CourtFormModal({
                     </div>
                   );
                 })}
+                {(() => {
+                  const problem = checkPricingPeriods(courtForm.pricingPeriods);
+                  return problem ? (
+                    <Alert type="error" showIcon message={problem} />
+                  ) : (
+                    <Alert type="success" showIcon message="The times cover the whole day with no overlaps." />
+                  );
+                })()}
                 <Text type="secondary" className="text-[11px]">
-                  Periods must tile the full day (12:00 AM → 12:00 AM). Ranges
-                  can wrap past midnight (e.g. 10:00 PM – 2:00 AM for evening
-                  peak). Example: Off-peak 12:00 AM–5:00 PM, Peak 5:00 PM–12:00
-                  AM.
+                  Every hour of the day must be either peak or off-peak, never
+                  both. A time can run past midnight, e.g. Peak 6:00 PM – 12:00 AM
+                  (midnight). Example: Off-peak 12:00 AM – 6:00 PM, Peak 6:00 PM –
+                  12:00 AM. Note: 12:00 PM is noon, 12:00 AM is midnight.
                 </Text>
               </div>
             )}
