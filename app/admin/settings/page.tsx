@@ -26,8 +26,20 @@ import {
   saveAdminAppSettings,
 } from "@/lib/tanstack/requests/admin-settings.requests";
 import type { BankAccount, Faq, ResolvedAppSettings, SportRules } from "@/lib/app-settings";
+import { exampleCancelDeadline, minutesInWords } from "@/lib/notice-time-text";
 
 const { Text } = Typography;
+
+/** Plain-words help under the carry-over rule, worked out from the number typed. */
+function membershipRuleHint(value: number) {
+  return (
+    <Text type="secondary">
+      {value === 0
+        ? "Unused hours move to the new plan only if the member renews before their plan ends. Once it ends, they're lost."
+        : `If a member renews within ${value} day${value === 1 ? "" : "s"} after their plan ends, their unused hours move to the new plan. After that, unused hours are lost.`}
+    </Text>
+  );
+}
 
 /** Any length from 1 hour to 6 hours, in 30-minute steps. The super admin picks each sport's list. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -292,7 +304,21 @@ export default function AdminAppSettingsPage() {
           <Card title="Booking rules">
             <Form.Item
               label="Customers can cancel until (minutes before start)"
-              extra={<Text type="secondary">240 minutes = 4 hours.</Text>}
+              extra={
+                <Space orientation="vertical" size={2} style={{ marginTop: 4 }}>
+                  <Text strong>
+                    {draft.cancellationNoticeMinutes} minutes = {minutesInWords(draft.cancellationNoticeMinutes)}
+                  </Text>
+                  <Text type="secondary">
+                    {draft.cancellationNoticeMinutes === 0
+                      ? "Customers can cancel on the website or app right up to the start time."
+                      : `Customers can cancel on the website or app until ${minutesInWords(draft.cancellationNoticeMinutes)} before their booking starts. For example, a booking at 8:00 PM can be cancelled until ${exampleCancelDeadline(draft.cancellationNoticeMinutes)}.`}
+                  </Text>
+                  <Text type="secondary">
+                    After that, they can&apos;t cancel themselves and need to contact you. Staff can still cancel any booking from the admin. Tip: 60 = 1 hour, 1440 = 1 day.
+                  </Text>
+                </Space>
+              }
             >
               <InputNumber
                 min={0}
@@ -374,15 +400,16 @@ export default function AdminAppSettingsPage() {
           </Card>
 
           <Card title="Membership rules">
-            <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-3">
+            <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
+              Members can pay for any free slot with their hours, at any time, right up to the start.
+            </Text>
+            <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
               {(
                 [
-                  ["weekdayAdvanceHours", "Notice to book with hours, Mon–Fri (hours)", 168],
-                  ["weekendAdvanceHours", "Notice to book with hours, Sat–Sun (hours)", 168],
-                  ["carryOverGraceDays", "Days after a plan ends that unused hours carry over", 90],
+                  ["carryOverGraceDays", "Days to renew and keep unused hours", 90],
                 ] as const
               ).map(([key, label, max]) => (
-                <Form.Item key={key} label={label}>
+                <Form.Item key={key} label={label} extra={membershipRuleHint(draft.membership[key])}>
                   <InputNumber
                     min={0}
                     max={max}

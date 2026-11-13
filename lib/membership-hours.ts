@@ -6,7 +6,6 @@ import UserMembership from "@/models/UserMembership";
 import "@/models/MembershipPlan";
 import { bookingStartMs } from "@/lib/api/booking-view";
 import { isWeekendDateKey } from "@/lib/membership-rules";
-import { DEFAULT_APP_SETTINGS, getAppSettings, type MembershipRules } from "@/lib/app-settings";
 
 /**
  * Membership hours per sport (Phase 12). Used by the website checkout, the
@@ -29,8 +28,6 @@ export type MembershipForHours = {
   weekdayOnly: boolean;
   validUntil: Date;
   hoursBySport: SportHours[];
-  /** Notice rules from App Settings (defaults if missing). */
-  rules?: Pick<MembershipRules, "weekdayAdvanceHours" | "weekendAdvanceHours">;
 };
 
 export type HoursCheck = {
@@ -44,7 +41,6 @@ export type HoursCheck = {
 export function checkHoursForSlot(
   m: MembershipForHours | null,
   slot: { sport: string; dateKey: string; startHour: number },
-  now = Date.now(),
 ): HoursCheck {
   if (!m) return { available: 0, canUse: false, reasonCode: "NO_MEMBERSHIP" };
   const row = m.hoursBySport.find((h) => h.sport === slot.sport);
@@ -55,9 +51,7 @@ export function checkHoursForSlot(
   if (m.weekdayOnly && isWeekendDateKey(slot.dateKey)) return no("WEEKDAYS_ONLY");
   const startMs = bookingStartMs(slot.dateKey, slot.startHour);
   if (startMs > m.validUntil.getTime()) return no("EXPIRES_BEFORE_BOOKING");
-  const rules = m.rules ?? DEFAULT_APP_SETTINGS.membership;
-  const needHours = isWeekendDateKey(slot.dateKey) ? rules.weekendAdvanceHours : rules.weekdayAdvanceHours;
-  if (startMs - now < needHours * 3_600_000) return no("TOO_SOON");
+  // No "book ahead" rule: if the slot is free, members can use their hours right up to the start.
   return { available, canUse: true, reasonCode: null };
 }
 
@@ -74,13 +68,10 @@ export function hoursBySportView(rows: SportHours[]) {
 /** The customer's active membership, in the shape the hours check needs. */
 export async function loadMembershipForHours(userId: string): Promise<MembershipForHours | null> {
   await connectDB();
-  const [m, settings] = await Promise.all([
-    UserMembership.findOne({ userId, status: "active", validUntil: { $gte: new Date() } })
-      .sort({ validUntil: -1 })
-      .populate("planId", "name weekdayOnly")
-      .lean(),
-    getAppSettings(),
-  ]);
+  const m = await UserMembership.findOne({ userId, status: "active", validUntil: { $gte: new Date() } })
+    .sort({ validUntil: -1 })
+    .populate("planId", "name weekdayOnly")
+    .lean();
   if (!m) return null;
   const plan = (m.planId ?? {}) as { name?: string; weekdayOnly?: boolean };
   return {
@@ -89,7 +80,6 @@ export async function loadMembershipForHours(userId: string): Promise<Membership
     weekdayOnly: !!plan.weekdayOnly,
     validUntil: new Date(m.validUntil),
     hoursBySport: (m.hoursBySport ?? []) as SportHours[],
-    rules: settings.membership,
   };
 }
 

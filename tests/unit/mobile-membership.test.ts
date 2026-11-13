@@ -6,8 +6,7 @@ import { computeQuote } from "@/lib/pricing/quote";
 import { pointsEarnedFor } from "@/lib/loyalty-rules";
 import { DEFAULT_APP_SETTINGS, type LoyaltyRules } from "@/lib/app-settings";
 
-// Wednesday 18 Nov 2026, 18:00 PKT; "now" is two days earlier.
-const NOW = Date.parse("2026-11-16T10:00:00+05:00");
+// The test slot: Wednesday 18 Nov 2026, 6 PM.
 const gold: MembershipForHours = {
   id: "m1",
   planName: "Gold",
@@ -22,7 +21,7 @@ const slot = { sport: "PADEL", dateKey: "2026-11-18", startHour: 18 };
 
 describe("can these hours pay for this slot?", () => {
   it("yes, with the sport's hours", () => {
-    expect(checkHoursForSlot(gold, slot, NOW)).toEqual({ available: 7.5, canUse: true, reasonCode: null });
+    expect(checkHoursForSlot(gold, slot)).toEqual({ available: 7.5, canUse: true, reasonCode: null });
   });
   it.each([
     [null, slot, "NO_MEMBERSHIP"],
@@ -30,9 +29,9 @@ describe("can these hours pay for this slot?", () => {
     [gold, { ...slot, sport: "FUTSAL" }, "NO_HOURS_LEFT"],
     [{ ...gold, weekdayOnly: true }, { ...slot, dateKey: "2026-11-21" }, "WEEKDAYS_ONLY"],
     [gold, { ...slot, dateKey: "2026-12-02" }, "EXPIRES_BEFORE_BOOKING"],
-    [gold, { ...slot, dateKey: "2026-11-16", startHour: 11 }, "TOO_SOON"],
+    // Not TOO_SOON any more: a free slot 1 hour away can be paid with hours.
   ] as const)("no: %#", (m, s, code) => {
-    const r = checkHoursForSlot(m as MembershipForHours | null, s, NOW);
+    const r = checkHoursForSlot(m as MembershipForHours | null, s);
     expect(r.canUse).toBe(false);
     expect(r.reasonCode).toBe(code);
   });

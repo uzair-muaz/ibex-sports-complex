@@ -63,8 +63,6 @@ const hrs = (n: number) => `${n} hour${n === 1 ? "" : "s"}`;
 function termsFrom(r: PlansAnswer["rules"]): string[] {
   return [
     "Valid for the number of days shown on each plan, from the date of purchase.",
-    `Slot booking must be confirmed at least ${hrs(r.weekdayAdvanceHours)} in advance on weekdays.`,
-    `Slot booking must be confirmed at least ${hrs(r.weekendAdvanceHours)} in advance on weekends.`,
     `Unused hours carry forward on renewal (grace ${r.carryOverGraceDays} days after expiry).`,
     `Online cancel allowed until ${hrs(Math.round((r.cancellationNoticeMinutes / 60) * 10) / 10)} before start.`,
     "Membership purchase is currently activated by staff after WhatsApp confirmation (online payments coming soon).",

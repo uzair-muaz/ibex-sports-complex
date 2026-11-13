@@ -48,10 +48,6 @@ export type BankAccount = {
 
 /** Membership rules shown on the website and used when paying with hours. */
 export type MembershipRules = {
-  /** Hours before the start a booking paid with hours must be made, Mon–Fri. */
-  weekdayAdvanceHours: number;
-  /** Same, Sat–Sun. */
-  weekendAdvanceHours: number;
   /** Days after a plan ends when unused hours still carry over to a new one. */
   carryOverGraceDays: number;
 };
@@ -176,7 +172,7 @@ export const DEFAULT_APP_SETTINGS: ResolvedAppSettings = {
     verificationNote: "Our team checks payments by hand. You will get a notification.",
     balanceNote: "Pay the remaining balance at the venue.",
   },
-  membership: { weekdayAdvanceHours: 2, weekendAdvanceHours: 24, carryOverGraceDays: 7 },
+  membership: { carryOverGraceDays: 7 },
   faqs: null,
 };
 
@@ -298,8 +294,6 @@ export function resolveAppSettings(stored: StoredSettings | null | undefined): R
       balanceNote: pick(stored?.payments?.balanceNote, d.payments.balanceNote),
     },
     membership: {
-      weekdayAdvanceHours: pick(stored?.membership?.weekdayAdvanceHours, d.membership.weekdayAdvanceHours),
-      weekendAdvanceHours: pick(stored?.membership?.weekendAdvanceHours, d.membership.weekendAdvanceHours),
       carryOverGraceDays: pick(stored?.membership?.carryOverGraceDays, d.membership.carryOverGraceDays),
     },
     faqs:
@@ -481,8 +475,6 @@ export function validateSettingsPatch(input: unknown): CheckResult {
     const m = body.membership as Record<string, unknown>;
     const rules: Partial<MembershipRules> = {};
     const limits: Record<keyof MembershipRules, [number, string]> = {
-      weekdayAdvanceHours: [168, "Weekday notice must be 0–168 hours."],
-      weekendAdvanceHours: [168, "Weekend notice must be 0–168 hours."],
       carryOverGraceDays: [90, "Carry-over days must be 0–90."],
     };
     for (const key of Object.keys(limits) as (keyof MembershipRules)[]) {
