@@ -17,8 +17,8 @@ export type CourtFormState = {
   surfaceLabel: string;
   isIndoor: boolean;
   hasRacketRental: boolean;
+  /** One list: the first key is the main feature (the app shows it next to "Select Court"). */
   featureKeys: string[];
-  highlightKey: string | null;
 };
 
 export const PRICING_LABEL_OPTIONS = [
@@ -42,7 +42,6 @@ export function createEmptyCourtForm(): CourtFormState {
     isIndoor: false,
     hasRacketRental: false,
     featureKeys: [],
-    highlightKey: null,
   };
 }
 
@@ -61,15 +60,24 @@ export function courtToFormState(court: Court): CourtFormState {
     surfaceLabel: court.surfaceLabel ?? "",
     isIndoor: court.isIndoor ?? false,
     hasRacketRental: court.hasRacketRental ?? false,
-    featureKeys: (court.features ?? []).map((f) => f.key),
-    highlightKey: court.highlight?.key ?? null,
+    // Main feature first, then the rest, without repeats.
+    featureKeys: [
+      ...new Set([
+        ...(court.highlight?.key ? [court.highlight.key] : []),
+        ...(court.features ?? []).map((f) => f.key),
+      ]),
+    ],
   };
 }
 
-/** Form state → what the courts API saves (features sent as keys; labels filled on the server). */
+/**
+ * Form state → what the courts API saves (keys; labels filled on the server).
+ * The first picked feature becomes the main feature; the others are the chips,
+ * so the app never shows the same feature twice on one court card.
+ */
 export function courtFormToPayload(form: CourtFormState) {
-  const { featureKeys, highlightKey, ...rest } = form;
-  return { ...rest, features: featureKeys, highlight: highlightKey };
+  const { featureKeys, ...rest } = form;
+  return { ...rest, features: featureKeys.slice(1), highlight: featureKeys[0] ?? null };
 }
 
 export function formatHourLabel(hour: number): string {

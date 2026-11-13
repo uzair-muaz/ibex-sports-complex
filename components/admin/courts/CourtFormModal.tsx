@@ -11,6 +11,7 @@ import {
   Modal,
   Select,
   Space,
+  Tag,
   Typography,
 } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
@@ -420,33 +421,35 @@ export function CourtFormModal({
               </Space>
             </Form.Item>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Form.Item label="Features">
-              <Select
-                mode="multiple"
-                value={courtForm.featureKeys}
-                onChange={(v) =>
-                  setCourtForm({ ...courtForm, featureKeys: v as string[] })
-                }
-                options={FEATURE_OPTIONS}
-                placeholder="LED lighting, Benches…"
-              />
-            </Form.Item>
-            <Form.Item label="Main feature (highlight)">
-              <Select
-                allowClear
-                value={courtForm.highlightKey ?? undefined}
-                onChange={(v) =>
-                  setCourtForm({
-                    ...courtForm,
-                    highlightKey: (v as string | undefined) ?? null,
-                  })
-                }
-                options={FEATURE_OPTIONS}
-                placeholder="Match replay"
-              />
-            </Form.Item>
-          </div>
+          <Form.Item
+            label="Court features"
+            extra="Pick the most important one first: the app shows it as the main feature next to the Select Court button. The others show as small tags on the court card."
+          >
+            <Select
+              mode="multiple"
+              value={courtForm.featureKeys}
+              onChange={(v) =>
+                setCourtForm({ ...courtForm, featureKeys: v as string[] })
+              }
+              options={FEATURE_OPTIONS}
+              placeholder="Match replay, LED lighting, Benches…"
+              tagRender={({ label, value, closable, onClose }) => {
+                const isMain = courtForm.featureKeys[0] === value;
+                return (
+                  <Tag
+                    color={isMain ? "gold" : undefined}
+                    closable={closable}
+                    onClose={onClose}
+                    onMouseDown={(e) => e.preventDefault()}
+                    style={{ marginInlineEnd: 4 }}
+                  >
+                    {isMain ? "★ Main: " : ""}
+                    {label}
+                  </Tag>
+                );
+              }}
+            />
+          </Form.Item>
         </div>
 
         <Form.Item className="mb-0 mt-6">
