@@ -31,7 +31,7 @@ export function defaultFaqs(s: ResolvedAppSettings): Faq[] {
     },
     {
       question: "What is the IBEX wallet?",
-      answer: "Money from cancelled bookings is kept in your wallet. It never expires and you can use it on your next booking. To get it back to your bank, ask our team.",
+      answer: "Money from cancelled bookings is kept in your wallet. It never expires and you can use it on your next booking.",
     },
   ];
 }
