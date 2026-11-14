@@ -22,7 +22,7 @@ import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
 import { acquireSlotLocks, releaseSlotLocks } from '@/lib/booking-locks';
 import { staffCancelBooking, type StaffRefundChoice } from '@/lib/staff-cancel';
-import { checkPromo, releasePromoForBooking, undoPromoUse, redeemPromo } from '@/lib/promo';
+import { checkPromo, undoPromoUse, redeemPromo } from '@/lib/promo';
 import { nextBookingSerial } from '@/lib/booking-serial';
 import {
   getApplicableDiscounts,
@@ -1338,47 +1338,6 @@ export async function extendBooking(input: ExtendBookingInput, opts?: StaffActor
     return { success: false, error: error.message || "Failed to extend booking" };
   }
 }
-
-export async function deleteBooking(bookingId: string, opts?: StaffActorOpts) {
-  try {
-    const gate = await requireStaffActor(opts, { superAdmin: true });
-    if (!gate.ok) {
-      return {
-        success: false,
-        error: 'Only super admin can delete bookings.',
-      };
-    }
-
-    await connectDB();
-
-    const auditBefore = await bookingSnap(bookingId);
-    const booking = await Booking.findByIdAndDelete(bookingId);
-
-    if (!booking) {
-      throw new Error('Booking not found');
-    }
-    // A deleted booking doesn't keep its promo code use.
-    if (booking.status !== 'cancelled') await releasePromoForBooking(bookingId).catch(() => {});
-    await auditBooking(gate, bookingId, "delete", auditBefore, ` — was ${booking.status}, PKR ${Math.round(booking.amountPaid ?? 0)} paid`);
-
-    safeRevalidatePath('/admin');
-    safeRevalidatePath('/booking');
-    scheduleAnalyticsDailyRebuild([booking.date]);
-
-    return {
-      success: true,
-    };
-  } catch (caught) {
-    const error = caught as Error;
-    console.error('Delete booking error:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to delete booking',
-    };
-  }
-}
-
-
 
 /** Public entry verification — single booking by id (no list dump). */
 export async function getBookingForVerification(bookingId: string) {

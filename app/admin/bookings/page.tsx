@@ -13,7 +13,6 @@ import { BookingViewModal } from "@/components/admin/bookings/BookingViewModal";
 import { BookingCancelModal } from "@/components/admin/bookings/BookingCancelModal";
 import type { StaffRefundChoice } from "@/lib/staff-refund-plan";
 import { RecordPaymentModal } from "@/components/admin/bookings/RecordPaymentModal";
-import { BookingDeleteModal } from "@/components/admin/bookings/BookingDeleteModal";
 import { BookingRangeModal } from "@/components/admin/bookings/BookingRangeModal";
 import { BookingFiltersBar } from "@/components/admin/bookings/BookingFiltersBar";
 import { BookingTableFooter } from "@/components/admin/bookings/BookingTableFooter";
@@ -29,7 +28,6 @@ import {
   useBookingExtensionAvailability,
 } from "@/lib/tanstack/hooks/queries";
 import {
-  useDeleteBookingMutation,
   useExtendBookingMutation,
   useUpdateBookingMutation,
 } from "@/lib/tanstack/hooks/mutations";
@@ -57,9 +55,6 @@ export default function BookingsPage() {
   );
   const [isCancelling, setIsCancelling] = useState(false);
   const [payingBooking, setPayingBooking] = useState<Booking | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [updatingStatusBookingId, setUpdatingStatusBookingId] = useState<
     string | null
   >(null);
@@ -114,7 +109,6 @@ export default function BookingsPage() {
   const totalCount = bookingsQuery.data?.totalCount ?? 0;
 
   const updateBookingMutation = useUpdateBookingMutation();
-  const deleteBookingMutation = useDeleteBookingMutation();
   const extendBookingMutation = useExtendBookingMutation();
 
   const extensionQuery = useBookingExtensionAvailability(
@@ -224,34 +218,6 @@ export default function BookingsPage() {
       );
     } finally {
       setIsCancelling(false);
-    }
-  };
-
-  const handleDeleteBooking = (booking: Booking) => {
-    setDeletingBooking(booking);
-    setShowDeleteModal(true);
-  };
-
-  const confirmDeleteBooking = async () => {
-    if (!deletingBooking) return;
-
-    setIsDeleting(true);
-    try {
-      const result = await deleteBookingMutation.mutateAsync(
-        deletingBooking._id,
-      );
-      if (result.success) {
-        setShowDeleteModal(false);
-        setDeletingBooking(null);
-      } else {
-        message.error(result.error || "Failed to delete booking");
-      }
-    } catch (error: unknown) {
-      message.error(
-        error instanceof Error ? error.message : "An error occurred",
-      );
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -370,16 +336,14 @@ export default function BookingsPage() {
         sortColumn,
         sortDirection,
         updatingStatusBookingId,
-        isSuperAdmin,
         onStatusChange: handleStatusChange,
         onView: handleViewBooking,
         onEdit: handleEditBooking,
         onCancel: handleCancelBooking,
-        onDelete: handleDeleteBooking,
         onRecordPayment: setPayingBooking,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sortColumn, sortDirection, updatingStatusBookingId, isSuperAdmin],
+    [sortColumn, sortDirection, updatingStatusBookingId],
   );
 
   if (!isAdmin) {
@@ -486,17 +450,6 @@ export default function BookingsPage() {
           setCancellingBooking(null);
         }}
         onConfirm={confirmCancelBooking}
-      />
-
-      <BookingDeleteModal
-        booking={deletingBooking}
-        open={showDeleteModal}
-        isDeleting={isDeleting}
-        onClose={() => {
-          setShowDeleteModal(false);
-          setDeletingBooking(null);
-        }}
-        onConfirm={confirmDeleteBooking}
       />
 
       <BookingRangeModal

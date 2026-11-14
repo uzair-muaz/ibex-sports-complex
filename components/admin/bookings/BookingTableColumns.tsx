@@ -7,7 +7,6 @@ import { Button, Select, Space, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
   CloseOutlined,
-  DeleteOutlined,
   EditOutlined,
   EyeOutlined,
   WalletOutlined,
@@ -28,12 +27,10 @@ export type BookingTableColumnHandlers = {
   sortColumn: SortColumn | null;
   sortDirection: "asc" | "desc";
   updatingStatusBookingId: string | null;
-  isSuperAdmin: boolean;
   onStatusChange: (bookingId: string, status: Booking["status"]) => void;
   onView: (booking: Booking) => void;
   onEdit: (booking: Booking) => void;
   onCancel: (booking: Booking) => void;
-  onDelete: (booking: Booking) => void;
   onRecordPayment: (booking: Booking) => void;
 };
 
@@ -44,12 +41,10 @@ export function getBookingTableColumns(
     sortColumn,
     sortDirection,
     updatingStatusBookingId,
-    isSuperAdmin,
     onStatusChange,
     onView,
     onEdit,
     onCancel,
-    onDelete,
     onRecordPayment,
   } = handlers;
 
@@ -228,15 +223,6 @@ export function getBookingTableColumns(
               icon={<CloseOutlined />}
               onClick={() => onCancel(booking)}
               title="Cancel Booking"
-            />
-          )}
-          {isSuperAdmin && (
-            <Button
-              type="text"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => onDelete(booking)}
-              title="Delete"
             />
           )}
         </Space>

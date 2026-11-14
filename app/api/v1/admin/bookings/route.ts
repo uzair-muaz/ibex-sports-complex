@@ -7,7 +7,6 @@ import {
   rebuildAnalyticsRollup,
   createBooking,
   updateBooking,
-  deleteBooking,
   extendBooking,
   recordBookingPayment,
   checkBookingExtensionAvailability,
@@ -158,18 +157,6 @@ export async function PATCH(request: Request) {
 
   const body = (await request.json()) as UpdateBookingInput;
   const result = await updateBooking(body, staffOpts);
-  if (!result.success) return bffError(result.error || "Failed", 400, request);
-  return bffOk(result, request);
-}
-
-export async function DELETE(request: Request) {
-  const gate = await requireBffAdmin(request);
-  if (!gate.ok) return gate.response;
-  const staffOpts = createTrustedApiActor(gate.user);
-
-  const { searchParams } = new URL(request.url);
-  const bookingId = searchParams.get("bookingId") || "";
-  const result = await deleteBooking(bookingId, staffOpts);
   if (!result.success) return bffError(result.error || "Failed", 400, request);
   return bffOk(result, request);
 }

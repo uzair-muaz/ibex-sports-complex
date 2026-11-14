@@ -124,13 +124,6 @@ export async function requestRecordBookingPayment(input: {
   });
 }
 
-export async function requestDeleteBooking(bookingId: string) {
-  return bffFetch<ActionResult>(
-    `/api/v1/admin/bookings?bookingId=${encodeURIComponent(bookingId)}`,
-    { method: "DELETE" },
-  );
-}
-
 export async function requestExtendBooking(input: ExtendBookingInput) {
   return bffFetch<ActionResult<{ booking?: Booking }>>("/api/v1/admin/bookings", {
     method: "POST",

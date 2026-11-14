@@ -781,20 +781,6 @@ export function getOpenApiDocument(baseUrl?: string) {
           security: [{ bearerAuth: [] }, { cookieAuth: [] }],
           responses: { "200": { description: "OK" } },
         },
-        delete: {
-          tags: ["Admin"],
-          summary: "Delete a booking",
-          security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-          parameters: [
-            {
-              name: "bookingId",
-              in: "query",
-              required: true,
-              schema: { type: "string" },
-            },
-          ],
-          responses: { "200": { description: "OK" } },
-        },
       },
       "/api/v1/admin/courts": {
         get: {
