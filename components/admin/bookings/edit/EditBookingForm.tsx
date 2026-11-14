@@ -176,7 +176,11 @@ export function EditBookingForm({
           Payment Details
         </Title>
 
-        <Form.Item label="Payment received" className="mb-0">
+        <Form.Item
+          label="Payment received"
+          className="mb-0"
+          extra="Only change these to fix a mistake. To add a new payment (for example the rest paid at the venue), use the Record payment button (wallet icon) on the Bookings list."
+        >
           <div className="grid grid-cols-1 gap-4 rounded-lg border border-[var(--ant-color-border)] bg-[var(--ant-color-bg-container)] p-4 sm:grid-cols-2">
             <Form.Item
               label="Received online (PKR)"

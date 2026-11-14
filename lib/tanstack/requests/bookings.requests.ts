@@ -112,6 +112,18 @@ export async function requestUpdateBooking(input: UpdateBookingInput) {
   });
 }
 
+export async function requestRecordBookingPayment(input: {
+  bookingId: string;
+  amount: number;
+  method: "cash" | "bank";
+  note?: string;
+}) {
+  return bffFetch<ActionResult<{ booking?: Booking }>>("/api/v1/admin/bookings", {
+    method: "POST",
+    body: JSON.stringify({ action: "record-payment", ...input }),
+  });
+}
+
 export async function requestDeleteBooking(bookingId: string) {
   return bffFetch<ActionResult>(
     `/api/v1/admin/bookings?bookingId=${encodeURIComponent(bookingId)}`,

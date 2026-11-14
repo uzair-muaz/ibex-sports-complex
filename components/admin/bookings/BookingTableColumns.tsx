@@ -10,7 +10,9 @@ import {
   DeleteOutlined,
   EditOutlined,
   EyeOutlined,
+  WalletOutlined,
 } from "@ant-design/icons";
+import { stillToPay } from "@/lib/venue-payments-rules";
 import type { Booking } from "@/types";
 import { formatDisplayDate } from "@/lib/utils";
 import {
@@ -32,6 +34,7 @@ export type BookingTableColumnHandlers = {
   onEdit: (booking: Booking) => void;
   onCancel: (booking: Booking) => void;
   onDelete: (booking: Booking) => void;
+  onRecordPayment: (booking: Booking) => void;
 };
 
 export function getBookingTableColumns(
@@ -47,6 +50,7 @@ export function getBookingTableColumns(
     onEdit,
     onCancel,
     onDelete,
+    onRecordPayment,
   } = handlers;
 
   const getSortOrder = (column: SortColumn) => {
@@ -191,10 +195,19 @@ export function getBookingTableColumns(
       title: "Actions",
       key: "actions",
       align: "right",
-      minWidth: 140,
+      minWidth: 180,
       fixed: "right",
       render: (_, booking) => (
         <Space size="small">
+          {booking.status !== "cancelled" && stillToPay(booking) > 0 && (
+            <Button
+              type="text"
+              icon={<WalletOutlined />}
+              className="text-[#2DD4BF]!"
+              onClick={() => onRecordPayment(booking)}
+              title={`Record payment (PKR ${stillToPay(booking).toLocaleString()} still to pay)`}
+            />
+          )}
           <Button
             type="text"
             icon={<EyeOutlined />}

@@ -12,6 +12,7 @@ import { AdminTableSkeleton } from "@/components/admin/loaders";
 import { BookingViewModal } from "@/components/admin/bookings/BookingViewModal";
 import { BookingCancelModal } from "@/components/admin/bookings/BookingCancelModal";
 import type { StaffRefundChoice } from "@/lib/staff-refund-plan";
+import { RecordPaymentModal } from "@/components/admin/bookings/RecordPaymentModal";
 import { BookingDeleteModal } from "@/components/admin/bookings/BookingDeleteModal";
 import { BookingRangeModal } from "@/components/admin/bookings/BookingRangeModal";
 import { BookingFiltersBar } from "@/components/admin/bookings/BookingFiltersBar";
@@ -55,6 +56,7 @@ export default function BookingsPage() {
     null,
   );
   const [isCancelling, setIsCancelling] = useState(false);
+  const [payingBooking, setPayingBooking] = useState<Booking | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -374,6 +376,7 @@ export default function BookingsPage() {
         onEdit: handleEditBooking,
         onCancel: handleCancelBooking,
         onDelete: handleDeleteBooking,
+        onRecordPayment: setPayingBooking,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sortColumn, sortDirection, updatingStatusBookingId, isSuperAdmin],
@@ -460,6 +463,17 @@ export default function BookingsPage() {
         extendingOption={extendingOption}
         onCheckExtensionAvailability={handleCheckExtensionAvailability}
         onExtendBooking={handleExtendBooking}
+        onRecordPayment={setPayingBooking}
+      />
+
+      <RecordPaymentModal
+        key={`pay-${payingBooking?._id ?? "none"}`}
+        booking={payingBooking}
+        open={!!payingBooking}
+        onClose={() => setPayingBooking(null)}
+        onSaved={(saved) =>
+          setViewingBooking((prev) => (prev && prev._id === saved._id ? { ...prev, ...saved } : prev))
+        }
       />
 
       <BookingCancelModal

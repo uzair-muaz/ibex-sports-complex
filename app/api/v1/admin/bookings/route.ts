@@ -9,6 +9,7 @@ import {
   updateBooking,
   deleteBooking,
   extendBooking,
+  recordBookingPayment,
   checkBookingExtensionAvailability,
   getAvailableStartTimes,
   type CreateBookingInput,
@@ -123,6 +124,15 @@ export async function POST(request: Request) {
 
   if (action === "extend") {
     const result = await extendBooking(body as ExtendBookingInput, staffOpts);
+    if (!result.success) return bffError(result.error || "Failed", 400, request);
+    return bffOk(result, request);
+  }
+
+  if (action === "record-payment") {
+    const result = await recordBookingPayment(
+      { bookingId: body?.bookingId, amount: body?.amount, method: body?.method, note: body?.note },
+      staffOpts,
+    );
     if (!result.success) return bffError(result.error || "Failed", 400, request);
     return bffOk(result, request);
   }

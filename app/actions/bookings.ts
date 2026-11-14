@@ -2,6 +2,7 @@
 
 import { closureSpansByCourt } from "@/lib/closures";
 import { auditBooking, bookingSnap } from "@/lib/audit-booking";
+import { recordVenuePayment } from "@/lib/venue-payments";
 import { isBookingBlocked } from "@/lib/customer-block";
 import { BLOCKED_MESSAGE } from "@/lib/customer-block-rules";
 import mongoose from 'mongoose';
@@ -1019,6 +1020,31 @@ export async function cancelBooking(
     const error = caught as Error;
     console.error('Cancel booking error:', error);
     return { success: false, error: error.message || 'Failed to cancel booking' };
+  }
+}
+
+/** Staff: record a payment the customer made after booking (e.g. the rest at the venue). */
+export async function recordBookingPayment(
+  input: { bookingId: string; amount: unknown; method: unknown; note?: unknown },
+  opts?: StaffActorOpts,
+) {
+  try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error };
+    await connectDB();
+    const auditBefore = await bookingSnap(input.bookingId);
+    const result = await recordVenuePayment({ ...input, staffId: gate.userId });
+    if (!result.ok) return { success: false, error: result.error };
+    const how = input.method === "cash" ? "cash" : "bank transfer";
+    await auditBooking(gate, input.bookingId, "update", auditBefore, ` — recorded payment PKR ${Math.round(Number(input.amount)).toLocaleString()} (${how})`);
+    safeRevalidatePath('/admin');
+    safeRevalidatePath('/account/bookings');
+    const booking = await Booking.findById(input.bookingId).lean();
+    if (booking) scheduleAnalyticsDailyRebuild([booking.date]);
+    return { success: true, booking: JSON.parse(JSON.stringify(booking)) };
+  } catch (caught) {
+    console.error('Record payment error:', caught);
+    return { success: false, error: 'Could not save the payment. Please try again.' };
   }
 }
 
