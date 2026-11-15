@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMyLoyalty } from "@/lib/tanstack/hooks/queries";
+import { useBookingPolicy, useMyLoyalty } from "@/lib/tanstack/hooks/queries";
+import { GetTheApp } from "@/components/GetTheApp";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 export default function RewardsPage() {
   const loyaltyQuery = useMyLoyalty();
+  // App first (App Settings): points are earned and used only in the app.
+  const pointsAppOnly = !!useBookingPolicy().data?.appFirst?.pointsAppOnly;
   const summary = loyaltyQuery.data
     ? {
         balance: loyaltyQuery.data.balance,
@@ -74,6 +77,16 @@ export default function RewardsPage() {
         </div>
       </div>
 
+      {pointsAppOnly ? (
+        <div className="space-y-3 rounded-3xl border border-[#2DD4BF]/30 bg-[#2DD4BF]/10 p-6">
+          <h3 className="font-semibold text-white">Points are an app benefit</h3>
+          <p className="text-sm text-zinc-300">
+            Bookings made in the IBEX app earn points, and you can use your {summary.balance} points for discounts in
+            the app. Website bookings don&apos;t earn points.
+          </p>
+          <GetTheApp compact text="Sign in with the same account and your points are already there." />
+        </div>
+      ) : (
       <div className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-zinc-900/60 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="font-semibold text-white">Redeem at checkout</h3>
@@ -90,6 +103,7 @@ export default function RewardsPage() {
           <Link href="/booking">Book a court</Link>
         </Button>
       </div>
+      )}
 
       <div className="rounded-3xl border border-white/10 bg-zinc-900/60 p-6">
         <h3 className="mb-4 font-semibold text-white">Recent activity</h3>

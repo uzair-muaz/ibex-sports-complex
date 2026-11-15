@@ -29,11 +29,21 @@ export function usePaymentInstructionsQuery(options?: { enabled?: boolean }) {
   });
 }
 
+/** App Settings → App first, as the public policy endpoint gives it. */
+export type PublicAppFirst = {
+  pointsAppOnly: boolean;
+  /** Days the website can book ahead (null = no website limit). */
+  websiteBookingWindowDays: number | null;
+  playStoreUrl: string | null;
+  appStoreUrl: string | null;
+};
+
 /** cancellationNoticeMinutes: customers can cancel until this many minutes before the start. */
 export function useBookingPolicyQuery() {
   return useQuery({
     queryKey: ["public", "booking-policy"],
-    queryFn: () => getJson<{ cancellationNoticeMinutes: number }>("/api/v1/booking-policy"),
-    staleTime: 5 * 60_000,
+    queryFn: () =>
+      getJson<{ cancellationNoticeMinutes: number; appFirst?: PublicAppFirst }>("/api/v1/booking-policy"),
+    staleTime: 60_000,
   });
 }

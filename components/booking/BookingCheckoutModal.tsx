@@ -35,6 +35,8 @@ type BookingCheckoutModalProps = {
   maxLoyaltyRedeem: number;
   useLoyalty: boolean;
   loyaltyPointsToRedeem: number;
+  /** Points are an app benefit (App Settings → App first): show a nudge instead. */
+  pointsAppOnly?: boolean;
   /** PKR value of 1 point (Admin → App Settings). Default 1. */
   pkrPerPoint?: number;
   hasMembership: boolean;
@@ -79,6 +81,7 @@ export function BookingCheckoutModal({
   useLoyalty,
   loyaltyPointsToRedeem,
   pkrPerPoint = 1,
+  pointsAppOnly = false,
   hasMembership,
   membershipHoursRemaining,
   membershipHoursUsed,
@@ -104,7 +107,7 @@ export function BookingCheckoutModal({
     (selectedQuote?.totalPrice || 0) -
       (appliedPromo?.discount ?? 0) -
       (useMembershipHours ? membershipDiscount : 0) -
-      (useLoyalty ? Math.floor(loyaltyPointsToRedeem * pkrPerPoint) : 0),
+      (useLoyalty && !pointsAppOnly ? Math.floor(loyaltyPointsToRedeem * pkrPerPoint) : 0),
   );
 
   const showIdentityChooser = !isLoggedIn && identityStep === "choose";
@@ -343,6 +346,13 @@ export function BookingCheckoutModal({
                         />
                       ) : null}
                     </div>
+                  ) : null}
+
+                  {pointsAppOnly ? (
+                    <p className="rounded-xl border border-[#2DD4BF]/25 bg-[#2DD4BF]/10 p-3 text-sm text-zinc-200">
+                      Reward points are an app benefit. Book in the IBEX app to earn points on every booking and use
+                      them for discounts.
+                    </p>
                   ) : null}
 
                   <div className="space-y-1.5">

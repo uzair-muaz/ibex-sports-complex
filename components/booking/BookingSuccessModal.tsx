@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BankDetails } from "@/components/booking/BankDetails";
+import { GetTheApp } from "@/components/GetTheApp";
 import { usePaymentInstructions } from "@/lib/tanstack/hooks/queries";
 import { formatTime12 } from "@/lib/utils";
 import { advanceFor, webBookingReference } from "@/lib/web-booking-labels";
@@ -145,6 +146,8 @@ export function BookingSuccessModal({
                   )}
                 </div>
               ) : null}
+
+              <GetTheApp compact text="Next time, book in the app: upload your payment in one tap and get match reminders." />
 
               <Button variant="outline" className="w-full border-white/15" onClick={onDone}>
                 {confirmed ? "Done" : "I'll pay later"}

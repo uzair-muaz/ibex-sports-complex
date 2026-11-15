@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useMyBookings } from "@/lib/tanstack/hooks/queries";
 import { StatusPill } from "@/components/account/StatusPill";
+import { GetTheApp } from "@/components/GetTheApp";
 import { BOOKING_STATUS_LABEL, PAYMENT_STATUS_LABEL } from "@/lib/web-booking-labels";
 import type { MobileBooking } from "@/lib/api/booking-view";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ export default function MyBookingsPage() {
 
   return (
     <div className="space-y-6">
+      <GetTheApp text="Get a notification when your payment is verified, and a reminder before every match." />
       <div className="inline-flex gap-1 rounded-2xl border border-white/10 bg-zinc-950/80 p-1">
         {(
           [

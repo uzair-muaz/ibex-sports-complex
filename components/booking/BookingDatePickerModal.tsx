@@ -11,6 +11,10 @@ type BookingDatePickerModalProps = {
   calendarDays: Array<Date | null>;
   selectedDate: Date;
   minSelectableDateKey: string;
+  /** Last day the website can book (App Settings → App first), or null for no limit. */
+  maxSelectableDateKey?: string | null;
+  /** Shown under the calendar, e.g. why later days are greyed out. */
+  note?: React.ReactNode;
   onSelectDate: (date: Date) => void;
 };
 
@@ -23,6 +27,8 @@ export function BookingDatePickerModal({
   calendarDays,
   selectedDate,
   minSelectableDateKey,
+  maxSelectableDateKey,
+  note,
   onSelectDate,
 }: BookingDatePickerModalProps) {
   return (
@@ -86,8 +92,10 @@ export function BookingDatePickerModal({
               {calendarDays.map((date, i) =>
                 (() => {
                   const isEmptyCell = !date;
+                  const key = date ? formatLocalDate(date) : "";
                   const isPastDate =
-                    !!date && formatLocalDate(date) < minSelectableDateKey;
+                    !!date &&
+                    (key < minSelectableDateKey || (!!maxSelectableDateKey && key > maxSelectableDateKey));
                   const isSelected =
                     !!date && date.toDateString() === selectedDate.toDateString();
                   return (
@@ -119,6 +127,7 @@ export function BookingDatePickerModal({
                 })(),
               )}
             </div>
+            {note ? <div className="mt-4 text-sm text-zinc-400">{note}</div> : null}
           </motion.div>
         </div>
       )}

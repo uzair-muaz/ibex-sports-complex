@@ -25,4 +25,4 @@ export {
 export { useVenueQuery as useVenue } from "./use-venue.query";
 export { useSportListQuery as useSportList, type SportOption } from "./use-sports.query";
 export { getQueryLoadingState } from "./use-query-loading-state";
-export { usePaymentInstructionsQuery as usePaymentInstructions, useBookingPolicyQuery as useBookingPolicy, type PaymentInstructions } from "./use-payment-info.queries";
+export { usePaymentInstructionsQuery as usePaymentInstructions, useBookingPolicyQuery as useBookingPolicy, type PaymentInstructions, type PublicAppFirst } from "./use-payment-info.queries";

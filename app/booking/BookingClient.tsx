@@ -41,10 +41,13 @@ import { useBookingAvailability } from "@/components/booking/hooks/useBookingAva
 import Link from "next/link";
 import { useCreatePublicBookingMutation } from "@/lib/tanstack/hooks/mutations";
 import {
+  useBookingPolicy,
   useMyLoyalty,
   useMyMembership,
   usePublicCourts,
 } from "@/lib/tanstack/hooks/queries";
+import { shiftDateKey } from "@/lib/date-time";
+import { GetTheApp } from "@/components/GetTheApp";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
 type CheckoutFormErrors = {
@@ -82,7 +85,7 @@ type CreatedBooking = {
 type SportBookingRules = {
   sport: CourtType;
   label?: string;
-  booking: { durationsMinutes: number[]; defaultDurationMinutes: number };
+  booking: { durationsMinutes: number[]; defaultDurationMinutes: number; bookingWindowDays?: number };
 };
 
 function durationLabel(minutes: number): string {
@@ -178,6 +181,10 @@ export default function BookingClient() {
   } | null>(null);
   const [promoChecking, setPromoChecking] = useState(false);
   const canQuickCheck = userRole === "admin" || userRole === "super_admin";
+  // App first (App Settings): points and far-ahead days are app benefits. Staff are never limited.
+  const appFirst = useBookingPolicy().data?.appFirst;
+  const pointsAppOnly = !!appFirst?.pointsAppOnly && !canQuickCheck;
+  const websiteDays = canQuickCheck ? null : (appFirst?.websiteBookingWindowDays ?? null);
 
   const courtsQuery = usePublicCourts();
   const createBookingMutation = useCreatePublicBookingMutation();
@@ -277,6 +284,13 @@ export default function BookingClient() {
   );
   const { todayBusinessKey, minSelectableDateKey, nowBusinessHourDecimal } =
     useBusinessTime(COMPLEX_OPENING_DATE);
+  const maxSelectableDateKey = websiteDays ? shiftDateKey(todayBusinessKey, websiteDays - 1) : null;
+  const appDays = selectedSportRules?.booking.bookingWindowDays ?? null;
+  const daysAheadText = websiteDays
+    ? `On the website you can book up to ${websiteDays} day${websiteDays === 1 ? "" : "s"} ahead${
+        appDays && appDays > websiteDays ? `; in the IBEX app, up to ${appDays} days` : ""
+      }.`
+    : null;
 
   const dateKeyToLocalDate = (key: string) => {
     const [y, m, d] = key.split("-").map(Number);
@@ -665,7 +679,7 @@ export default function BookingClient() {
         userEmail: email,
         userPhone: normalizedPhone,
         loyaltyPointsToRedeem:
-          isCustomerLoggedIn && useLoyalty ? loyaltyPointsToRedeem : undefined,
+          isCustomerLoggedIn && useLoyalty && !pointsAppOnly ? loyaltyPointsToRedeem : undefined,
         useMembershipHours:
           isCustomerLoggedIn && useMembershipHours && hasMembership ? true : undefined,
         promoCode: appliedPromo?.code,
@@ -734,6 +748,14 @@ export default function BookingClient() {
               </>
             ) : null}
           </div>
+
+          <GetTheApp
+            className="mb-6"
+            text={[
+              pointsAppOnly ? "Earn and use reward points on every booking." : "Track your bookings and get match reminders.",
+              daysAheadText && appDays ? `Book up to ${appDays} days ahead.` : "",
+            ].filter(Boolean).join(" ")}
+          />
 
           {/* Date trigger */}
           <div className="mb-6 flex flex-col lg:flex-row gap-3">
@@ -1099,6 +1121,8 @@ export default function BookingClient() {
         calendarDays={calendarDays}
         selectedDate={selectedDate}
         minSelectableDateKey={minSelectableDateKey}
+        maxSelectableDateKey={maxSelectableDateKey}
+        note={daysAheadText}
         onSelectDate={(date) => {
           setSelectedDate(date);
           setSelectedQuote(null);
@@ -1119,7 +1143,8 @@ export default function BookingClient() {
         isLoggedIn={isCustomerLoggedIn}
         identityStep={checkoutIdentityStep}
         loyaltyBalance={loyaltyBalance}
-        maxLoyaltyRedeem={maxLoyaltyRedeem}
+        maxLoyaltyRedeem={pointsAppOnly ? 0 : maxLoyaltyRedeem}
+        pointsAppOnly={pointsAppOnly}
         useLoyalty={useLoyalty}
         loyaltyPointsToRedeem={loyaltyPointsToRedeem}
         pkrPerPoint={loyaltyQuery.data?.rules?.pkrPerPoint ?? 1}
