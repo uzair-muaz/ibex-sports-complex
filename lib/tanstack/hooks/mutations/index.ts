@@ -18,6 +18,7 @@ export {
   useSetMyPasswordMutation,
   useClaimBookingsMutation,
   useCancelMyBookingMutation,
+  useUploadPaymentProofMutation,
   useCreateSupportTicketMutation,
   useReplySupportTicketMutation,
 } from "./use-account.mutations";

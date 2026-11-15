@@ -1166,6 +1166,7 @@ export default function BookingClient() {
         createdBooking={createdBooking}
         selectedQuote={selectedQuote}
         advancePercent={advancePercent}
+        isLoggedIn={isCustomerLoggedIn}
         onDone={resetAfterSuccess}
       />
 
