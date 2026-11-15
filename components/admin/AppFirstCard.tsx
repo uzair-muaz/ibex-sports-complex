@@ -23,7 +23,7 @@ export function AppFirstCard({
         type={anyOn ? "warning" : "info"}
         showIcon
         style={{ marginBottom: 16 }}
-        message={anyOn ? "Some app-only rules are ON for customers now." : "All app-only rules are off."}
+        title={anyOn ? "Some app-only rules are ON for customers now." : "All app-only rules are off."}
         description={
           <ol style={{ margin: 0, paddingLeft: 18 }}>
             <li>Launch day: first make sure the app is live on BOTH the Play Store and the App Store.</li>
@@ -61,7 +61,7 @@ export function AppFirstCard({
               max={365}
               value={value.websiteBookingWindowDays}
               onChange={(v) => typeof v === "number" && onChange({ websiteBookingWindowDays: Math.round(v) })}
-              addonAfter="days"
+              suffix="days"
             />
           </div>
         </Form.Item>

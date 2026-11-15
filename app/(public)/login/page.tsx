@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BLOCKED_MESSAGE } from "@/lib/customer-block-rules";
+import { useBookingPolicy } from "@/lib/tanstack/hooks/queries";
 import { Loader2 } from "lucide-react";
 import { registerCustomerRequest } from "@/lib/tanstack/requests/auth.requests";
 import {
@@ -40,6 +41,8 @@ function GoogleIcon({ className }: { className?: string }) {
 }
 
 function LoginContent() {
+  // App first: when points are app-only, the website doesn't promise rewards.
+  const pointsAppOnly = !!useBookingPolicy().data?.appFirst?.pointsAppOnly;
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -151,8 +154,12 @@ function LoginContent() {
       title={mode === "signin" ? "Welcome back" : "Join IBEX"}
       description={
         mode === "signin"
-          ? "Sign in to track bookings, earn rewards, and manage your membership."
-          : "Create an account to save bookings and unlock loyalty rewards."
+          ? pointsAppOnly
+            ? "Sign in to track bookings and manage your membership."
+            : "Sign in to track bookings, earn rewards, and manage your membership."
+          : pointsAppOnly
+            ? "Create an account to save and track your bookings."
+            : "Create an account to save bookings and unlock loyalty rewards."
       }
     >
       <div className="mb-8">
