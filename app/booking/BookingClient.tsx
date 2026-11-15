@@ -743,7 +743,7 @@ export default function BookingClient() {
                 >
                   Sign in
                 </Link>{" "}
-                to track bookings and earn rewards — or continue as guest at
+                to track bookings{pointsAppOnly ? "" : " and earn rewards"} — or continue as guest at
                 checkout.
               </>
             ) : null}

@@ -148,7 +148,7 @@ export function BookingCheckoutModal({
               <div className="space-y-3 pt-1">
                 <p className="text-sm text-zinc-400">
                   Guests can book instantly. Sign in or create an account to
-                  track bookings and earn rewards.
+                  track bookings{pointsAppOnly ? "" : " and earn rewards"}.
                 </p>
                 <button
                   type="button"
@@ -195,7 +195,7 @@ export function BookingCheckoutModal({
                       Create an account
                     </span>
                     <span className="mt-0.5 block text-xs text-zinc-400">
-                      Save bookings and unlock loyalty rewards
+                      {pointsAppOnly ? "Save and track your bookings" : "Save bookings and unlock loyalty rewards"}
                     </span>
                   </span>
                 </Link>
