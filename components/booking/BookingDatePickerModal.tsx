@@ -81,9 +81,9 @@ export function BookingDatePickerModal({
               </button>
             </div>
             <div className="grid grid-cols-7 gap-2 mb-4">
-              {["S", "M", "T", "W", "T", "F", "S"].map((d) => (
+              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
                 <div
-                  key={d}
+                  key={i}
                   className="text-center text-[10px] font-black text-zinc-700 py-2"
                 >
                   {d}

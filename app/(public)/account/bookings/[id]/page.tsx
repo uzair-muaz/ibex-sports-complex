@@ -153,6 +153,7 @@ function CancelSection({ booking }: { booking: MobileBooking }) {
         month: "short",
         hour: "numeric",
         minute: "2-digit",
+        hour12: true,
       })
     : null;
   const pv = preview.data;
