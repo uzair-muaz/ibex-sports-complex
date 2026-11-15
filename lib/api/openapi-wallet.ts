@@ -73,7 +73,7 @@ export const walletPaths = {
       tags: ["Account"],
       summary: "My IBEX wallet: balance and history",
       description:
-        "Credit comes from cancelled bookings (money paid + wallet used). Use it with `useWallet: true` on POST /bookings/quote and POST /bookings. Wallet credit is never paid out in the app; customers ask staff at the desk. History is newest first; amount is + money in, − money out. type: refund | spent | adjustment.",
+        "Credit comes from cancelled bookings (money paid + wallet used). Use it with `useWallet: true` on POST /bookings/quote and POST /bookings. Wallet credit can only be used on bookings; it is never paid out to a bank or in cash. History is newest first; amount is + money in, − money out. type: refund | spent | adjustment.",
       security: [{ bearerAuth: [] }, { cookieAuth: [] }],
       parameters: [
         { name: "cursor", in: "query", schema: { type: "string" }, description: "nextCursor from the previous page" },

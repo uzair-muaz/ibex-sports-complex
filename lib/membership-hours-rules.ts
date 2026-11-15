@@ -5,7 +5,6 @@ export type HoursReasonCode =
   | "SPORT_NOT_INCLUDED"
   | "NO_HOURS_LEFT"
   | "WEEKDAYS_ONLY"
-  | "TOO_SOON"
   | "EXPIRES_BEFORE_BOOKING";
 
 export const HOURS_REASON_TEXT: Record<HoursReasonCode, string> = {
@@ -13,7 +12,6 @@ export const HOURS_REASON_TEXT: Record<HoursReasonCode, string> = {
   SPORT_NOT_INCLUDED: "Your membership has no hours for this sport.",
   NO_HOURS_LEFT: "You have no hours left for this sport.",
   WEEKDAYS_ONLY: "Your membership can only be used on weekdays (Mon–Fri).",
-  TOO_SOON: "Membership hours need to be booked further ahead for this day.",
   EXPIRES_BEFORE_BOOKING: "Your membership ends before this booking.",
 };
 

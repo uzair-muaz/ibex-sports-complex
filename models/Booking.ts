@@ -10,6 +10,15 @@ export interface IAppliedDiscount {
   amountSaved: number; // Actual PKR amount saved by this discount
 }
 
+/** One payment staff recorded with "Record payment" on the bookings screen. */
+export interface IVenuePayment {
+  amount: number;
+  method: 'cash' | 'bank';
+  note?: string | null;
+  receivedAt: Date;
+  staffId: mongoose.Types.ObjectId;
+}
+
 export interface IBooking extends Document {
   courtId: mongoose.Types.ObjectId;
   date: string; // YYYY-MM-DD
@@ -42,6 +51,8 @@ export interface IBooking extends Document {
   amountPaid: number; // Total received (online + cash), kept for backward compatibility
   amountReceivedOnline?: number; // Payment received online (e.g. bank transfer)
   amountReceivedCash?: number; // Payment received in cash at venue
+  /** Payments staff recorded after the booking (e.g. the rest paid at the venue). One entry each. */
+  venuePayments?: IVenuePayment[];
   /** Mobile app: where the booking came from ("web" when missing). */
   source?: 'web' | 'app';
   /** Mobile app: advance the customer must pay (whole PKR) and the % used. */
@@ -221,6 +232,21 @@ const BookingSchema: Schema = new Schema(
       type: Number,
       default: 0,
       min: 0,
+    },
+    venuePayments: {
+      type: [
+        new Schema(
+          {
+            amount: { type: Number, required: true, min: 1 },
+            method: { type: String, enum: ['cash', 'bank'], required: true },
+            note: { type: String, default: null },
+            receivedAt: { type: Date, required: true },
+            staffId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+          },
+          { _id: true },
+        ),
+      ],
+      default: undefined,
     },
     source: {
       type: String,

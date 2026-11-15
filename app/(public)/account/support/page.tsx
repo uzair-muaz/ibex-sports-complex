@@ -2,15 +2,13 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  useCreateSupportTicketMutation,
-  useReplySupportTicketMutation,
-} from "@/lib/tanstack/hooks/mutations";
-import { useMySupportTickets } from "@/lib/tanstack/hooks/queries";
+import { useReplySupportTicketMutation } from "@/lib/tanstack/hooks/mutations";
+import { useMySupportTickets, useVenue } from "@/lib/tanstack/hooks/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { GetTheApp } from "@/components/GetTheApp";
+import { telHref, waHref } from "@/lib/venue-rules";
+import { Loader2, Mail, MessageCircle, Phone } from "lucide-react";
 import { toast } from "sonner";
 
 /** Shown only if the FAQs can't be loaded. The real ones come from /api/v1/content/faqs. */
@@ -21,7 +19,7 @@ const FALLBACK_FAQS = [
   },
   {
     question: "Need help?",
-    answer: "Open a ticket below and our team will get back to you.",
+    answer: "Message us on WhatsApp or call the venue using the buttons below.",
   },
 ];
 
@@ -39,8 +37,10 @@ export default function SupportPage() {
     staleTime: 5 * 60_000,
   });
   const faqs = faqsQuery.data?.length ? faqsQuery.data : faqsQuery.isError ? FALLBACK_FAQS : [];
-  const createTicket = useCreateSupportTicketMutation();
   const replyTicket = useReplySupportTicketMutation();
+  // Contacts from Admin → App Settings (same as the app's Support screen).
+  const venue = useVenue();
+  const whatsApp = waHref(venue.whatsApp);
   const tickets = (ticketsQuery.data?.tickets ?? []) as Array<{
     _id: string;
     topic: string;
@@ -48,20 +48,7 @@ export default function SupportPage() {
     messages?: Array<{ authorType: string; body: string }>;
   }>;
 
-  const [topic, setTopic] = useState("");
-  const [message, setMessage] = useState("");
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
-
-  const onCreate = async () => {
-    try {
-      await createTicket.mutateAsync({ topic, message });
-      setTopic("");
-      setMessage("");
-      toast.success("Ticket submitted");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
-    }
-  };
 
   const onReply = async (ticketId: string) => {
     const body = replyDrafts[ticketId]?.trim();
@@ -97,45 +84,32 @@ export default function SupportPage() {
       </div>
 
       <div className="rounded-3xl border border-white/10 bg-zinc-900/60 p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-white">New ticket</h2>
-        <div className="space-y-2">
-          <Label htmlFor="topic">Topic</Label>
-          <Input
-            id="topic"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            className="bg-zinc-950 border-white/10"
-            placeholder="Booking issue, membership, other…"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="message">Message</Label>
-          <textarea
-            id="message"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={4}
-            className="w-full rounded-md border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white"
-          />
-        </div>
-        <Button
-          onClick={onCreate}
-          disabled={createTicket.isPending}
-          className="rounded-xl bg-[#2DD4BF] text-[#0F172A] font-semibold"
-        >
-          {createTicket.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        <h2 className="text-lg font-semibold text-white">Contact us</h2>
+        <p className="text-sm text-zinc-400">Message or call the venue. We usually reply on WhatsApp within the hour.</p>
+        <div className="flex flex-wrap gap-2">
+          {whatsApp ? (
+            <a href={whatsApp} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#2DD4BF] px-4 text-sm font-semibold text-[#0F172A] hover:bg-[#14B8A6]">
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </a>
           ) : null}
-          Submit
-        </Button>
+          {venue.phone ? (
+            <a href={telHref(venue.phone)} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 px-4 text-sm font-semibold text-white hover:border-[#2DD4BF]/50">
+              <Phone className="h-4 w-4" /> Call {venue.phone}
+            </a>
+          ) : null}
+          {venue.email ? (
+            <a href={`mailto:${venue.email}`} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 px-4 text-sm font-semibold text-white hover:border-[#2DD4BF]/50">
+              <Mail className="h-4 w-4" /> Email
+            </a>
+          ) : null}
+        </div>
+        <GetTheApp compact text="Get booking updates, payment alerts and match reminders on your phone." />
       </div>
 
+      {tickets.length === 0 ? null : (
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-white">Your tickets</h2>
-        {tickets.length === 0 ? (
-          <p className="text-sm text-zinc-400">No tickets yet.</p>
-        ) : (
-          tickets.map((t) => (
+        <h2 className="text-lg font-semibold text-white">Your earlier tickets</h2>
+        {tickets.map((t) => (
             <div
               key={t._id}
               className="rounded-2xl border border-white/10 bg-zinc-950/40 p-5 space-y-3"
@@ -178,9 +152,9 @@ export default function SupportPage() {
                 </div>
               ) : null}
             </div>
-          ))
-        )}
+          ))}
       </div>
+      )}
     </div>
   );
 }

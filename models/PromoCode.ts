@@ -14,6 +14,8 @@ export interface IPromoCode extends Document {
   maxUses?: number | null;
   maxUsesPerCustomer: number;
   newCustomersOnly: boolean;
+  /** Only in the IBEX app (the website refuses it). */
+  appOnly: boolean;
   isActive: boolean;
   /** Uses on bookings that weren't cancelled. */
   usedCount: number;
@@ -36,6 +38,7 @@ const PromoCodeSchema = new Schema(
     maxUses: { type: Number, min: 1, default: null },
     maxUsesPerCustomer: { type: Number, min: 0, default: 1 },
     newCustomersOnly: { type: Boolean, default: false },
+    appOnly: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     usedCount: { type: Number, min: 0, default: 0 },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", default: null },

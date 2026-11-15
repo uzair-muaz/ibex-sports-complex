@@ -241,7 +241,9 @@ export async function submitAppProof(params: {
 }
 
 /**
- * Add verified money to a booking and confirm it once the advance is covered.
+ * Add verified money to a booking and confirm it. Any verified payment
+ * confirms the booking, even one smaller than the advance (staff have checked
+ * it; the rest is paid at the venue).
  * Each step is a single database update, so two staff clicking at once can't
  * double count.
  */
@@ -272,9 +274,7 @@ async function applyVerifiedAmount(
     }
     return updated;
   }
-  const advance = advanceFor(updated, minAdvancePercent);
-  const covered = (updated.amountReceivedOnline ?? 0) + (updated.walletCreditUsed ?? 0);
-  if (updated.status === "pending_payment" && covered >= advance) {
+  if (updated.status === "pending_payment" && amount > 0) {
     await Booking.updateOne({ _id: bookingId, status: "pending_payment" }, { $set: { status: "confirmed" } });
   }
   return updated;

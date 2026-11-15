@@ -3,6 +3,7 @@
 import { useSportList } from "@/lib/tanstack/hooks/queries";
 import React from "react";
 import {
+  Alert,
   Button,
   Checkbox,
   Form,
@@ -11,6 +12,7 @@ import {
   Modal,
   Select,
   Space,
+  Tag,
   Typography,
 } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
@@ -25,6 +27,7 @@ import {
 } from "./courtHelpers";
 import { COURT_FEATURE_LABELS } from "@/lib/court-features";
 import { priceUnit } from "@/lib/pricing-utils";
+import { checkPricingPeriods } from "@/lib/pricing-periods";
 import { priceUnitMinutesFor } from "@/lib/sport-rules";
 import { PhotoUpload } from "@/components/admin/PhotoUpload";
 
@@ -351,11 +354,19 @@ export function CourtFormModal({
                     </div>
                   );
                 })}
+                {(() => {
+                  const problem = checkPricingPeriods(courtForm.pricingPeriods);
+                  return problem ? (
+                    <Alert type="error" showIcon message={problem} />
+                  ) : (
+                    <Alert type="success" showIcon message="The times cover the whole day with no overlaps." />
+                  );
+                })()}
                 <Text type="secondary" className="text-[11px]">
-                  Periods must tile the full day (12:00 AM → 12:00 AM). Ranges
-                  can wrap past midnight (e.g. 10:00 PM – 2:00 AM for evening
-                  peak). Example: Off-peak 12:00 AM–5:00 PM, Peak 5:00 PM–12:00
-                  AM.
+                  Every hour of the day must be either peak or off-peak, never
+                  both. A time can run past midnight, e.g. Peak 6:00 PM – 12:00 AM
+                  (midnight). Example: Off-peak 12:00 AM – 6:00 PM, Peak 6:00 PM –
+                  12:00 AM. Note: 12:00 PM is noon, 12:00 AM is midnight.
                 </Text>
               </div>
             )}
@@ -420,33 +431,35 @@ export function CourtFormModal({
               </Space>
             </Form.Item>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Form.Item label="Features">
-              <Select
-                mode="multiple"
-                value={courtForm.featureKeys}
-                onChange={(v) =>
-                  setCourtForm({ ...courtForm, featureKeys: v as string[] })
-                }
-                options={FEATURE_OPTIONS}
-                placeholder="LED lighting, Benches…"
-              />
-            </Form.Item>
-            <Form.Item label="Main feature (highlight)">
-              <Select
-                allowClear
-                value={courtForm.highlightKey ?? undefined}
-                onChange={(v) =>
-                  setCourtForm({
-                    ...courtForm,
-                    highlightKey: (v as string | undefined) ?? null,
-                  })
-                }
-                options={FEATURE_OPTIONS}
-                placeholder="Match replay"
-              />
-            </Form.Item>
-          </div>
+          <Form.Item
+            label="Court features"
+            extra="Pick the most important one first: the app shows it as the main feature next to the Select Court button. The others show as small tags on the court card."
+          >
+            <Select
+              mode="multiple"
+              value={courtForm.featureKeys}
+              onChange={(v) =>
+                setCourtForm({ ...courtForm, featureKeys: v as string[] })
+              }
+              options={FEATURE_OPTIONS}
+              placeholder="Match replay, LED lighting, Benches…"
+              tagRender={({ label, value, closable, onClose }) => {
+                const isMain = courtForm.featureKeys[0] === value;
+                return (
+                  <Tag
+                    color={isMain ? "gold" : undefined}
+                    closable={closable}
+                    onClose={onClose}
+                    onMouseDown={(e) => e.preventDefault()}
+                    style={{ marginInlineEnd: 4 }}
+                  >
+                    {isMain ? "★ Main: " : ""}
+                    {label}
+                  </Tag>
+                );
+              }}
+            />
+          </Form.Item>
         </div>
 
         <Form.Item className="mb-0 mt-6">

@@ -57,6 +57,16 @@ export interface AppliedDiscount {
   amountSaved: number;
 }
 
+/** One payment staff recorded with "Record payment". */
+export interface VenuePayment {
+  _id: string;
+  amount: number;
+  method: "cash" | "bank";
+  note?: string | null;
+  receivedAt: string;
+  staffId: string;
+}
+
 export interface Booking {
   _id: string;
   courtId: string;
@@ -85,6 +95,8 @@ export interface Booking {
   walletCreditUsed?: number;
   amountReceivedOnline?: number;
   amountReceivedCash?: number;
+  /** Payments staff recorded after booking, newest last. */
+  venuePayments?: VenuePayment[];
   createdAt: string;
   updatedAt: string;
 }

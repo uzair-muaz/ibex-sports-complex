@@ -46,6 +46,8 @@ export async function POST(request: Request) {
       sport: body.sport as string,
       courtFee,
       customer: signedIn ? { userId: user.id, email: user.email } : { email: typeof body.email === "string" ? body.email : null },
+      // The app sends a Bearer token; the website uses its sign-in cookie (or none). Staff may use any code.
+      channel: user && !isCustomerRole(user.role) ? "staff" : /^Bearer\s/i.test(request.headers.get("authorization") ?? "") ? "app" : "web",
     });
     return apiOk(
       result.ok

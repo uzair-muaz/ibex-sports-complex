@@ -2,6 +2,7 @@
 
 import { closureSpansByCourt } from "@/lib/closures";
 import { auditBooking, bookingSnap } from "@/lib/audit-booking";
+import { recordVenuePayment } from "@/lib/venue-payments";
 import { isBookingBlocked } from "@/lib/customer-block";
 import { BLOCKED_MESSAGE } from "@/lib/customer-block-rules";
 import mongoose from 'mongoose';
@@ -21,7 +22,7 @@ import { sendBookingConfirmationEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/utils';
 import { acquireSlotLocks, releaseSlotLocks } from '@/lib/booking-locks';
 import { staffCancelBooking, type StaffRefundChoice } from '@/lib/staff-cancel';
-import { checkPromo, releasePromoForBooking, undoPromoUse, redeemPromo } from '@/lib/promo';
+import { checkPromo, undoPromoUse, redeemPromo } from '@/lib/promo';
 import { nextBookingSerial } from '@/lib/booking-serial';
 import {
   getApplicableDiscounts,
@@ -30,7 +31,8 @@ import {
 } from '@/lib/discount-utils';
 import { calculateOriginalPrice } from '@/lib/pricing-utils';
 import type { AppliedDiscount } from '@/types';
-import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from '@/lib/date-time';
+import { BUSINESS_TIMEZONE, getBusinessDateKey, toDateKeyInTimezone } from '@/lib/date-time';
+import { POINTS_APP_ONLY_TEXT, websiteWindowError } from '@/lib/app-first-rules';
 import {
   awardLoyaltyForCompletedBooking,
   redeemLoyaltyPoints,
@@ -249,6 +251,17 @@ export async function createBooking(
       throw new Error(lengthError);
     }
 
+    // App first (App Settings): limits for website customers. Staff are never limited.
+    if (!isStaffBooking) {
+      const { appFirst, sports } = await getAppSettings();
+      const appDays = sports.find((s) => s.sport === input.courtType)?.bookingWindowDays ?? null;
+      const windowError = websiteWindowError(appFirst, input.date, getBusinessDateKey(), appDays);
+      if (windowError) throw new Error(windowError);
+      if (appFirst.pointsAppOnly && (input.loyaltyPointsToRedeem ?? 0) > 0) {
+        throw new Error(POINTS_APP_ONLY_TEXT);
+      }
+    }
+
     // Validate duration increments (can be 1, 1.5, 2, 2.5, etc.)
     if (input.duration % 0.5 !== 0) {
       throw new Error('Duration must be in 30-minute increments');
@@ -363,6 +376,7 @@ export async function createBooking(
         sport: input.courtType,
         courtFee: finalPrice,
         customer: { userId: shouldLinkUser ? sessionUserId : null, email: input.userEmail },
+        channel: staffBooking ? "staff" : "web",
       });
       if (!check.ok) throw new Error(check.message);
       promo = { promoId: check.promoId!, code: check.code, discount: check.discount };
@@ -1022,6 +1036,31 @@ export async function cancelBooking(
   }
 }
 
+/** Staff: record a payment the customer made after booking (e.g. the rest at the venue). */
+export async function recordBookingPayment(
+  input: { bookingId: string; amount: unknown; method: unknown; note?: unknown },
+  opts?: StaffActorOpts,
+) {
+  try {
+    const gate = await requireStaffActor(opts);
+    if (!gate.ok) return { success: false, error: gate.error };
+    await connectDB();
+    const auditBefore = await bookingSnap(input.bookingId);
+    const result = await recordVenuePayment({ ...input, staffId: gate.userId });
+    if (!result.ok) return { success: false, error: result.error };
+    const how = input.method === "cash" ? "cash" : "bank transfer";
+    await auditBooking(gate, input.bookingId, "update", auditBefore, ` — recorded payment PKR ${Math.round(Number(input.amount)).toLocaleString()} (${how})`);
+    safeRevalidatePath('/admin');
+    safeRevalidatePath('/account/bookings');
+    const booking = await Booking.findById(input.bookingId).lean();
+    if (booking) scheduleAnalyticsDailyRebuild([booking.date]);
+    return { success: true, booking: JSON.parse(JSON.stringify(booking)) };
+  } catch (caught) {
+    console.error('Record payment error:', caught);
+    return { success: false, error: 'Could not save the payment. Please try again.' };
+  }
+}
+
 export interface UpdateBookingInput {
   bookingId: string;
   /** When rescheduling, set to the court from availability (first free court for that slot). */
@@ -1312,47 +1351,6 @@ export async function extendBooking(input: ExtendBookingInput, opts?: StaffActor
     return { success: false, error: error.message || "Failed to extend booking" };
   }
 }
-
-export async function deleteBooking(bookingId: string, opts?: StaffActorOpts) {
-  try {
-    const gate = await requireStaffActor(opts, { superAdmin: true });
-    if (!gate.ok) {
-      return {
-        success: false,
-        error: 'Only super admin can delete bookings.',
-      };
-    }
-
-    await connectDB();
-
-    const auditBefore = await bookingSnap(bookingId);
-    const booking = await Booking.findByIdAndDelete(bookingId);
-
-    if (!booking) {
-      throw new Error('Booking not found');
-    }
-    // A deleted booking doesn't keep its promo code use.
-    if (booking.status !== 'cancelled') await releasePromoForBooking(bookingId).catch(() => {});
-    await auditBooking(gate, bookingId, "delete", auditBefore, ` — was ${booking.status}, PKR ${Math.round(booking.amountPaid ?? 0)} paid`);
-
-    safeRevalidatePath('/admin');
-    safeRevalidatePath('/booking');
-    scheduleAnalyticsDailyRebuild([booking.date]);
-
-    return {
-      success: true,
-    };
-  } catch (caught) {
-    const error = caught as Error;
-    console.error('Delete booking error:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to delete booking',
-    };
-  }
-}
-
-
 
 /** Public entry verification — single booking by id (no list dump). */
 export async function getBookingForVerification(bookingId: string) {

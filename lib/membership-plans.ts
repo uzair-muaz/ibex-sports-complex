@@ -74,8 +74,9 @@ export async function listPublicPlans() {
     phone: settings.venue.phone || null,
     // Rules from Admin → App Settings, for the terms under the plans.
     rules: {
-      weekdayAdvanceHours: settings.membership.weekdayAdvanceHours,
-      weekendAdvanceHours: settings.membership.weekendAdvanceHours,
+      // No "book ahead" rule any more. Always 0; kept so older app builds still read them.
+      weekdayAdvanceHours: 0,
+      weekendAdvanceHours: 0,
       carryOverGraceDays: settings.membership.carryOverGraceDays,
       cancellationNoticeMinutes: settings.cancellationNoticeMinutes,
     },

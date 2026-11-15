@@ -5,6 +5,7 @@ import Link from "next/link";
 import React from "react";
 import { Button, Modal, QRCode, Space, Tag, Typography } from "antd";
 import type { Booking } from "@/types";
+import { stillToPay } from "@/lib/venue-payments-rules";
 import {
   formatStatusLabel,
   getCourtName,
@@ -32,6 +33,8 @@ type BookingViewModalProps = {
   extendingOption: 0.5 | 1 | null;
   onCheckExtensionAvailability: (bookingId: string) => void;
   onExtendBooking: (bookingId: string, extraDuration: 0.5 | 1) => void;
+  /** Opens the "Record payment" box for this booking. */
+  onRecordPayment?: (booking: Booking) => void;
 };
 
 export function BookingViewModal({
@@ -45,6 +48,7 @@ export function BookingViewModal({
   extendingOption,
   onCheckExtensionAvailability,
   onExtendBooking,
+  onRecordPayment,
 }: BookingViewModalProps) {
   const viewingReceived = booking
     ? (booking.amountReceivedOnline ?? 0) +
@@ -294,18 +298,42 @@ export function BookingViewModal({
               </div>
             )}
 
-            {viewingReceived < booking.totalPrice && (
+            {booking.status !== "cancelled" && stillToPay(booking) > 0 && (
               <div className="space-y-1">
                 <Text type="secondary" className="text-xs">
-                  Remaining balance
+                  Still to pay
                 </Text>
                 <p className="font-semibold text-yellow-400">
-                  PKR{" "}
-                  {(booking.totalPrice - viewingReceived).toLocaleString()}
+                  PKR {stillToPay(booking).toLocaleString()}
                 </p>
+                {onRecordPayment && (
+                  <Button size="small" type="primary" onClick={() => onRecordPayment(booking)}>
+                    Record payment
+                  </Button>
+                )}
               </div>
             )}
           </div>
+
+          {(booking.venuePayments?.length ?? 0) > 0 && (
+            <div className="space-y-2 border-t border-[var(--ant-color-border)] pt-4">
+              <Text type="secondary" className="block text-xs">
+                Payments recorded by staff
+              </Text>
+              {booking.venuePayments!.map((p) => (
+                <div key={p._id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span>
+                    <span className="font-semibold">PKR {p.amount.toLocaleString()}</span>{" "}
+                    <Tag>{p.method === "cash" ? "Cash" : "Bank transfer"}</Tag>
+                    {p.note ? <Text type="secondary">{p.note}</Text> : null}
+                  </span>
+                  <Text type="secondary" className="text-xs">
+                    {new Date(p.receivedAt).toLocaleString("en-PK", { dateStyle: "medium", timeStyle: "short" })}
+                  </Text>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="border-t border-[var(--ant-color-border)] pt-6">
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

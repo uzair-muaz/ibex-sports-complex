@@ -51,6 +51,7 @@ type Draft = {
   maxUses: number | null;
   maxUsesPerCustomer: number | null;
   newCustomersOnly: boolean;
+  appOnly: boolean;
   isActive: boolean;
 };
 
@@ -67,6 +68,7 @@ const EMPTY: Draft = {
   maxUses: null,
   maxUsesPerCustomer: 1,
   newCustomersOnly: false,
+  appOnly: false,
   isActive: true,
 };
 
@@ -83,6 +85,7 @@ const toDraft = (p: AdminPromo): Draft => ({
   maxUses: p.maxUses,
   maxUsesPerCustomer: p.maxUsesPerCustomer,
   newCustomersOnly: p.newCustomersOnly,
+  appOnly: p.appOnly,
   isActive: p.isActive,
 });
 
@@ -227,6 +230,7 @@ export default function PromoCodesPage() {
                     {p.minFeePkr && <div>Court fee from {pkr(p.minFeePkr)}</div>}
                     <div>{p.maxUsesPerCustomer ? `${p.maxUsesPerCustomer}× per customer` : "No limit per customer"}</div>
                     {p.newCustomersOnly && <div>First booking only</div>}
+                    {p.appOnly && <div>App only</div>}
                   </div>
                 ),
               },
@@ -371,6 +375,9 @@ export default function PromoCodesPage() {
           <Space size="large" wrap>
             <Checkbox checked={draft.newCustomersOnly} onChange={(e) => set({ newCustomersOnly: e.target.checked })}>
               First booking only
+            </Checkbox>
+            <Checkbox checked={draft.appOnly} onChange={(e) => set({ appOnly: e.target.checked })}>
+              App only (the website refuses it)
             </Checkbox>
             <Space>
               <Switch checked={draft.isActive} onChange={(v) => set({ isActive: v })} />

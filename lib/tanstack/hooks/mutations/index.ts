@@ -1,8 +1,8 @@
 export { useCreateBookingMutation } from "./use-create-booking.mutation";
 export { useCreatePublicBookingMutation } from "./use-create-public-booking.mutation";
 export { useUpdateBookingMutation } from "./use-update-booking.mutation";
-export { useDeleteBookingMutation } from "./use-delete-booking.mutation";
 export { useExtendBookingMutation } from "./use-extend-booking.mutation";
+export { useRecordBookingPaymentMutation } from "./use-record-booking-payment.mutation";
 export { useCreateCourtMutation } from "./use-create-court.mutation";
 export { useUpdateCourtMutation } from "./use-update-court.mutation";
 export { useDeleteCourtMutation } from "./use-delete-court.mutation";
@@ -18,6 +18,7 @@ export {
   useSetMyPasswordMutation,
   useClaimBookingsMutation,
   useCancelMyBookingMutation,
+  useUploadPaymentProofMutation,
   useCreateSupportTicketMutation,
   useReplySupportTicketMutation,
 } from "./use-account.mutations";

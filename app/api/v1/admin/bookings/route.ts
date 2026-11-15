@@ -7,8 +7,8 @@ import {
   rebuildAnalyticsRollup,
   createBooking,
   updateBooking,
-  deleteBooking,
   extendBooking,
+  recordBookingPayment,
   checkBookingExtensionAvailability,
   getAvailableStartTimes,
   type CreateBookingInput,
@@ -127,6 +127,15 @@ export async function POST(request: Request) {
     return bffOk(result, request);
   }
 
+  if (action === "record-payment") {
+    const result = await recordBookingPayment(
+      { bookingId: body?.bookingId, amount: body?.amount, method: body?.method, note: body?.note },
+      staffOpts,
+    );
+    if (!result.success) return bffError(result.error || "Failed", 400, request);
+    return bffOk(result, request);
+  }
+
   if (action === "rebuild-analytics") {
     const result = await rebuildAnalyticsRollup(
       { dates: body?.dates as string[] | undefined },
@@ -148,18 +157,6 @@ export async function PATCH(request: Request) {
 
   const body = (await request.json()) as UpdateBookingInput;
   const result = await updateBooking(body, staffOpts);
-  if (!result.success) return bffError(result.error || "Failed", 400, request);
-  return bffOk(result, request);
-}
-
-export async function DELETE(request: Request) {
-  const gate = await requireBffAdmin(request);
-  if (!gate.ok) return gate.response;
-  const staffOpts = createTrustedApiActor(gate.user);
-
-  const { searchParams } = new URL(request.url);
-  const bookingId = searchParams.get("bookingId") || "";
-  const result = await deleteBooking(bookingId, staffOpts);
   if (!result.success) return bffError(result.error || "Failed", 400, request);
   return bffOk(result, request);
 }

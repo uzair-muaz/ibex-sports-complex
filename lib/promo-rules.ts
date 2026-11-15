@@ -28,9 +28,14 @@ export type PromoRules = {
   maxUsesPerCustomer?: number | null;
   /** Only for customers with no earlier booking. */
   newCustomersOnly?: boolean;
+  /** Only in the IBEX app: the website refuses it (staff can still use it). */
+  appOnly?: boolean;
   isActive: boolean;
   usedCount?: number;
 };
+
+/** Where a booking is made: the app, the website, or staff in admin. */
+export type PromoChannel = "app" | "web" | "staff";
 
 export type PromoReason =
   | "PROMO_NOT_FOUND"
@@ -41,7 +46,8 @@ export type PromoReason =
   | "PROMO_MIN_FEE"
   | "PROMO_USED_UP"
   | "PROMO_ALREADY_USED"
-  | "PROMO_NEW_CUSTOMERS_ONLY";
+  | "PROMO_NEW_CUSTOMERS_ONLY"
+  | "PROMO_APP_ONLY";
 
 export const PROMO_REASON_TEXT: Record<PromoReason, string> = {
   PROMO_NOT_FOUND: "This promo code doesn't exist.",
@@ -53,6 +59,7 @@ export const PROMO_REASON_TEXT: Record<PromoReason, string> = {
   PROMO_USED_UP: "This promo code has been fully used.",
   PROMO_ALREADY_USED: "You've already used this promo code.",
   PROMO_NEW_CUSTOMERS_ONLY: "This promo code is only for your first booking.",
+  PROMO_APP_ONLY: "This promo code works only in the IBEX app. Download the app to use it.",
 };
 
 /** Sport names; a sport added later gets a name made from its code ("TABLE_TENNIS" → "Table Tennis"). */
@@ -94,6 +101,8 @@ export function evaluatePromo(
     usesByCustomer: number;
     /** Customer has an earlier booking (not cancelled). */
     hasEarlierBooking: boolean;
+    /** Where the booking is made. "web" can't use app-only codes; staff can. Default "app". */
+    channel?: PromoChannel;
   },
 ): PromoCheck {
   const now = ctx.now ?? Date.now();
@@ -108,6 +117,7 @@ export function evaluatePromo(
   const perCustomer = promo.maxUsesPerCustomer ?? 1;
   if (perCustomer > 0 && ctx.usesByCustomer >= perCustomer) return no("PROMO_ALREADY_USED");
   if (promo.newCustomersOnly && ctx.hasEarlierBooking) return no("PROMO_NEW_CUSTOMERS_ONLY");
+  if (promo.appOnly && ctx.channel === "web") return no("PROMO_APP_ONLY");
   return { ok: true, code: promo.code, discount: promoDiscountFor(promo, ctx.courtFee), description: promo.description ?? "" };
 }
 
@@ -180,7 +190,7 @@ export function validatePromoInput(
   if (out.validFrom && out.validUntil && new Date(out.validUntil) <= new Date(out.validFrom)) {
     return { ok: false, error: "The end date must be after the start date." };
   }
-  for (const k of ["newCustomersOnly", "isActive"] as const) {
+  for (const k of ["newCustomersOnly", "appOnly", "isActive"] as const) {
     if (!partial || has(k)) {
       if (!has(k)) out[k] = k === "isActive";
       else if (typeof b[k] !== "boolean") return { ok: false, error: `${k} must be true or false.` };

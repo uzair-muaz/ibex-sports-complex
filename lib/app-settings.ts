@@ -48,10 +48,6 @@ export type BankAccount = {
 
 /** Membership rules shown on the website and used when paying with hours. */
 export type MembershipRules = {
-  /** Hours before the start a booking paid with hours must be made, Mon–Fri. */
-  weekdayAdvanceHours: number;
-  /** Same, Sat–Sun. */
-  weekendAdvanceHours: number;
   /** Days after a plan ends when unused hours still carry over to a new one. */
   carryOverGraceDays: number;
 };
@@ -66,6 +62,22 @@ export type PaymentRules = {
   balanceNote: string;
 };
 
+/**
+ * Rules that move customers to the app. All off until launch day; the super
+ * admin turns them on in App Settings → App first.
+ */
+export type AppFirstRules = {
+  /** Only app bookings earn points, and points can only be used in the app. */
+  pointsAppOnly: boolean;
+  /** Limit how far ahead the website can book (the app keeps each sport's window). */
+  websiteWindowOn: boolean;
+  /** Days the website can book, counting today (used when websiteWindowOn). */
+  websiteBookingWindowDays: number;
+  /** Store links for "Get the app" banners. Empty = banners hidden. */
+  playStoreUrl: string | null;
+  appStoreUrl: string | null;
+};
+
 export type ResolvedAppSettings = {
   venue: VenueInfo;
   sports: SportRules[];
@@ -75,6 +87,7 @@ export type ResolvedAppSettings = {
   membership: MembershipRules;
   /** Super admin's FAQs, or null to use the built-in ones (lib/faqs.ts). */
   faqs: Faq[] | null;
+  appFirst: AppFirstRules;
 };
 
 export type Faq = { question: string; answer: string };
@@ -176,8 +189,15 @@ export const DEFAULT_APP_SETTINGS: ResolvedAppSettings = {
     verificationNote: "Our team checks payments by hand. You will get a notification.",
     balanceNote: "Pay the remaining balance at the venue.",
   },
-  membership: { weekdayAdvanceHours: 2, weekendAdvanceHours: 24, carryOverGraceDays: 7 },
+  membership: { carryOverGraceDays: 7 },
   faqs: null,
+  appFirst: {
+    pointsAppOnly: false,
+    websiteWindowOn: false,
+    websiteBookingWindowDays: 3,
+    playStoreUrl: null,
+    appStoreUrl: null,
+  },
 };
 
 type StoredSettings = {
@@ -188,6 +208,7 @@ type StoredSettings = {
   payments?: IPaymentSetting | null;
   membership?: Partial<MembershipRules> | null;
   faqs?: Faq[] | null;
+  appFirst?: Partial<AppFirstRules> | null;
 };
 
 function pick<T>(value: T | null | undefined, fallback: T): T {
@@ -298,14 +319,19 @@ export function resolveAppSettings(stored: StoredSettings | null | undefined): R
       balanceNote: pick(stored?.payments?.balanceNote, d.payments.balanceNote),
     },
     membership: {
-      weekdayAdvanceHours: pick(stored?.membership?.weekdayAdvanceHours, d.membership.weekdayAdvanceHours),
-      weekendAdvanceHours: pick(stored?.membership?.weekendAdvanceHours, d.membership.weekendAdvanceHours),
       carryOverGraceDays: pick(stored?.membership?.carryOverGraceDays, d.membership.carryOverGraceDays),
     },
     faqs:
       Array.isArray(stored?.faqs) && stored.faqs.length > 0
         ? stored.faqs.map((f) => ({ question: f.question, answer: f.answer }))
         : null,
+    appFirst: {
+      pointsAppOnly: pick(stored?.appFirst?.pointsAppOnly, d.appFirst.pointsAppOnly),
+      websiteWindowOn: pick(stored?.appFirst?.websiteWindowOn, d.appFirst.websiteWindowOn),
+      websiteBookingWindowDays: pick(stored?.appFirst?.websiteBookingWindowDays, d.appFirst.websiteBookingWindowDays),
+      playStoreUrl: stored?.appFirst?.playStoreUrl || null,
+      appStoreUrl: stored?.appFirst?.appStoreUrl || null,
+    },
   };
 }
 
@@ -320,6 +346,7 @@ export type SettingsPatch = {
   membership?: Partial<MembershipRules>;
   /** null = go back to the built-in FAQs. */
   faqs?: Faq[] | null;
+  appFirst?: Partial<AppFirstRules>;
 };
 
 type CheckResult = { ok: true; value: SettingsPatch } | { ok: false; error: string };
@@ -481,8 +508,6 @@ export function validateSettingsPatch(input: unknown): CheckResult {
     const m = body.membership as Record<string, unknown>;
     const rules: Partial<MembershipRules> = {};
     const limits: Record<keyof MembershipRules, [number, string]> = {
-      weekdayAdvanceHours: [168, "Weekday notice must be 0–168 hours."],
-      weekendAdvanceHours: [168, "Weekend notice must be 0–168 hours."],
       carryOverGraceDays: [90, "Carry-over days must be 0–90."],
     };
     for (const key of Object.keys(limits) as (keyof MembershipRules)[]) {
@@ -492,6 +517,34 @@ export function validateSettingsPatch(input: unknown): CheckResult {
       rules[key] = m[key] as number;
     }
     if (Object.keys(rules).length > 0) out.membership = rules;
+  }
+
+  if (body.appFirst !== undefined) {
+    if (!body.appFirst || typeof body.appFirst !== "object") return { ok: false, error: "appFirst must be an object." };
+    const a = body.appFirst as Record<string, unknown>;
+    const rules: Partial<AppFirstRules> = {};
+    for (const k of ["pointsAppOnly", "websiteWindowOn"] as const) {
+      if (a[k] === undefined) continue;
+      if (typeof a[k] !== "boolean") return { ok: false, error: `${k} must be true or false.` };
+      rules[k] = a[k] as boolean;
+    }
+    if (a.websiteBookingWindowDays !== undefined) {
+      const n = a.websiteBookingWindowDays;
+      if (!isInt(n) || n < 1 || n > 365) return { ok: false, error: "Website booking days must be 1–365." };
+      rules.websiteBookingWindowDays = n;
+    }
+    const stores: [keyof AppFirstRules, RegExp, string][] = [
+      ["playStoreUrl", /^https:\/\/play\.google\.com\//, "The Play Store link must start with https://play.google.com/"],
+      ["appStoreUrl", /^https:\/\/apps\.apple\.com\//, "The App Store link must start with https://apps.apple.com/"],
+    ];
+    for (const [k, re, error] of stores) {
+      if (a[k] === undefined) continue;
+      const v = typeof a[k] === "string" ? (a[k] as string).trim() : a[k] === null ? "" : null;
+      if (v === null) return { ok: false, error };
+      if (v && (!re.test(v) || v.length > 300)) return { ok: false, error };
+      (rules as Record<string, unknown>)[k] = v || null;
+    }
+    if (Object.keys(rules).length > 0) out.appFirst = rules;
   }
 
   if (body.faqs !== undefined) {
@@ -653,6 +706,7 @@ export async function updateAppSettings(
     payments: { ...current.payments, ...(patch.payments || {}) },
     membership: { ...current.membership, ...(patch.membership || {}) },
     faqs: patch.faqs !== undefined ? patch.faqs : current.faqs,
+    appFirst: { ...current.appFirst, ...(patch.appFirst || {}) },
     updatedBy,
   };
 

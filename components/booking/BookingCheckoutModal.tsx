@@ -35,6 +35,8 @@ type BookingCheckoutModalProps = {
   maxLoyaltyRedeem: number;
   useLoyalty: boolean;
   loyaltyPointsToRedeem: number;
+  /** Points are an app benefit (App Settings → App first): show a nudge instead. */
+  pointsAppOnly?: boolean;
   /** PKR value of 1 point (Admin → App Settings). Default 1. */
   pkrPerPoint?: number;
   hasMembership: boolean;
@@ -79,6 +81,7 @@ export function BookingCheckoutModal({
   useLoyalty,
   loyaltyPointsToRedeem,
   pkrPerPoint = 1,
+  pointsAppOnly = false,
   hasMembership,
   membershipHoursRemaining,
   membershipHoursUsed,
@@ -104,7 +107,7 @@ export function BookingCheckoutModal({
     (selectedQuote?.totalPrice || 0) -
       (appliedPromo?.discount ?? 0) -
       (useMembershipHours ? membershipDiscount : 0) -
-      (useLoyalty ? Math.floor(loyaltyPointsToRedeem * pkrPerPoint) : 0),
+      (useLoyalty && !pointsAppOnly ? Math.floor(loyaltyPointsToRedeem * pkrPerPoint) : 0),
   );
 
   const showIdentityChooser = !isLoggedIn && identityStep === "choose";
@@ -145,7 +148,7 @@ export function BookingCheckoutModal({
               <div className="space-y-3 pt-1">
                 <p className="text-sm text-zinc-400">
                   Guests can book instantly. Sign in or create an account to
-                  track bookings and earn rewards.
+                  track bookings{pointsAppOnly ? "" : " and earn rewards"}.
                 </p>
                 <button
                   type="button"
@@ -192,7 +195,7 @@ export function BookingCheckoutModal({
                       Create an account
                     </span>
                     <span className="mt-0.5 block text-xs text-zinc-400">
-                      Save bookings and unlock loyalty rewards
+                      {pointsAppOnly ? "Save and track your bookings" : "Save bookings and unlock loyalty rewards"}
                     </span>
                   </span>
                 </Link>
@@ -343,6 +346,13 @@ export function BookingCheckoutModal({
                         />
                       ) : null}
                     </div>
+                  ) : null}
+
+                  {pointsAppOnly ? (
+                    <p className="rounded-xl border border-[#2DD4BF]/25 bg-[#2DD4BF]/10 p-3 text-sm text-zinc-200">
+                      Reward points are an app benefit. Book in the IBEX app to earn points on every booking and use
+                      them for discounts.
+                    </p>
                   ) : null}
 
                   <div className="space-y-1.5">

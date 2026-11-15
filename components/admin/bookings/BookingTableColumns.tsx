@@ -7,10 +7,11 @@ import { Button, Select, Space, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
   CloseOutlined,
-  DeleteOutlined,
   EditOutlined,
   EyeOutlined,
+  WalletOutlined,
 } from "@ant-design/icons";
+import { stillToPay } from "@/lib/venue-payments-rules";
 import type { Booking } from "@/types";
 import { formatDisplayDate } from "@/lib/utils";
 import {
@@ -26,12 +27,11 @@ export type BookingTableColumnHandlers = {
   sortColumn: SortColumn | null;
   sortDirection: "asc" | "desc";
   updatingStatusBookingId: string | null;
-  isSuperAdmin: boolean;
   onStatusChange: (bookingId: string, status: Booking["status"]) => void;
   onView: (booking: Booking) => void;
   onEdit: (booking: Booking) => void;
   onCancel: (booking: Booking) => void;
-  onDelete: (booking: Booking) => void;
+  onRecordPayment: (booking: Booking) => void;
 };
 
 export function getBookingTableColumns(
@@ -41,12 +41,11 @@ export function getBookingTableColumns(
     sortColumn,
     sortDirection,
     updatingStatusBookingId,
-    isSuperAdmin,
     onStatusChange,
     onView,
     onEdit,
     onCancel,
-    onDelete,
+    onRecordPayment,
   } = handlers;
 
   const getSortOrder = (column: SortColumn) => {
@@ -191,10 +190,19 @@ export function getBookingTableColumns(
       title: "Actions",
       key: "actions",
       align: "right",
-      minWidth: 140,
+      minWidth: 180,
       fixed: "right",
       render: (_, booking) => (
         <Space size="small">
+          {booking.status !== "cancelled" && stillToPay(booking) > 0 && (
+            <Button
+              type="text"
+              icon={<WalletOutlined />}
+              className="text-[#2DD4BF]!"
+              onClick={() => onRecordPayment(booking)}
+              title={`Record payment (PKR ${stillToPay(booking).toLocaleString()} still to pay)`}
+            />
+          )}
           <Button
             type="text"
             icon={<EyeOutlined />}
@@ -215,15 +223,6 @@ export function getBookingTableColumns(
               icon={<CloseOutlined />}
               onClick={() => onCancel(booking)}
               title="Cancel Booking"
-            />
-          )}
-          {isSuperAdmin && (
-            <Button
-              type="text"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => onDelete(booking)}
-              title="Delete"
             />
           )}
         </Space>

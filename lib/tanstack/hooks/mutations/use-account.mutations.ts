@@ -9,6 +9,7 @@ import {
   replySupportTicketRequest,
   setMyPasswordRequest,
   updateMyProfileRequest,
+  uploadPaymentProofRequest,
 } from "@/lib/tanstack/requests/account.requests";
 
 function useInvalidateAccount() {
@@ -59,12 +60,23 @@ export function useClaimBookingsMutation() {
 export function useCancelMyBookingMutation() {
   const invalidate = useInvalidateAccount();
   return useMutation({
-    mutationFn: (bookingId: string) => cancelMyBookingRequest(bookingId),
-    onSuccess: (_data, bookingId) => {
-      void invalidate.booking(bookingId);
+    mutationFn: cancelMyBookingRequest,
+    onSuccess: (_data, input) => {
+      void invalidate.booking(input.id);
       void invalidate.bookings();
       void invalidate.loyalty();
       void invalidate.membership();
+    },
+  });
+}
+
+export function useUploadPaymentProofMutation() {
+  const invalidate = useInvalidateAccount();
+  return useMutation({
+    mutationFn: uploadPaymentProofRequest,
+    onSuccess: (_data, input) => {
+      void invalidate.booking(input.bookingId);
+      void invalidate.bookings();
     },
   });
 }

@@ -23,6 +23,7 @@ type PromoLean = {
   maxUses?: number | null;
   maxUsesPerCustomer: number;
   newCustomersOnly: boolean;
+  appOnly: boolean;
   isActive: boolean;
   usedCount: number;
   createdAt: Date;
@@ -43,6 +44,7 @@ function view(p: PromoLean, totalOff = 0) {
     maxUses: p.maxUses ?? null,
     maxUsesPerCustomer: p.maxUsesPerCustomer,
     newCustomersOnly: p.newCustomersOnly,
+    appOnly: !!p.appOnly,
     isActive: p.isActive,
     usedCount: p.usedCount,
     /** PKR taken off on bookings that weren't cancelled. */

@@ -6,6 +6,18 @@ import type { ColumnsType, TableProps } from "antd/es/table";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import type { Court } from "@/types";
 
+/**
+ * The prices to show in the list. With peak/off-peak on, bookings use the
+ * period prices (not the base price), so show their lowest and highest.
+ */
+function shownPrices(court: Court): { low: number; high: number; peak: boolean } {
+  const periods = court.timeBasedPricingEnabled ? court.pricingPeriods ?? [] : [];
+  if (periods.length === 0) return { low: court.pricePerHour, high: court.pricePerHour, peak: false };
+  const prices = periods.map((p) => Number(p.pricePerHour)).filter((n) => Number.isFinite(n));
+  if (prices.length === 0) return { low: 0, high: 0, peak: true };
+  return { low: Math.min(...prices), high: Math.max(...prices), peak: true };
+}
+
 const { Text } = Typography;
 
 type CourtsTableProps = {
@@ -66,19 +78,22 @@ export function CourtsTable({
       title: "Price",
       dataIndex: "pricePerHour",
       key: "pricePerHour",
-      sorter: (a, b) => a.pricePerHour - b.pricePerHour,
+      sorter: (a, b) => shownPrices(a).low - shownPrices(b).low,
       sortOrder: sortOrderFor("pricePerHour"),
-      render: (price: number, court) => {
-        const weekend = court.timeBasedPricingEnabled
+      render: (_: number, court) => {
+        const { low, high, peak } = shownPrices(court);
+        const weekend = peak
           ? court.pricingPeriods?.some((p) => p.weekendPricePerHour != null)
           : court.weekendPricePerHour != null;
         return (
           <Space size="small" wrap>
             <span className="font-semibold text-[#2DD4BF]">
-              PKR {price.toLocaleString()}
+              PKR {low.toLocaleString()}
+              {high > low && ` – ${high.toLocaleString()}`}
               <span className="font-normal text-[var(--ant-color-text-secondary)]">{priceUnit(court).short}</span>
             </span>
-            {price === 0 && <Tag>Free</Tag>}
+            {peak && <Tag color="gold">Peak / off-peak</Tag>}
+            {high === 0 && <Tag>Free</Tag>}
             {weekend && <Tag color="purple">Weekend price</Tag>}
           </Space>
         );

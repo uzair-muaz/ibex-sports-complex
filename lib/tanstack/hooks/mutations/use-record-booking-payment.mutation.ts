@@ -2,12 +2,13 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { useInvalidateBookings } from "@/lib/tanstack/hooks/mutations/use-invalidate-bookings";
-import { requestDeleteBooking } from "@/lib/tanstack/requests/bookings.requests";
+import { requestRecordBookingPayment } from "@/lib/tanstack/requests/bookings.requests";
 
-export function useDeleteBookingMutation() {
+/** Staff: record a payment (e.g. the rest paid at the venue) as a new entry. */
+export function useRecordBookingPaymentMutation() {
   const invalidate = useInvalidateBookings();
   return useMutation({
-    mutationFn: (bookingId: string) => requestDeleteBooking(bookingId),
+    mutationFn: requestRecordBookingPayment,
     onSuccess: () => invalidate(),
   });
 }

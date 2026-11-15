@@ -20,22 +20,19 @@ describe("membership-rules", () => {
     expect(isWeekendDateKey("2026-08-10")).toBe(false); // Mon
   });
 
-  it("notice before a booking paid with hours comes from App Settings", () => {
+  it("members can use hours for any free slot, even one starting soon", () => {
     const m = {
       id: "m1",
       planName: "Gold",
       weekdayOnly: false,
       validUntil: new Date("2026-12-31T00:00:00+05:00"),
       hoursBySport: [{ sport: "PADEL", total: 10, remaining: 10 }],
-      rules: { weekdayAdvanceHours: 2, weekendAdvanceHours: 24 },
     };
-    const now = Date.parse("2026-08-07T19:00:00+05:00"); // Fri 7 pm
-    // Sat 6 pm is 23 hours away: weekend needs 24.
-    expect(checkHoursForSlot(m, { sport: "PADEL", dateKey: "2026-08-08", startHour: 18 }, now).reasonCode).toBe("TOO_SOON");
-    // The super admin lowers weekend notice to 12 hours: now it's fine.
-    expect(checkHoursForSlot({ ...m, rules: { weekdayAdvanceHours: 2, weekendAdvanceHours: 12 } }, { sport: "PADEL", dateKey: "2026-08-08", startHour: 18 }, now).canUse).toBe(true);
+    // Say it is Fri 7 PM: Sat 6 PM (23 hours away) and Fri 7:30 PM (30 minutes away) are both fine.
+    expect(checkHoursForSlot(m, { sport: "PADEL", dateKey: "2026-08-08", startHour: 18 }).canUse).toBe(true);
+    expect(checkHoursForSlot(m, { sport: "PADEL", dateKey: "2026-08-07", startHour: 19.5 }).canUse).toBe(true);
     // Weekday-only plan on a Saturday.
-    expect(checkHoursForSlot({ ...m, weekdayOnly: true }, { sport: "PADEL", dateKey: "2026-08-08", startHour: 18 }, now).reasonCode).toBe("WEEKDAYS_ONLY");
+    expect(checkHoursForSlot({ ...m, weekdayOnly: true }, { sport: "PADEL", dateKey: "2026-08-08", startHour: 18 }).reasonCode).toBe("WEEKDAYS_ONLY");
   });
 
   it("allows cancel when far enough before start", () => {
