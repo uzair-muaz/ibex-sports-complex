@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { accountKeys } from "@/lib/tanstack/keys";
 import { LIVE_QUERY } from "@/lib/tanstack/live-query";
 import {
+  fetchCancelPreview,
   fetchMyBooking,
   fetchMyBookings,
   fetchMyLoyalty,
@@ -38,6 +39,16 @@ export function useMyBookingQuery(
     queryKey: accountKeys.booking(bookingId || "missing"),
     queryFn: () => fetchMyBooking(bookingId!),
     enabled: (options?.enabled ?? true) && !!bookingId,
+    ...LIVE_QUERY,
+  });
+}
+
+/** What cancelling would give back. Only loaded when the customer opens the cancel box. */
+export function useCancelPreviewQuery(bookingId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...accountKeys.booking(bookingId), "cancel-preview"],
+    queryFn: () => fetchCancelPreview(bookingId),
+    enabled: options?.enabled ?? true,
     ...LIVE_QUERY,
   });
 }
