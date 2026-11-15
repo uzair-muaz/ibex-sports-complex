@@ -22,7 +22,7 @@ export const membershipAdminPaths = {
       tags: ["Admin"],
       summary: "Super admin: make a promo code",
       description:
-        "Body: `{code, description?, type: percentage|fixed, value, maxDiscountPkr?, minFeePkr?, sports? ([] = all), validFrom?, validUntil?, maxUses?, maxUsesPerCustomer? (default 1, 0 = no limit), newCustomersOnly?, isActive?}`. The code comes off the court fee after automatic discounts. A use is given back when the booking is cancelled (not when staff keep the money).",
+        "Body: `{code, description?, type: percentage|fixed, value, maxDiscountPkr?, minFeePkr?, sports? ([] = all), validFrom?, validUntil?, maxUses?, maxUsesPerCustomer? (default 1, 0 = no limit), newCustomersOnly?, appOnly? (website refuses it), isActive?}`. The code comes off the court fee after automatic discounts. A use is given back when the booking is cancelled (not when staff keep the money).",
       security: sec,
       requestBody: { required: true, content: { "application/json": { example: { code: "EID20", description: "Eid offer", type: "percentage", value: 20, maxDiscountPkr: 2000, sports: [], maxUsesPerCustomer: 1 } } } },
       responses: { "201": { description: "Created" }, "400": { description: "VALIDATION_ERROR" }, "403": { description: "Super admin only" }, "409": { description: "DUPLICATE" } },

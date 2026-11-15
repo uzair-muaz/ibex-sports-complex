@@ -1,11 +1,25 @@
 import { apiOk, apiError, apiOptions } from "@/lib/api/response";
 import { getAppSettings } from "@/lib/app-settings";
 
-/** General booking rules. cancellationNoticeMinutes: customers can cancel until this many minutes before start. */
+/**
+ * General booking rules.
+ * - cancellationNoticeMinutes: customers can cancel until this many minutes before start.
+ * - appFirst: extra app benefits (all off until launch). pointsAppOnly: only app bookings
+ *   earn points and points can be used only in the app. websiteBookingWindowDays: how far
+ *   ahead the website can book (null = no website limit). Store links are null until set.
+ */
 export async function GET(request: Request) {
   try {
-    const { cancellationNoticeMinutes } = await getAppSettings();
-    return apiOk({ cancellationNoticeMinutes }, request, {
+    const { cancellationNoticeMinutes, appFirst } = await getAppSettings();
+    return apiOk({
+      cancellationNoticeMinutes,
+      appFirst: {
+        pointsAppOnly: appFirst.pointsAppOnly,
+        websiteBookingWindowDays: appFirst.websiteWindowOn ? appFirst.websiteBookingWindowDays : null,
+        playStoreUrl: appFirst.playStoreUrl,
+        appStoreUrl: appFirst.appStoreUrl,
+      },
+    }, request, {
       headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
     });
   } catch (err) {

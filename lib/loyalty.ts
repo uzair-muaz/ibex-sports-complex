@@ -9,6 +9,7 @@ import LoyaltyAccount from "@/models/LoyaltyAccount";
 import LoyaltyTransaction from "@/models/LoyaltyTransaction";
 import Booking from "@/models/Booking";
 import { maxUsablePoints, pointsDiscountPkr, pointsEarnedFor } from "@/lib/loyalty-rules";
+import { earnsPoints } from "@/lib/app-first-rules";
 import { getAppSettings } from "@/lib/app-settings";
 
 export async function getOrCreateLoyaltyAccount(userId: string) {
@@ -42,7 +43,11 @@ export async function awardLoyaltyForCompletedBooking(bookingId: string) {
   }
 
   // Rules from Admin → App Settings (default = 10 points per hour played).
-  const { loyalty } = await getAppSettings();
+  const { loyalty, appFirst } = await getAppSettings();
+  // App first: only bookings made in the app earn points (website and staff bookings don't).
+  if (!earnsPoints(appFirst, booking.source)) {
+    return { success: true as const, skipped: true, points: 0 };
+  }
   const points = pointsEarnedFor(loyalty, {
     paidTotal: booking.totalPrice,
     durationMinutes: Math.round(booking.duration * 60),

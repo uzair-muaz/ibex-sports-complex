@@ -21,6 +21,7 @@ import { BUILT_IN_SPORTS, sportCodeFromName } from "@/lib/sport-rules";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminTableSkeleton } from "@/components/admin/loaders";
 import { FaqsCard } from "@/components/admin/FaqsCard";
+import { AppFirstCard } from "@/components/admin/AppFirstCard";
 import {
   fetchAdminAppSettings,
   saveAdminAppSettings,
@@ -176,6 +177,7 @@ export default function AdminAppSettingsPage() {
         loyalty: draft.loyalty,
         payments: draft.payments,
         membership: draft.membership,
+        appFirst: draft.appFirst,
         removeSports: removedSports.length ? removedSports : undefined,
         sports: draft.sports.map((s) => ({
           sport: s.sport,
@@ -545,6 +547,11 @@ export default function AdminAppSettingsPage() {
               The website and the app both use these rules.
             </Text>
           </Card>
+
+          <AppFirstCard
+            value={draft.appFirst}
+            onChange={(patch) => setDraft({ ...draft, appFirst: { ...draft.appFirst, ...patch } })}
+          />
 
           {draft.sports.map((s) => (
             <Card

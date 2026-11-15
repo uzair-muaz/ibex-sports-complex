@@ -1,4 +1,5 @@
 import connectDB from "@/lib/mongodb";
+import { earnsPoints } from "@/lib/app-first-rules";
 import Booking from "@/models/Booking";
 import LoyaltyAccount from "@/models/LoyaltyAccount";
 import LoyaltyTransaction, { type LoyaltyTxnType } from "@/models/LoyaltyTransaction";
@@ -82,6 +83,7 @@ type BookingRow = {
   membershipHoursUsed?: number;
   membershipDiscountPkr?: number;
   courtId?: { type?: string } | null;
+  source?: string | null;
 };
 
 /**
@@ -103,7 +105,7 @@ export async function buildAppLoyalty(params: { userId: string; cursor?: string 
     LoyaltyAccount.findOne({ userId: params.userId }).select("balance").lean(),
     // Points are credited when staff mark the booking completed; until then they are pending.
     Booking.find({ userId: params.userId, status: { $in: ["pending_payment", "confirmed"] } })
-      .select("serialNumber date startTime duration totalPrice usedMembershipHours membershipHoursUsed membershipDiscountPkr courtId")
+      .select("serialNumber date startTime duration totalPrice usedMembershipHours membershipHoursUsed membershipDiscountPkr courtId source")
       .populate("courtId", "type")
       .lean(),
     LoyaltyTransaction.find({ userId: params.userId }).sort({ createdAt: -1, _id: -1 }).skip(offset).limit(limit).lean(),
@@ -111,6 +113,8 @@ export async function buildAppLoyalty(params: { userId: string; cursor?: string 
   ]);
 
   const pendingItems: AppPointsItem[] = (upcoming as unknown as BookingRow[])
+    // App first: website and staff bookings earn nothing when points are app-only.
+    .filter((b) => earnsPoints(settings.appFirst, b.source))
     .map((b) => ({
       b,
       points: pointsEarnedFor(rules, {

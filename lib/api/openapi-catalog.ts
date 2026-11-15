@@ -176,8 +176,14 @@ export const catalogPaths = {
     get: {
       tags: ["Venue"],
       summary: "General booking rules",
-      description: "Customers can cancel in the app until cancellationNoticeMinutes before the start (240 = 4 hours).",
-      responses: { "200": ok("Policy", { cancellationNoticeMinutes: 240 }) },
+      description:
+        "Customers can cancel in the app until cancellationNoticeMinutes before the start (240 = 4 hours). appFirst = extra app benefits, all off until launch: pointsAppOnly true → only app bookings earn points and points can only be used in the app (show \"Points are an app benefit\"). websiteBookingWindowDays = how far ahead the WEBSITE can book (null = no limit); the app keeps each sport's bookingWindowDays. playStoreUrl / appStoreUrl are null until the super admin adds them.",
+      responses: {
+        "200": ok("Policy", {
+          cancellationNoticeMinutes: 240,
+          appFirst: { pointsAppOnly: false, websiteBookingWindowDays: null, playStoreUrl: null, appStoreUrl: null },
+        }),
+      },
     },
   },
   "/api/v1/courts": {
@@ -206,7 +212,7 @@ export const catalogPaths = {
       summary: "Price check before booking (guest or signed in)",
       description: [
         "Nothing is saved or reserved. Order: court fee (after automatic promotions) → promo code → membership hours → points → total → advance → wallet → toTransfer → pointsToEarn. All money is whole PKR.",
-        "- Promo code (optional): send `promoCode` (guests may add `guestEmail` so their own past uses are checked). A valid code gives `promo: {code, discount, description}`. A code that can't be used does NOT fail the price check: `promo` is null and `promoError: {code, reasonCode, message}` says why (PROMO_NOT_FOUND, PROMO_INACTIVE, PROMO_NOT_STARTED, PROMO_EXPIRED, PROMO_WRONG_SPORT, PROMO_MIN_FEE, PROMO_USED_UP, PROMO_ALREADY_USED, PROMO_NEW_CUSTOMERS_ONLY). Show the message next to the code box.",
+        "- Promo code (optional): send `promoCode` (guests may add `guestEmail` so their own past uses are checked). A valid code gives `promo: {code, discount, description}`. A code that can't be used does NOT fail the price check: `promo` is null and `promoError: {code, reasonCode, message}` says why (PROMO_NOT_FOUND, PROMO_INACTIVE, PROMO_NOT_STARTED, PROMO_EXPIRED, PROMO_WRONG_SPORT, PROMO_MIN_FEE, PROMO_USED_UP, PROMO_ALREADY_USED, PROMO_NEW_CUSTOMERS_ONLY; PROMO_APP_ONLY only on the website, never in the app). Show the message next to the code box.",
         "- hours (signed-in customers): the hours left for THIS court's sport. With `useHours: true` the customer's hours are used in half hours, up to the booking length; they pay the rest. hours.discount is the same share of the court fee (e.g. 1 h of a 1.5 h booking = 2/3 of the fee). When hours can't be used, canUse is false and reasonCode says why: NO_MEMBERSHIP, SPORT_NOT_INCLUDED, NO_HOURS_LEFT, WEEKDAYS_ONLY, EXPIRES_BEFORE_BOOKING. There is no book-ahead rule: hours can be used for any free slot, right up to its start.",
         "- Points are worked out on the fee left after hours. Hours, points and wallet can all be used together.",
         "- total = courtFee − promo discount − hours discount − points discount (wallet is money, not a discount).",

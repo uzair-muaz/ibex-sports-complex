@@ -7,7 +7,7 @@ import connectDB from "@/lib/mongodb";
 import PromoCode from "@/models/PromoCode";
 import PromoRedemption from "@/models/PromoRedemption";
 import Booking from "@/models/Booking";
-import { evaluatePromo, isValidCodeText, normaliseCode, PROMO_REASON_TEXT, type PromoCheck } from "@/lib/promo-rules";
+import { evaluatePromo, isValidCodeText, normaliseCode, PROMO_REASON_TEXT, type PromoChannel, type PromoCheck } from "@/lib/promo-rules";
 
 export type PromoCustomer = { userId?: string | null; email?: string | null };
 
@@ -17,6 +17,8 @@ export async function checkPromo(params: {
   sport: string;
   courtFee: number;
   customer: PromoCustomer;
+  /** Where the booking is made (default "app"). */
+  channel?: PromoChannel;
 }): Promise<PromoCheck & { promoId?: string }> {
   const code = normaliseCode(params.code);
   if (!isValidCodeText(code)) {
@@ -49,6 +51,7 @@ export async function checkPromo(params: {
     courtFee: params.courtFee,
     usesByCustomer,
     hasEarlierBooking: !!earlier,
+    channel: params.channel ?? "app",
   });
   return result.ok ? { ...result, promoId: promo!._id.toString() } : result;
 }

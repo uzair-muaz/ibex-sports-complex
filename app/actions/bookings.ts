@@ -31,7 +31,8 @@ import {
 } from '@/lib/discount-utils';
 import { calculateOriginalPrice } from '@/lib/pricing-utils';
 import type { AppliedDiscount } from '@/types';
-import { BUSINESS_TIMEZONE, toDateKeyInTimezone } from '@/lib/date-time';
+import { BUSINESS_TIMEZONE, getBusinessDateKey, toDateKeyInTimezone } from '@/lib/date-time';
+import { POINTS_APP_ONLY_TEXT, websiteWindowError } from '@/lib/app-first-rules';
 import {
   awardLoyaltyForCompletedBooking,
   redeemLoyaltyPoints,
@@ -250,6 +251,17 @@ export async function createBooking(
       throw new Error(lengthError);
     }
 
+    // App first (App Settings): limits for website customers. Staff are never limited.
+    if (!isStaffBooking) {
+      const { appFirst, sports } = await getAppSettings();
+      const appDays = sports.find((s) => s.sport === input.courtType)?.bookingWindowDays ?? null;
+      const windowError = websiteWindowError(appFirst, input.date, getBusinessDateKey(), appDays);
+      if (windowError) throw new Error(windowError);
+      if (appFirst.pointsAppOnly && (input.loyaltyPointsToRedeem ?? 0) > 0) {
+        throw new Error(POINTS_APP_ONLY_TEXT);
+      }
+    }
+
     // Validate duration increments (can be 1, 1.5, 2, 2.5, etc.)
     if (input.duration % 0.5 !== 0) {
       throw new Error('Duration must be in 30-minute increments');
@@ -364,6 +376,7 @@ export async function createBooking(
         sport: input.courtType,
         courtFee: finalPrice,
         customer: { userId: shouldLinkUser ? sessionUserId : null, email: input.userEmail },
+        channel: staffBooking ? "staff" : "web",
       });
       if (!check.ok) throw new Error(check.message);
       promo = { promoId: check.promoId!, code: check.code, discount: check.discount };

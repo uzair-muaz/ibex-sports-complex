@@ -71,6 +71,14 @@ export interface IAppSettings extends Document {
   membership?: { carryOverGraceDays?: number };
   /** Support FAQs. Empty/missing = the built-in ones (lib/faqs.ts). */
   faqs?: { question: string; answer: string }[] | null;
+  /** App-first rules (lib/app-settings.ts AppFirstRules). */
+  appFirst?: {
+    pointsAppOnly?: boolean;
+    websiteWindowOn?: boolean;
+    websiteBookingWindowDays?: number;
+    playStoreUrl?: string | null;
+    appStoreUrl?: string | null;
+  };
   updatedBy?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -167,6 +175,19 @@ const AppSettingsSchema = new Schema<IAppSettings>(
     },
     faqs: {
       type: [{ _id: false, question: { type: String, required: true }, answer: { type: String, required: true } }],
+      default: undefined,
+    },
+    appFirst: {
+      type: new Schema(
+        {
+          pointsAppOnly: { type: Boolean },
+          websiteWindowOn: { type: Boolean },
+          websiteBookingWindowDays: { type: Number, min: 1, max: 365 },
+          playStoreUrl: { type: String, default: null },
+          appStoreUrl: { type: String, default: null },
+        },
+        { _id: false },
+      ),
       default: undefined,
     },
     updatedBy: { type: String, default: null },
