@@ -46,7 +46,7 @@ import {
   useMyMembership,
   usePublicCourts,
 } from "@/lib/tanstack/hooks/queries";
-import { shiftDateKey } from "@/lib/date-time";
+import { getBusinessDateKey, shiftDateKey } from "@/lib/date-time";
 import { GetTheApp } from "@/components/GetTheApp";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
@@ -197,9 +197,10 @@ export default function BookingClient() {
     | null
     | undefined;
 
-  // Default to opening date if today is before it
+  // Start on today's date in Pakistan (not the visitor's own clock), or the opening date if later.
   const getInitialDate = () => {
-    const today = new Date();
+    const [y, m, d] = getBusinessDateKey().split("-").map(Number);
+    const today = new Date(y, m - 1, d);
     return today < COMPLEX_OPENING_DATE ? COMPLEX_OPENING_DATE : today;
   };
 
