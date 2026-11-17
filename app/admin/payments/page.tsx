@@ -150,7 +150,7 @@ export default function AdminPaymentsPage() {
           <div>
             <Text type="secondary">{when(r.submittedAt)}</Text>
           </div>
-          {r.source === "whatsapp" && <Tag>WhatsApp</Tag>}
+          <Tag>{r.channel === "whatsapp" ? "WhatsApp" : r.channel === "web" ? "Website" : "App"}</Tag>
         </div>
       ),
     },
