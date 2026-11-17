@@ -188,7 +188,8 @@ export default function AdminNewBookingPage() {
       message.success("Booking created successfully");
       const raw = result.booking as { _id?: string; id?: string };
       const id = raw._id ?? raw.id;
-      router.push(`/admin/bookings/${id ?? ""}`);
+      // There is no booking details page; open the edit page (or the list if the id is missing).
+      router.push(id ? `/admin/bookings/${id}/edit` : "/admin/bookings");
     } catch (err) {
       setErrorMessage(
         err instanceof Error ? err.message : "Failed to create booking",

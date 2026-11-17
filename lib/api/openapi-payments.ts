@@ -14,6 +14,7 @@ const proofExample = {
   amount: 3600,
   status: "submitted",
   source: "app",
+  channel: "app",
   submittedAt: "2026-11-02T15:10:00+05:00",
   imageUrl: "https://staging.ibexsportscomplex.com/api/v1/payment-proofs/6650c0ffee0000000000f031/file?exp=1794061847&sig=…",
   fileType: "jpg",

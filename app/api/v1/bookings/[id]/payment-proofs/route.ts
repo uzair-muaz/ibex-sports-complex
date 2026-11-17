@@ -43,6 +43,8 @@ export async function POST(request: Request, ctx: Ctx) {
       amount: form.get("amount"),
       transferReference: form.get("transferReference"),
       transferredAt: form.get("transferredAt"),
+      // The app sends a Bearer token or a guest code; the website uses its sign-in cookie.
+      channel: request.headers.get("authorization") || request.headers.get("x-guest-token") ? "app" : "web",
     });
     if (!result.ok) return apiError(result.error, result.status, request, { code: result.code });
 

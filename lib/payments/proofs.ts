@@ -88,7 +88,10 @@ export type MobileProof = {
   id: string;
   amount: number;
   status: IPaymentProof["status"];
-  source: IPaymentProof["source"];
+  /** Kept as before for the app: website uploads show as "app" (sent by the customer). */
+  source: "app" | "whatsapp";
+  /** Where it really came from, for staff: "app", "web" or "whatsapp". */
+  channel: IPaymentProof["source"];
   submittedAt: string | null;
   imageUrl: string | null;
   fileType: ProofFileType | null;
@@ -105,7 +108,8 @@ export function toMobileProof(p: ProofLike, baseUrl?: string): MobileProof {
     id,
     amount: p.amount,
     status: p.status,
-    source: p.source,
+    source: p.source === "whatsapp" ? "whatsapp" : "app",
+    channel: p.source,
     submittedAt: toPkIso(p.createdAt ?? null),
     imageUrl: p.fileKey ? proofFileUrl(id, Date.now(), baseUrl) : null,
     fileType: p.fileType ?? null,
@@ -188,6 +192,8 @@ export async function submitAppProof(params: {
   amount: unknown;
   transferReference?: unknown;
   transferredAt?: unknown;
+  /** "web" when sent from the website (cookie sign-in); default "app". */
+  channel?: "app" | "web";
 }): Promise<{ ok: true; proof: MobileProof } | ProofError> {
   const amount = parseAmount(params.amount);
   if (amount === null) {
@@ -227,7 +233,7 @@ export async function submitAppProof(params: {
   const proof = await PaymentProof.create({
     bookingId: params.bookingId,
     userId: params.userId,
-    source: "app",
+    source: params.channel ?? "app",
     amount,
     transferReference: reference,
     transferredAt,

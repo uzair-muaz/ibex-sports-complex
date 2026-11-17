@@ -10,7 +10,8 @@ export interface IPaymentProof extends Document {
   bookingId: Types.ObjectId;
   /** Who sent it (null for guests and for staff-added WhatsApp proofs). */
   userId?: Types.ObjectId | null;
-  source: "app" | "whatsapp";
+  /** Where it came from: the app, the website, or staff adding a WhatsApp screenshot. */
+  source: "app" | "web" | "whatsapp";
   /** Amount the customer says they sent, whole PKR. */
   amount: number;
   transferReference?: string | null;
@@ -34,7 +35,7 @@ const PaymentProofSchema = new Schema<IPaymentProof>(
   {
     bookingId: { type: Schema.Types.ObjectId, ref: "Booking", required: true, index: true },
     userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
-    source: { type: String, enum: ["app", "whatsapp"], required: true },
+    source: { type: String, enum: ["app", "web", "whatsapp"], required: true },
     amount: { type: Number, required: true, min: 0 },
     transferReference: { type: String, default: null, maxlength: 100 },
     transferredAt: { type: Date, default: null },
