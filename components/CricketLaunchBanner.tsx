@@ -7,34 +7,45 @@ import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 
-/** Box cricket launch: 21 Nov 2026, 00:00 Pakistan time. The banner stays hidden before this. */
-const SHOW_FROM = new Date("2026-11-21T00:00:00+05:00");
-const CLOSED_KEY = "ibex-cricket-banner-closed";
+/** Bookings open 22 Nov 2026, 00:00 Pakistan time. Before this the popup says "coming soon". */
+const BOOKINGS_OPEN = new Date("2026-11-22T00:00:00+05:00");
 
 /**
- * One-time announcement popup on the public site. Shown once per visit
- * (closing it hides it until the browser tab is opened again). Not shown on admin pages.
+ * Box cricket announcement popup on the public site. Shown once per visit
+ * (closing it hides it until the site is opened again). Not shown on admin pages.
+ * Until 22 Nov it says "coming soon"; from 22 Nov it says "now open" with a Book now button.
  */
 export function CricketLaunchBanner() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [isOpenForBooking, setIsOpenForBooking] = useState(false);
   const hidden = pathname?.startsWith("/admin");
+  const closedKey = `ibex-cricket-banner-closed-${isOpenForBooking ? "open" : "soon"}`;
 
   useEffect(() => {
-    if (hidden || Date.now() < SHOW_FROM.getTime()) return;
+    if (hidden) return;
+    const live = Date.now() >= BOOKINGS_OPEN.getTime();
     try {
-      if (sessionStorage.getItem(CLOSED_KEY)) return;
+      if (
+        sessionStorage.getItem(
+          `ibex-cricket-banner-closed-${live ? "open" : "soon"}`,
+        )
+      )
+        return;
     } catch {
       // Storage blocked: still show it.
     }
-    const t = setTimeout(() => setOpen(true), 400);
+    const t = setTimeout(() => {
+      setIsOpenForBooking(live);
+      setOpen(true);
+    }, 400);
     return () => clearTimeout(t);
   }, [hidden]);
 
   const close = () => {
     setOpen(false);
     try {
-      sessionStorage.setItem(CLOSED_KEY, "1");
+      sessionStorage.setItem(closedKey, "1");
     } catch {
       // Ignore.
     }
@@ -45,7 +56,7 @@ export function CricketLaunchBanner() {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (hidden) return null;
 
@@ -61,7 +72,10 @@ export function CricketLaunchBanner() {
           aria-modal="true"
           aria-labelledby="cricket-banner-title"
         >
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={close} />
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={close}
+          />
           <motion.div
             initial={{ scale: 0.95, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -90,29 +104,48 @@ export function CricketLaunchBanner() {
             </div>
 
             <div className="space-y-4 p-6 pt-2 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#2DD4BF]">Now open</p>
-              <h2 id="cricket-banner-title" className="text-2xl font-bold text-white md:text-3xl">
-                Box Cricket is here!
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#2DD4BF]">
+                {isOpenForBooking ? "Now open" : "Coming soon"}
+              </p>
+              <h2
+                id="cricket-banner-title"
+                className="text-2xl font-bold text-white md:text-3xl"
+              >
+                {isOpenForBooking
+                  ? "Box Cricket is here!"
+                  : "Box Cricket is coming to IBEX!"}
               </h2>
               <p className="text-zinc-400">
-                Box cricket is now open at IBEX Sports Complex. Bring your team and book your slot today.
+                {isOpenForBooking
+                  ? "Box cricket is now open at IBEX Sports Complex. Bring your team and book your slot today."
+                  : "Get your team ready. Box cricket bookings open on 22 November at IBEX Sports Complex."}
               </p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Link
-                  href="/booking"
-                  onClick={close}
-                  className="flex h-11 flex-1 items-center justify-center rounded-xl bg-[#2DD4BF] text-sm font-semibold text-[#0F172A] transition hover:bg-[#14B8A6]"
-                >
-                  Book now
-                </Link>
+              {isOpenForBooking ? (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Link
+                    href="/booking"
+                    onClick={close}
+                    className="flex h-11 flex-1 items-center justify-center rounded-xl bg-[#2DD4BF] text-sm font-semibold text-[#0F172A] transition hover:bg-[#14B8A6]"
+                  >
+                    Book now
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="flex h-11 flex-1 items-center justify-center rounded-xl border border-white/15 text-sm text-zinc-300 transition hover:bg-white/5"
+                  >
+                    Maybe later
+                  </button>
+                </div>
+              ) : (
                 <button
                   type="button"
                   onClick={close}
-                  className="flex h-11 flex-1 items-center justify-center rounded-xl border border-white/15 text-sm text-zinc-300 transition hover:bg-white/5"
+                  className="flex h-11 w-full items-center justify-center rounded-xl bg-[#2DD4BF] text-sm font-semibold text-[#0F172A] transition hover:bg-[#14B8A6]"
                 >
-                  Maybe later
+                  Can&apos;t wait!
                 </button>
-              </div>
+              )}
             </div>
           </motion.div>
         </motion.div>
