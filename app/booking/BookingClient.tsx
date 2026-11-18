@@ -30,6 +30,7 @@ import {
   type AvailableStartTimeQuote,
 } from "../actions/bookings";
 import { COMPLEX_OPENING_DATE, type CourtType } from "@/types";
+import { CRICKET_BOOKINGS_FROM } from "@/lib/cricket-launch";
 import { formatLocalDate, formatTime12 } from "@/lib/utils";
 import { useBusinessTime } from "@/components/booking/hooks/useBusinessTime";
 import { useBookingAvailability } from "@/components/booking/hooks/useBookingAvailability";
@@ -201,10 +202,24 @@ export default function BookingClient() {
     return new Date(y, m - 1, d);
   };
 
+  // Cricket can only be booked from its first day (22 Nov 2026).
+  const cricketNotOpenYet =
+    selectedCourtType === "CRICKET" &&
+    minSelectableDateKey < CRICKET_BOOKINGS_FROM;
+  const pickerMinDateKey = cricketNotOpenYet
+    ? CRICKET_BOOKINGS_FROM
+    : minSelectableDateKey;
+  /** When switching to cricket, move an earlier date to the first cricket day. */
+  const moveDateForCricket = (type: CourtType) => {
+    if (type === "CRICKET" && formatLocalDate(selectedDate) < CRICKET_BOOKINGS_FROM) {
+      setSelectedDate(dateKeyToLocalDate(CRICKET_BOOKINGS_FROM));
+    }
+  };
+
   const quickCheckMinDate = useMemo(() => {
-    const biz = dateKeyToLocalDate(minSelectableDateKey);
+    const biz = dateKeyToLocalDate(pickerMinDateKey);
     return COMPLEX_OPENING_DATE > biz ? COMPLEX_OPENING_DATE : biz;
-  }, [minSelectableDateKey]);
+  }, [pickerMinDateKey]);
 
   const [quickCheckDate, setQuickCheckDate] = useState<Date>(selectedDate);
   const quickCheckDateKey = useMemo(
@@ -232,6 +247,7 @@ export default function BookingClient() {
           if (!selectedCourtType && types.length > 0) {
             const firstType = types[0];
             setSelectedCourtType(firstType);
+            moveDateForCricket(firstType);
             setSelectedTypeCourts(courts.filter((c) => c.type === firstType));
           }
         }
@@ -604,9 +620,17 @@ export default function BookingClient() {
             activeKey={selectedCourtType}
             onSelect={(type) => {
               setSelectedCourtType(type as CourtType);
+              moveDateForCricket(type as CourtType);
               setSelectedQuote(null);
             }}
           />
+
+          {cricketNotOpenYet && (
+            <div className="mb-6 rounded-2xl border border-[#2DD4BF]/30 bg-[#2DD4BF]/10 p-4 text-sm text-[#2DD4BF]">
+              Box cricket opens soon! You can book now for 22 November and
+              later dates.
+            </div>
+          )}
 
           {canQuickCheck && (
             <div className="mb-6 flex justify-end">
@@ -916,7 +940,7 @@ export default function BookingClient() {
         goToNextMonth={goToNextMonth}
         calendarDays={calendarDays}
         selectedDate={selectedDate}
-        minSelectableDateKey={minSelectableDateKey}
+        minSelectableDateKey={pickerMinDateKey}
         onSelectDate={(date) => {
           setSelectedDate(date);
           setSelectedQuote(null);

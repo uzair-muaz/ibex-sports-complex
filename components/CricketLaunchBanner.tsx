@@ -13,7 +13,7 @@ const BOOKINGS_OPEN = new Date("2026-11-22T00:00:00+05:00");
 /**
  * Box cricket announcement popup on the public site. Shown once per visit
  * (closing it hides it until the site is opened again). Not shown on admin pages.
- * Until 22 Nov it says "coming soon"; from 22 Nov it says "now open" with a Book now button.
+ * Until 22 Nov it says "coming soon, book now for 22 Nov or later"; from 22 Nov it says "now open".
  */
 export function CricketLaunchBanner() {
   const pathname = usePathname();
@@ -118,34 +118,24 @@ export function CricketLaunchBanner() {
               <p className="text-zinc-400">
                 {isOpenForBooking
                   ? "Box cricket is now open at IBEX Sports Complex. Bring your team and book your slot today."
-                  : "Get your team ready. Box cricket bookings open on 22 November at IBEX Sports Complex."}
+                  : "Box cricket opens on 22 November. Bookings are open now: reserve your slot for 22 November or any later date."}
               </p>
-              {isOpenForBooking ? (
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Link
-                    href="/booking"
-                    onClick={close}
-                    className="flex h-11 flex-1 items-center justify-center rounded-xl bg-[#2DD4BF] text-sm font-semibold text-[#0F172A] transition hover:bg-[#14B8A6]"
-                  >
-                    Book now
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={close}
-                    className="flex h-11 flex-1 items-center justify-center rounded-xl border border-white/15 text-sm text-zinc-300 transition hover:bg-white/5"
-                  >
-                    Maybe later
-                  </button>
-                </div>
-              ) : (
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Link
+                  href="/booking"
+                  onClick={close}
+                  className="flex h-11 flex-1 items-center justify-center rounded-xl bg-[#2DD4BF] text-sm font-semibold text-[#0F172A] transition hover:bg-[#14B8A6]"
+                >
+                  Book now
+                </Link>
                 <button
                   type="button"
                   onClick={close}
-                  className="flex h-11 w-full items-center justify-center rounded-xl bg-[#2DD4BF] text-sm font-semibold text-[#0F172A] transition hover:bg-[#14B8A6]"
+                  className="flex h-11 flex-1 items-center justify-center rounded-xl border border-white/15 text-sm text-zinc-300 transition hover:bg-white/5"
                 >
-                  Can&apos;t wait!
+                  Maybe later
                 </button>
-              )}
+              </div>
             </div>
           </motion.div>
         </motion.div>

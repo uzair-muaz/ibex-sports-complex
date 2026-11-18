@@ -1,6 +1,7 @@
 'use server';
 
 import mongoose from 'mongoose';
+import { CRICKET_TOO_EARLY_MESSAGE, isCricketDateTooEarly } from '@/lib/cricket-launch';
 import connectDB from '@/lib/mongodb';
 import Booking from '@/models/Booking';
 import Court from '@/models/Court';
@@ -134,6 +135,10 @@ export async function createBooking(input: CreateBookingInput) {
     // Validate duration increments (can be 1, 1.5, 2, 2.5, etc.)
     if (input.duration % 0.5 !== 0) {
       throw new Error('Duration must be in 30-minute increments');
+    }
+
+    if (isCricketDateTooEarly(input.courtType, input.date)) {
+      throw new Error(CRICKET_TOO_EARLY_MESSAGE);
     }
 
     // Get all active courts of the selected type
@@ -339,6 +344,10 @@ export async function getAvailableStartTimes(
       return { success: false, error: 'Duration must be in 30-minute increments', startTimes: [] };
     }
 
+    if (isCricketDateTooEarly(input.courtType, input.date)) {
+      return { success: false, error: CRICKET_TOO_EARLY_MESSAGE, startTimes: [] };
+    }
+
     const courts = await Court.find({ type: input.courtType, isActive: true }).sort({ createdAt: 1 });
     if (courts.length === 0) {
       return { success: false, error: `No ${input.courtType} courts available`, startTimes: [] };
@@ -464,6 +473,10 @@ export async function getQuickSlotCourtAvailability(
 
     if (input.duration % 0.5 !== 0) {
       return { success: false, error: 'Duration must be in 30-minute increments', slots: [] };
+    }
+
+    if (isCricketDateTooEarly(input.courtType, input.date)) {
+      return { success: false, error: CRICKET_TOO_EARLY_MESSAGE, slots: [] };
     }
 
     const courts = await Court.find({ type: input.courtType, isActive: true }).sort({ createdAt: 1 });
