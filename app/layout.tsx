@@ -5,6 +5,7 @@ import { Providers } from "./providers";
 import { getBaseUrl } from "@/lib/utils";
 import { WhatsAppFloat } from "@/components/WhatsAppFloat";
 import { ConditionalWhatsApp } from "@/components/ConditionalWhatsApp";
+import { CricketLaunchBanner } from "@/components/CricketLaunchBanner";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -92,6 +93,7 @@ export default function RootLayout({
         <Providers>
           {children}
           <ConditionalWhatsApp />
+          <CricketLaunchBanner />
           <Analytics />
           <SpeedInsights />
         </Providers>
