@@ -122,7 +122,7 @@ export function CricketLaunchBanner() {
               </p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Link
-                  href="/booking"
+                  href="/booking?sport=CRICKET"
                   onClick={close}
                   className="flex h-11 flex-1 items-center justify-center rounded-xl bg-[#2DD4BF] text-sm font-semibold text-[#0F172A] transition hover:bg-[#14B8A6]"
                 >
