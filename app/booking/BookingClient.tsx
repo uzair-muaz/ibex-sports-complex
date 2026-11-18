@@ -245,7 +245,12 @@ export default function BookingClient() {
           // Default to the first court type, and derive courts locally from the
           // already-fetched list to avoid a second network call.
           if (!selectedCourtType && types.length > 0) {
-            const firstType = types[0];
+            // A link like /booking?sport=CRICKET (from the cricket popup) picks that sport.
+            const wanted = new URLSearchParams(window.location.search)
+              .get("sport")
+              ?.toUpperCase() as CourtType | undefined;
+            const firstType =
+              wanted && types.includes(wanted) ? wanted : types[0];
             setSelectedCourtType(firstType);
             moveDateForCricket(firstType);
             setSelectedTypeCourts(courts.filter((c) => c.type === firstType));
